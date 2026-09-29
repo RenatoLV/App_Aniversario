@@ -19,6 +19,7 @@ class CatActor extends StatefulWidget {
   final bool movable;
   final bool feeding;
   final bool digging;
+  final bool crying;
   final double packProgress;
   final VoidCallback? onPet;
 
@@ -33,6 +34,7 @@ class CatActor extends StatefulWidget {
     this.movable = false,
     this.feeding = false,
     this.digging = false,
+    this.crying = false,
     this.packProgress = 0,
     this.onPet,
   });
@@ -196,6 +198,7 @@ class _CatActorState extends State<CatActor> with TickerProviderStateMixin {
                       reaction: _reaction,
                       feeding: widget.feeding,
                       digging: widget.digging,
+                      crying: widget.crying,
                       packProgress: widget.packProgress,
                     ),
                   ),
@@ -229,6 +232,7 @@ class _CatPainter extends CustomPainter {
   final int reaction;
   final bool feeding;
   final bool digging;
+  final bool crying;
   final double packProgress;
   const _CatPainter({
     required this.cat,
@@ -241,6 +245,7 @@ class _CatPainter extends CustomPainter {
     required this.reaction,
     required this.feeding,
     required this.digging,
+    required this.crying,
     required this.packProgress,
   });
 
@@ -483,8 +488,29 @@ class _CatPainter extends CustomPainter {
       }
       if (!blink && !sleeping) {
         ellipse(canvas, x, 43, 7, 8, amber);
-        ellipse(canvas, x + gaze * 2, 43, 2.3, 7, const Color(0xff211b17));
+        ellipse(
+          canvas,
+          x + gaze * 2,
+          crying ? 45 : 43,
+          2.3,
+          crying ? 5 : 7,
+          const Color(0xff211b17),
+        );
         ellipse(canvas, x - 2, 39, 2, 2, Colors.white);
+      }
+      if (crying && !sleeping) {
+        final brow = Path()
+          ..moveTo(x - 7, 32 + (x < 50 ? 3 : 0))
+          ..quadraticBezierTo(x, 28, x + 7, 32 + (x > 50 ? 3 : 0));
+        path(canvas, brow, dark, style: PaintingStyle.stroke, width: 2.3);
+        final fall = (phase * 2 + (x > 50 ? .45 : 0)) % 1;
+        final tearY = 52 + fall * 22;
+        final tear = Path()
+          ..moveTo(x, tearY - 5)
+          ..quadraticBezierTo(x - 5, tearY + 2, x, tearY + 6)
+          ..quadraticBezierTo(x + 5, tearY + 2, x, tearY - 5)
+          ..close();
+        path(canvas, tear, const Color(0xff5bc8ff).withValues(alpha: .85));
       }
     }
     ellipse(
@@ -496,8 +522,21 @@ class _CatPainter extends CustomPainter {
       maru ? const Color(0xff7e5b55) : const Color(0xffeaa6b3),
     );
     line(canvas, 50, 56, 50, 60, maru ? dark : const Color(0xff8b8588), 1.5);
-    line(canvas, 50, 60, 45, 62, maru ? dark : const Color(0xff8b8588), 1.3);
-    line(canvas, 50, 60, 55, 62, maru ? dark : const Color(0xff8b8588), 1.3);
+    if (crying && !sleeping) {
+      final sadMouth = Path()
+        ..moveTo(42, 65)
+        ..quadraticBezierTo(50, 57, 58, 65);
+      path(
+        canvas,
+        sadMouth,
+        maru ? dark : const Color(0xff8b8588),
+        style: PaintingStyle.stroke,
+        width: 2,
+      );
+    } else {
+      line(canvas, 50, 60, 45, 62, maru ? dark : const Color(0xff8b8588), 1.3);
+      line(canvas, 50, 60, 55, 62, maru ? dark : const Color(0xff8b8588), 1.3);
+    }
     if (feeding && !sleeping) {
       final lick = (math.sin(phase * math.pi * 8) + 1) / 2;
       ellipse(
@@ -616,6 +655,7 @@ class _CatPainter extends CustomPainter {
       old.action != action ||
       old.feeding != feeding ||
       old.digging != digging ||
+      old.crying != crying ||
       old.packProgress != packProgress ||
       old.cat != cat;
 }

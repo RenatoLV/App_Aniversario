@@ -29,6 +29,8 @@ Color rarityColor(CardRarity rarity) => switch (rarity) {
   CardRarity.legendary => const Color(0xffffd55e),
 };
 
+enum _CollectionSort { rarity, name, copies }
+
 class RinconApp extends StatelessWidget {
   final GameStore store;
   const RinconApp({super.key, required this.store});
@@ -69,6 +71,11 @@ class RinconHome extends StatefulWidget {
 class _RinconHomeState extends State<RinconHome>
     with SingleTickerProviderStateMixin {
   int page = 0;
+  String _collectionQuery = '';
+  final TextEditingController _collectionSearch = TextEditingController();
+  CardRarity? _collectionRarity;
+  _CollectionSort _collectionSort = _CollectionSort.rarity;
+  bool _collectionOwnedOnly = false;
   late final AnimationController _packAnimation;
   bool _openingPack = false;
   Map<String, dynamic>? _cloudMember;
@@ -177,6 +184,7 @@ class _RinconHomeState extends State<RinconHome>
   @override
   void dispose() {
     _packAnimation.dispose();
+    _collectionSearch.dispose();
     super.dispose();
   }
 
@@ -840,18 +848,41 @@ class _RinconHomeState extends State<RinconHome>
     ],
   );
   Widget collection() {
+    final query = _collectionQuery.trim().toLowerCase();
+    final rarityCounts = {
+      for (final rarity in CardRarity.values)
+        rarity: s.cards.keys
+            .where((id) => (s.rarities[id] ?? CardRarity.common) == rarity)
+            .length,
+    };
     final order = List<int>.generate(cardNames.length, (i) => i)
+      ..removeWhere((i) {
+        final owned = s.cards.containsKey(i);
+        if (_collectionOwnedOnly && !owned) return true;
+        if (_collectionRarity != null &&
+            (!owned ||
+                (s.rarities[i] ?? CardRarity.common) != _collectionRarity)) {
+          return true;
+        }
+        return query.isNotEmpty &&
+            (!owned || !cardNames[i].toLowerCase().contains(query));
+      })
       ..sort((a, b) {
         final owned =
             (s.cards.containsKey(b) ? 1 : 0) - (s.cards.containsKey(a) ? 1 : 0);
         if (owned != 0) return owned;
-        final quality =
-            (s.rarities[b] ?? CardRarity.common).index -
-            (s.rarities[a] ?? CardRarity.common).index;
-        if (quality != 0) return quality;
-        final sample =
-            (a < sampleCardCount ? 1 : 0) - (b < sampleCardCount ? 1 : 0);
-        return sample != 0 ? sample : a.compareTo(b);
+        return switch (_collectionSort) {
+          _CollectionSort.rarity =>
+            (s.rarities[b] ?? CardRarity.common).index.compareTo(
+              (s.rarities[a] ?? CardRarity.common).index,
+            ),
+          _CollectionSort.name => cardNames[a].toLowerCase().compareTo(
+            cardNames[b].toLowerCase(),
+          ),
+          _CollectionSort.copies => (s.cards[b] ?? 0).compareTo(
+            s.cards[a] ?? 0,
+          ),
+        };
       });
     return ListView(
       padding: const EdgeInsets.all(24),
@@ -878,101 +909,193 @@ class _RinconHomeState extends State<RinconHome>
           ],
         ),
         const SizedBox(height: 12),
+        TextField(
+          controller: _collectionSearch,
+          decoration: InputDecoration(
+            hintText: 'Buscar entre tus cartas',
+            prefixIcon: const Icon(Icons.search),
+            suffixIcon: _collectionQuery.isEmpty
+                ? null
+                : IconButton(
+                    tooltip: 'Limpiar búsqueda',
+                    onPressed: () {
+                      _collectionSearch.clear();
+                      setState(() => _collectionQuery = '');
+                    },
+                    icon: const Icon(Icons.close),
+                  ),
+            filled: true,
+            fillColor: Colors.white,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: const BorderSide(color: Color(0xffded5c6)),
+            ),
+          ),
+          onChanged: (value) => setState(() => _collectionQuery = value),
+        ),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 7,
+          runSpacing: 7,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            ChoiceChip(
+              label: const Text('Todas'),
+              selected: _collectionRarity == null,
+              onSelected: (_) => setState(() => _collectionRarity = null),
+            ),
+            for (final rarity in CardRarity.values)
+              ChoiceChip(
+                avatar: Icon(
+                  Icons.auto_awesome,
+                  size: 16,
+                  color: rarityColor(rarity),
+                ),
+                label: Text('${rarity.label} ${rarityCounts[rarity]}'),
+                selected: _collectionRarity == rarity,
+                onSelected: (_) => setState(() => _collectionRarity = rarity),
+              ),
+            FilterChip(
+              label: const Text('Descubiertas'),
+              selected: _collectionOwnedOnly,
+              onSelected: (value) =>
+                  setState(() => _collectionOwnedOnly = value),
+            ),
+            DropdownButton<_CollectionSort>(
+              value: _collectionSort,
+              borderRadius: BorderRadius.circular(14),
+              onChanged: (value) {
+                if (value != null) setState(() => _collectionSort = value);
+              },
+              items: const [
+                DropdownMenuItem(
+                  value: _CollectionSort.rarity,
+                  child: Text('Orden: calidad'),
+                ),
+                DropdownMenuItem(
+                  value: _CollectionSort.name,
+                  child: Text('Orden: nombre'),
+                ),
+                DropdownMenuItem(
+                  value: _CollectionSort.copies,
+                  child: Text('Orden: copias'),
+                ),
+              ],
+            ),
+            Text(
+              '${order.length} resultados',
+              style: const TextStyle(fontSize: 12, color: Color(0xff69776d)),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
         const _CatPair(
           compact: true,
           caption: 'Maru y Lady vigilan la colección.',
           action: CatAction.collection,
         ),
         const SizedBox(height: 24),
-        LayoutBuilder(
-          builder: (context, constraints) => GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: cardNames.length,
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: constraints.maxWidth >= 1050
-                  ? 5
-                  : constraints.maxWidth >= 740
-                  ? 4
-                  : constraints.maxWidth >= 520
-                  ? 3
-                  : 2,
-              childAspectRatio: .73,
-              crossAxisSpacing: 12,
-              mainAxisSpacing: 12,
+        if (order.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 48),
+            child: Center(
+              child: Text(
+                'No encontramos cartas con esos filtros 🐾',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Color(0xff69776d)),
+              ),
             ),
-            itemBuilder: (context, displayIndex) {
-              final i = order[displayIndex];
-              final unlocked = s.cards.containsKey(i);
-              return InkWell(
-                onTap: unlocked
-                    ? () => showDialog<void>(
-                        context: context,
-                        builder: (_) => _InspectCardDialog(
-                          cardId: i,
-                          copies: s.cards[i]!,
-                          rarity: s.rarities[i] ?? CardRarity.common,
-                        ),
-                      )
-                    : null,
-                borderRadius: BorderRadius.circular(20),
-                child: _RarityFrame(
-                  rarity: unlocked
-                      ? s.rarities[i] ?? CardRarity.common
-                      : CardRarity.common,
-                  locked: !unlocked,
-                  child: Container(
-                    padding: const EdgeInsets.all(12),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(
-                          child: unlocked
-                              ? _CardArt(cardId: i)
-                              : const Center(
-                                  child: Text(
-                                    '?',
-                                    style: TextStyle(
-                                      fontSize: 46,
-                                      color: green,
+          )
+        else
+          LayoutBuilder(
+            builder: (context, constraints) => GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: cardNames.length,
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: constraints.maxWidth >= 1050
+                    ? 5
+                    : constraints.maxWidth >= 740
+                    ? 4
+                    : constraints.maxWidth >= 520
+                    ? 3
+                    : 2,
+                childAspectRatio: .73,
+                crossAxisSpacing: 12,
+                mainAxisSpacing: 12,
+              ),
+              itemBuilder: (context, displayIndex) {
+                final i = order[displayIndex];
+                final unlocked = s.cards.containsKey(i);
+                return InkWell(
+                  onTap: unlocked
+                      ? () => showDialog<void>(
+                          context: context,
+                          builder: (_) => _InspectCardDialog(
+                            cardId: i,
+                            copies: s.cards[i]!,
+                            rarity: s.rarities[i] ?? CardRarity.common,
+                          ),
+                        )
+                      : null,
+                  borderRadius: BorderRadius.circular(20),
+                  child: _RarityFrame(
+                    rarity: unlocked
+                        ? s.rarities[i] ?? CardRarity.common
+                        : CardRarity.common,
+                    locked: !unlocked,
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: unlocked
+                                ? _CardArt(cardId: i)
+                                : const Center(
+                                    child: Text(
+                                      '?',
+                                      style: TextStyle(
+                                        fontSize: 46,
+                                        color: green,
+                                      ),
                                     ),
                                   ),
-                                ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          unlocked ? cardNames[i] : 'Por descubrir',
-                          textAlign: TextAlign.center,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: unlocked ? Colors.white : ink,
                           ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          unlocked
-                              ? '${(s.rarities[i] ?? CardRarity.common).label.toUpperCase()}  ·  ×${s.cards[i]}'
-                              : 'Abre un sobre',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w900,
-                            color: unlocked
-                                ? rarityColor(
-                                    s.rarities[i] ?? CardRarity.common,
-                                  )
-                                : ink,
+                          const SizedBox(height: 8),
+                          Text(
+                            unlocked ? cardNames[i] : 'Por descubrir',
+                            textAlign: TextAlign.center,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: unlocked ? Colors.white : ink,
+                            ),
                           ),
-                        ),
-                      ],
+                          const SizedBox(height: 8),
+                          Text(
+                            unlocked
+                                ? '${(s.rarities[i] ?? CardRarity.common).label.toUpperCase()}  ·  ×${s.cards[i]}'
+                                : 'Abre un sobre',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w900,
+                              color: unlocked
+                                  ? rarityColor(
+                                      s.rarities[i] ?? CardRarity.common,
+                                    )
+                                  : ink,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-              );
-            },
+                );
+              },
+            ),
           ),
-        ),
       ],
     );
   }
@@ -1973,7 +2096,7 @@ class _GameOverDialog extends StatelessWidget {
               ),
               const SizedBox(height: 5),
               const Text(
-                'Maru y Lady te esperan para otra ronda',
+                'Maru y Lady están tristes… ¡quieren otra ronda!',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Color(0xffe1d5f7), fontSize: 12),
               ),
@@ -1986,16 +2109,18 @@ class _GameOverDialog extends StatelessWidget {
                     size: 88,
                     action: CatAction.blocks,
                     active: true,
+                    crying: true,
                     showLabel: false,
                   ),
                   SizedBox(width: 18),
-                  Icon(Icons.favorite, color: Color(0xffff91bd), size: 24),
+                  Text('💔', style: TextStyle(fontSize: 24)),
                   SizedBox(width: 18),
                   CatActor(
                     cat: CatKind.lady,
                     size: 88,
                     action: CatAction.blocks,
                     active: true,
+                    crying: true,
                     showLabel: false,
                   ),
                 ],
