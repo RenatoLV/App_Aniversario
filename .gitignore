@@ -1,0 +1,15 @@
+.tools/
+**/.dart_tool/
+**/build/
+**/local.properties
+**/key.properties
+**/*.jks
+**/*.keystore
+.env*
+!.env.example
+config.local.json
+app/config.local.json
+supabase/activation.local.txt
+supabase/seed.local.sql
+supabase/deploy.local.sql
+app/config.local.json
