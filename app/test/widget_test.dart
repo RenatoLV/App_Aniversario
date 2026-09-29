@@ -5,6 +5,30 @@ import 'package:nuestro_rincon/home.dart';
 import 'package:nuestro_rincon/store.dart';
 
 void main() {
+  testWidgets('Collection rarity filter renders only matching cards', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    SharedPreferences.setMockInitialValues({});
+    final prefs = await SharedPreferences.getInstance();
+    final store = GameStore(prefs)
+      ..cards = {6: 1}
+      ..rarities = {6: CardRarity.legendary};
+
+    await tester.pumpWidget(RinconApp(store: store));
+    await tester.tap(find.text('Colección'));
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.tap(find.text('Legendaria 1'));
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(find.text(cardNames[6]), findsOneWidget);
+    expect(find.text('1 resultados'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('Purchase and note survive reload at mobile size', (
     tester,
   ) async {

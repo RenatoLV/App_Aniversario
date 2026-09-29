@@ -1011,7 +1011,7 @@ class _RinconHomeState extends State<RinconHome>
             builder: (context, constraints) => GridView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
-              itemCount: cardNames.length,
+              itemCount: order.length,
               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: constraints.maxWidth >= 1050
                     ? 5
