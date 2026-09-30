@@ -494,7 +494,7 @@ class _WordleScreenState extends State<WordleScreen>
   Widget build(BuildContext context) {
     if (_loading) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Palabras & bigotes')),
+        appBar: AppBar(title: const Text('Wordlady')),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
@@ -507,7 +507,7 @@ class _WordleScreenState extends State<WordleScreen>
       }
     }
     return Scaffold(
-      appBar: AppBar(title: const Text('Palabras & bigotes')),
+      appBar: AppBar(title: const Text('Wordlady')),
       body: Focus(
         focusNode: _focus,
         autofocus: true,

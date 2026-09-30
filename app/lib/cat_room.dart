@@ -3,11 +3,13 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'cat_character.dart';
 
-enum _RoomMoment { cuddle, churu, litter, thoughts, yarn, window, food }
+enum _RoomMoment { cuddle, churu, litter, thoughts, yarn, window, food, cards }
 
 /// A small autonomous room. All props and movements share its coordinates.
 class CatRoom extends StatefulWidget {
-  const CatRoom({super.key});
+  final List<int> ownedCards;
+  final Widget Function(int)? cardBuilder;
+  const CatRoom({super.key, this.ownedCards = const [], this.cardBuilder});
   @override
   State<CatRoom> createState() => _CatRoomState();
 }
@@ -22,6 +24,41 @@ class _CatRoomState extends State<CatRoom> with TickerProviderStateMixin {
   _RoomMoment _moment = _RoomMoment.cuddle;
   bool _maruTurn = true;
   int _thought = 0;
+  final Map<CatKind, int> _heldCards = {};
+  late final AnimationController _drawCards;
+  late final AnimationController _hop;
+  Timer? _hopTimer;
+  CatKind? _hopping, _dragging;
+  double _hopHeight = 24;
+  final Map<CatKind, Offset> _positions = {};
+  Offset _dragStart = Offset.zero;
+
+  void _scheduleHop() {
+    _hopTimer = Timer(Duration(seconds: 7 + _random.nextInt(12)), () {
+      if (!mounted) return;
+      if (_dragging == null &&
+          _moment != _RoomMoment.litter &&
+          _moment != _RoomMoment.food) {
+        setState(() {
+          _hopping = CatKind.values[_random.nextInt(CatKind.values.length)];
+          _hopHeight = 18 + _random.nextDouble() * 24;
+        });
+        _hop.forward(from: 0);
+      }
+      _scheduleHop();
+    });
+  }
+
+  void _pickCards() {
+    _heldCards.clear();
+    final pool = widget.ownedCards.toList()..shuffle(_random);
+    if (pool.isEmpty) return;
+    for (final cat in CatKind.values) {
+      _heldCards[cat] = pool[cat.index % pool.length];
+    }
+    _drawCards.forward(from: 0);
+  }
+
   final _maruThoughts = const [
     '🐟 ¿Y si aparece un atún?',
     '💛 Lady es mi lugar feliz',
@@ -54,6 +91,19 @@ class _CatRoomState extends State<CatRoom> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
+    _hop = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 850),
+    );
+    _scheduleHop();
+    _drawCards = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2200),
+    );
+    if (widget.ownedCards.isNotEmpty) {
+      _moment = _RoomMoment.cards;
+      _pickCards();
+    }
     _purr = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1800),
@@ -66,8 +116,8 @@ class _CatRoomState extends State<CatRoom> with TickerProviderStateMixin {
     _detailTimer = Timer.periodic(const Duration(seconds: 6), (_) {
       if (!mounted) return;
       setState(() {
-        _maruTurn = !_maruTurn;
-        _thought = (_thought + 1) % 12;
+        if (_dragging == null) _maruTurn = _random.nextBool();
+        _thought = (_thought + 1 + _random.nextInt(11)) % 12;
       });
     });
   }
@@ -76,18 +126,39 @@ class _CatRoomState extends State<CatRoom> with TickerProviderStateMixin {
     _sceneTimer?.cancel();
     _sceneTimer = Timer(Duration(seconds: 13 + _random.nextInt(5)), () {
       if (!mounted) return;
+      if (_dragging != null) {
+        _schedule();
+        return;
+      }
       if (_queue.isEmpty) {
         _queue.addAll(
-          _RoomMoment.values.where((m) => m != _moment).toList()
+          _RoomMoment.values
+              .where(
+                (m) =>
+                    m != _moment &&
+                    (m != _RoomMoment.cards || widget.ownedCards.isNotEmpty),
+              )
+              .toList()
             ..shuffle(_random),
         );
       }
       setState(() {
+        _queue.removeWhere((m) => m == _moment);
         _moment = _queue.removeAt(0);
         _maruTurn = _random.nextBool();
+        if (_moment == _RoomMoment.cards) _pickCards();
       });
       _schedule();
     });
+  }
+
+  @override
+  void didUpdateWidget(covariant CatRoom oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.ownedCards.isEmpty && widget.ownedCards.isNotEmpty) {
+      _moment = _RoomMoment.cards;
+      _pickCards();
+    }
   }
 
   @override
@@ -96,6 +167,9 @@ class _CatRoomState extends State<CatRoom> with TickerProviderStateMixin {
     _detailTimer?.cancel();
     _life.dispose();
     _purr.dispose();
+    _drawCards.dispose();
+    _hopTimer?.cancel();
+    _hop.dispose();
     super.dispose();
   }
 
@@ -122,7 +196,9 @@ class _CatRoomState extends State<CatRoom> with TickerProviderStateMixin {
         final churu = _moment == _RoomMoment.churu;
         final thoughts = _moment == _RoomMoment.thoughts;
         final yarn = _moment == _RoomMoment.yarn;
+        final cards = _moment == _RoomMoment.cards;
         final caption = switch (_moment) {
+          _RoomMoment.cards => '¡Mira los tesoros que encontramos!',
           _RoomMoment.cuddle => 'Maru y Lady, juntitos en casa',
           _RoomMoment.churu =>
             _maruTurn
@@ -292,7 +368,7 @@ class _CatRoomState extends State<CatRoom> with TickerProviderStateMixin {
                             ? 14
                             : 16 - (thoughts ? catSize * .82 : catSize) * .06,
                         child: AnimatedBuilder(
-                          animation: _life,
+                          animation: Listenable.merge([_life, _hop]),
                           builder: (context, _) {
                             final t = _life.value;
                             final side = cat == CatKind.maru ? 1.0 : -1.0;
@@ -308,74 +384,243 @@ class _CatRoomState extends State<CatRoom> with TickerProviderStateMixin {
                             final cuddle = _moment == _RoomMoment.cuddle
                                 ? math.sin(t * math.pi) * 8 * side
                                 : 0.0;
-                            return Transform.translate(
-                              offset: Offset(cuddle, -jump),
-                              child: Transform.rotate(
-                                angle: eats
-                                    ? math.sin(t * math.pi * 8) * .025
-                                    : digs
-                                    ? math.sin(t * math.pi * 12) * .035
-                                    : 0,
-                                child: Stack(
-                                  clipBehavior: Clip.none,
-                                  children: [
-                                    CatActor(
-                                      cat: cat,
-                                      size: digs || munches
-                                          ? catSize * .88
-                                          : thoughts
-                                          ? catSize * .82
-                                          : catSize,
-                                      action: digs || eats || munches || yarn
-                                          ? CatAction.blocks
-                                          : CatAction.idle,
-                                      active: digs || eats || munches || yarn,
-                                      munching: munches,
-                                      feeding: eats,
-                                      digging: digs,
-                                      focus: _moment == _RoomMoment.window
-                                          ? -.6
-                                          : side * .4,
-                                      movable: !litter && !meal,
-                                      showLabel: false,
-                                      showShadow: false,
-                                      onPet: () => _pet(cat),
+                            final baseX =
+                                (litter || meal) &&
+                                    (cat == CatKind.maru) == _maruTurn
+                                ? width / 2 - catSize * .44
+                                : cat == CatKind.maru
+                                ? 5.0
+                                : width - catSize - 5;
+                            final position = _positions[cat] ?? Offset.zero;
+                            final hop = _hopping == cat && _dragging != cat
+                                ? math.sin(_hop.value * math.pi) * _hopHeight
+                                : 0.0;
+                            return GestureDetector(
+                              onLongPressStart: (_) {
+                                _dragStart = position;
+                                setState(() => _dragging = cat);
+                              },
+                              onLongPressMoveUpdate: (details) => setState(() {
+                                _positions[cat] = Offset(
+                                  (_dragStart.dx + details.offsetFromOrigin.dx)
+                                      .clamp(-baseX, width - catSize - baseX),
+                                  (_dragStart.dy + details.offsetFromOrigin.dy)
+                                      .clamp(-(height - catSize - 24), 0.0),
+                                );
+                              }),
+                              onLongPressEnd: (_) =>
+                                  setState(() => _dragging = null),
+                              onLongPressCancel: () =>
+                                  setState(() => _dragging = null),
+                              child: Transform.translate(
+                                offset:
+                                    position +
+                                    Offset(
+                                      cuddle,
+                                      -jump - hop - (_dragging == cat ? 5 : 0),
                                     ),
-                                    if (_purring == cat)
-                                      Positioned(
-                                        top: -6,
-                                        right: 5,
-                                        child: IgnorePointer(
-                                          child: AnimatedBuilder(
-                                            animation: _purr,
-                                            builder: (context, _) => Opacity(
-                                              opacity: (1 - _purr.value).clamp(
-                                                0.0,
-                                                1.0,
+                                child: Transform.rotate(
+                                  angle: eats
+                                      ? math.sin(t * math.pi * 8) * .025
+                                      : digs
+                                      ? math.sin(t * math.pi * 12) * .035
+                                      : 0,
+                                  child: Stack(
+                                    clipBehavior: Clip.none,
+                                    children: [
+                                      CatActor(
+                                        cat: cat,
+                                        size: digs || munches
+                                            ? catSize * .88
+                                            : thoughts
+                                            ? catSize * .82
+                                            : catSize,
+                                        action: cards
+                                            ? CatAction.collection
+                                            : digs || eats || munches || yarn
+                                            ? CatAction.blocks
+                                            : CatAction.idle,
+                                        active:
+                                            cards ||
+                                            digs ||
+                                            eats ||
+                                            munches ||
+                                            yarn,
+                                        munching: munches,
+                                        feeding: eats,
+                                        digging: digs,
+                                        focus: _moment == _RoomMoment.window
+                                            ? -.6
+                                            : side * .4,
+                                        movable: false,
+                                        showLabel: false,
+                                        showShadow: false,
+                                        onPet: () => _pet(cat),
+                                      ),
+                                      if (cards && _heldCards.containsKey(cat))
+                                        Positioned(
+                                          left:
+                                              catSize *
+                                              (cat == CatKind.maru ? .54 : .17),
+                                          top: catSize * .52,
+                                          child: IgnorePointer(
+                                            child: AnimatedBuilder(
+                                              animation: _drawCards,
+                                              builder: (context, child) {
+                                                final progress = Curves
+                                                    .easeOutCubic
+                                                    .transform(
+                                                      ((_drawCards.value -
+                                                                  cat.index *
+                                                                      .2) /
+                                                              .8)
+                                                          .clamp(0.0, 1.0),
+                                                    );
+                                                return Opacity(
+                                                  opacity: progress,
+                                                  child: Transform.translate(
+                                                    offset: Offset(
+                                                      side *
+                                                          (1 - progress) *
+                                                          25,
+                                                      (1 - progress) *
+                                                          catSize *
+                                                          .4,
+                                                    ),
+                                                    child: Transform.rotate(
+                                                      angle:
+                                                          side *
+                                                          (-.15 +
+                                                              (1 - progress) *
+                                                                  .65),
+                                                      child: child,
+                                                    ),
+                                                  ),
+                                                );
+                                              },
+                                              child: Stack(
+                                                children: [
+                                                  Container(
+                                                    width: catSize * .3,
+                                                    height: catSize * .4,
+                                                    padding:
+                                                        const EdgeInsets.all(3),
+                                                    decoration: BoxDecoration(
+                                                      gradient:
+                                                          const LinearGradient(
+                                                            colors: [
+                                                              Color(0xffdca6ff),
+                                                              Color(0xff6940a6),
+                                                            ],
+                                                          ),
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                            6,
+                                                          ),
+                                                      border: Border.all(
+                                                        color: Colors.white,
+                                                        width: 1.5,
+                                                      ),
+                                                      boxShadow: const [
+                                                        BoxShadow(
+                                                          color: Color(
+                                                            0x33000000,
+                                                          ),
+                                                          blurRadius: 5,
+                                                          offset: Offset(0, 3),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                    child: ClipRRect(
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                            3,
+                                                          ),
+                                                      child:
+                                                          widget.cardBuilder
+                                                              ?.call(
+                                                                _heldCards[cat]!,
+                                                              ) ??
+                                                          const Icon(
+                                                            Icons.pets,
+                                                          ),
+                                                    ),
+                                                  ),
+                                                  Positioned(
+                                                    right: cat == CatKind.maru
+                                                        ? null
+                                                        : 0,
+                                                    left: cat == CatKind.maru
+                                                        ? 0
+                                                        : null,
+                                                    bottom: 8,
+                                                    child: Container(
+                                                      width: catSize * .1,
+                                                      height: catSize * .08,
+                                                      decoration: BoxDecoration(
+                                                        color:
+                                                            cat == CatKind.maru
+                                                            ? const Color(
+                                                                0xff777269,
+                                                              )
+                                                            : const Color(
+                                                                0xfffff9ef,
+                                                              ),
+                                                        borderRadius:
+                                                            BorderRadius.circular(
+                                                              10,
+                                                            ),
+                                                        border: Border.all(
+                                                          color: const Color(
+                                                            0xff887d73,
+                                                          ),
+                                                          width: .8,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
                                               ),
-                                              child: Transform.translate(
-                                                offset: Offset(
-                                                  0,
-                                                  -_purr.value * 30,
-                                                ),
-                                                child: Transform.scale(
-                                                  scale:
-                                                      1 +
-                                                      math.sin(
-                                                            _purr.value *
-                                                                math.pi *
-                                                                4,
-                                                          ) *
-                                                          .12,
-                                                  child: const Text(
-                                                    '♥\nprrr…',
-                                                    textAlign: TextAlign.center,
-                                                    style: TextStyle(
-                                                      fontSize: 22,
-                                                      height: 1.1,
-                                                      color: Color(0xffdb759b),
-                                                      fontWeight:
-                                                          FontWeight.w800,
+                                            ),
+                                          ),
+                                        ),
+                                      if (_purring == cat)
+                                        Positioned(
+                                          top: -6,
+                                          right: 5,
+                                          child: IgnorePointer(
+                                            child: AnimatedBuilder(
+                                              animation: _purr,
+                                              builder: (context, _) => Opacity(
+                                                opacity: (1 - _purr.value)
+                                                    .clamp(0.0, 1.0),
+                                                child: Transform.translate(
+                                                  offset: Offset(
+                                                    0,
+                                                    -_purr.value * 30,
+                                                  ),
+                                                  child: Transform.scale(
+                                                    scale:
+                                                        1 +
+                                                        math.sin(
+                                                              _purr.value *
+                                                                  math.pi *
+                                                                  4,
+                                                            ) *
+                                                            .12,
+                                                    child: const Text(
+                                                      '♥\nprrr…',
+                                                      textAlign:
+                                                          TextAlign.center,
+                                                      style: TextStyle(
+                                                        fontSize: 22,
+                                                        height: 1.1,
+                                                        color: Color(
+                                                          0xffdb759b,
+                                                        ),
+                                                        fontWeight:
+                                                            FontWeight.w800,
+                                                      ),
                                                     ),
                                                   ),
                                                 ),
@@ -383,36 +628,14 @@ class _CatRoomState extends State<CatRoom> with TickerProviderStateMixin {
                                             ),
                                           ),
                                         ),
-                                      ),
-                                  ],
+                                    ],
+                                  ),
                                 ),
                               ),
                             );
                           },
                         ),
                       ),
-                    for (final cat in CatKind.values)
-                      if (!((litter || meal) &&
-                          (cat == CatKind.maru) == _maruTurn))
-                        Positioned(
-                          bottom: 0,
-                          left: cat == CatKind.maru ? 5 : width - catSize - 5,
-                          width: thoughts ? catSize * .82 : catSize,
-                          child: IgnorePointer(
-                            child: Text(
-                              cat == CatKind.maru ? 'Maru' : 'Lady',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 10,
-                                height: 1.2,
-                                fontWeight: FontWeight.w700,
-                                color: cat == CatKind.maru
-                                    ? const Color(0xff5b493b)
-                                    : const Color(0xffa45663),
-                              ),
-                            ),
-                          ),
-                        ),
                     if (litter) ...[
                       Positioned(
                         bottom: 9,
@@ -528,7 +751,7 @@ class _CatRoomState extends State<CatRoom> with TickerProviderStateMixin {
             ),
             const SizedBox(height: 7),
             const Text(
-              'Un hogar con vida propia · toca a Maru o Lady para darles cariño',
+              'Tócalos para darles cariño · mantén pulsado y arrastra para moverlos',
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 10, color: Color(0xff69776d)),
             ),

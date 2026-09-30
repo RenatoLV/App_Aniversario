@@ -66,6 +66,9 @@ class _SweetScreenState extends State<SweetScreen>
 
   Future<void> _save() async {
     try {
+      if (_game.score > (widget.store.prefs.getInt('sweet.best') ?? 0)) {
+        await widget.store.prefs.setInt('sweet.best', _game.score);
+      }
       final ok = await widget.store.prefs.setString(
         'sweet.v1',
         jsonEncode(_game.toJson()),
@@ -208,7 +211,7 @@ class _SweetScreenState extends State<SweetScreen>
   void _help() => showDialog<void>(
     context: context,
     builder: (context) => AlertDialog(
-      title: const Text('Dulces & bigotes'),
+      title: const Text('Candy Churu Cat'),
       content: const SingleChildScrollView(
         child: Text(
           'Desliza un premio a una casilla vecina o toca dos casillas. Combina 3 del mismo tipo para limpiar gelatina. Un intercambio sin combinación vuelve atrás sin gastar turno.\n\n'
@@ -255,7 +258,7 @@ class _SweetScreenState extends State<SweetScreen>
       backgroundColor: const Color(0xfffff5ed),
       appBar: AppBar(
         backgroundColor: const Color(0xfffff5ed),
-        title: const Text('Dulces & bigotes'),
+        title: const Text('Candy Churu Cat'),
         actions: [
           IconButton(onPressed: _help, icon: const Icon(Icons.help_outline)),
           IconButton(

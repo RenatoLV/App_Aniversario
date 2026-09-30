@@ -1,0 +1,28 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "spaces": {
+      "$space": {
+        "members": {
+          "$uid": {
+            ".write": "auth != null && auth.uid === $uid && $space.length === 20",
+            ".validate": "newData.val() === true"
+          }
+        },
+        "presence": {
+          ".read": "auth != null && root.child('spaces').child($space).child('members').child(auth.uid).val() === true",
+          "$uid": {
+            "$connection": {
+              ".write": "auth != null && auth.uid === $uid && root.child('spaces').child($space).child('members').child(auth.uid).val() === true",
+              ".validate": "newData.hasChildren(['name','since'])",
+              "name": {".validate": "newData.isString() && newData.val().length <= 200"},
+              "since": {".validate": "newData.isNumber()"},
+              "$other": {".validate": false}
+            }
+          }
+        }
+      }
+    }
+  }
+}

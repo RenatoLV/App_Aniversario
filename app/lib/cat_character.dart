@@ -372,6 +372,9 @@ class _CatPainter extends CustomPainter {
         ? .18 + .08 * math.sin(phase * math.pi * 8)
         : sleeping
         ? 0.0
+        : action == CatAction.collection && active
+        ? math.sin(packProgress * math.pi).clamp(0.0, 1.0) * .9 +
+              math.sin(pet * math.pi) * .8
         : (active ? .55 + pulse * .45 : 0.0) +
               math.sin(pet * math.pi) * .8 +
               packSwipe +

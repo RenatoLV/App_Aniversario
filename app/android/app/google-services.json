@@ -1,0 +1,33 @@
+{
+  "project_info": {
+    "project_number": "273979503185",
+    "firebase_url": "https://cumplemes-default-rtdb.firebaseio.com",
+    "project_id": "cumplemes",
+    "storage_bucket": "cumplemes.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:273979503185:android:08a58d0e33e079307f3e70",
+        "android_client_info": {
+          "package_name": "cl.nuestrorincon.nuestro_rincon"
+        }
+      },
+      "oauth_client": [
+        {"client_id":"273979503185-6mifu6dg7p34hvgd54lhe0vkld307h20.apps.googleusercontent.com","client_type":1,"android_info":{"package_name":"cl.nuestrorincon.nuestro_rincon","certificate_hash":"30c76c285ce965f2d7cb5861f4a24adeef01d823"}},
+        {"client_id":"273979503185-uedtn2kteikv8u0gi0tvqb7otpa9gkje.apps.googleusercontent.com","client_type":3}
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDxolgouPz0UwDj6B9SHoD7zgqUtVGiUuI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [{"client_id":"273979503185-uedtn2kteikv8u0gi0tvqb7otpa9gkje.apps.googleusercontent.com","client_type":3}]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

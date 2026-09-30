@@ -1,8 +1,12 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
 
 import 'game.dart';
 import 'store.dart';
@@ -12,6 +16,10 @@ import 'wordle.dart';
 import 'sweet_screen.dart';
 import 'cat_room.dart';
 import 'leap_screen.dart';
+import 'card_palette.dart';
+import 'card_ar.dart';
+import 'card_ar_photo_review.dart';
+import 'game_leaderboard.dart';
 
 const ink = Color(0xff293f39),
     cream = Color(0xfffaf6ee),
@@ -31,6 +39,9 @@ Color rarityColor(CardRarity rarity) => switch (rarity) {
   CardRarity.common => const Color(0xffbee7fa),
   CardRarity.epic => const Color(0xffbf67ff),
   CardRarity.legendary => const Color(0xffffd55e),
+  CardRarity.uncommon => const Color(0xff83e4ae),
+  CardRarity.rare => const Color(0xff5fafff),
+  CardRarity.mythic => const Color(0xffff83be),
 };
 
 enum _CollectionSort { rarity, name, copies }
@@ -80,12 +91,21 @@ class _RinconHomeState extends State<RinconHome>
   CardRarity? _collectionRarity;
   _CollectionSort _collectionSort = _CollectionSort.rarity;
   bool _collectionOwnedOnly = false;
+  String? _selectedCollection;
   late final AnimationController _packAnimation;
+  late final PageController _packCarousel;
+  Timer? _packCarouselTimer;
+  int _selectedPackVolume = 0;
   bool _openingPack = false;
   Map<String, dynamic>? _cloudMember;
   List<Map<String, dynamic>> _cloudScores = [];
   String? _cloudError;
   bool _cloudBusy = false;
+  StreamSubscription<List<Map<String, dynamic>>>? _scoreSubscription;
+  Timer? _catNoteTimer;
+  Timer? _collectionPlayTimer;
+  int _collectionShuffle = 0;
+  bool _inspectingCollection = false;
   GameStore get s => widget.store;
   CatKind get _packCat => s.totalCards.isEven ? CatKind.lady : CatKind.maru;
   String get _packCatName => _packCat == CatKind.lady ? 'Lady' : 'Maru';
@@ -97,7 +117,29 @@ class _RinconHomeState extends State<RinconHome>
       vsync: this,
       duration: const Duration(milliseconds: 3100),
     );
+    _packCarousel = PageController(viewportFraction: .82);
+    _packCarouselTimer = Timer.periodic(const Duration(seconds: 9), (_) {
+      if (!mounted || page != 1 || _openingPack || !_packCarousel.hasClients) {
+        return;
+      }
+      _selectPackVolume(1 - _selectedPackVolume);
+    });
     _refreshCloud();
+    _collectionPlayTimer = Timer.periodic(const Duration(seconds: 28), (_) {
+      if (mounted && page == 2) {
+        setState(() => _collectionShuffle++);
+      }
+    });
+    _catNoteTimer = Timer.periodic(const Duration(seconds: 14), (_) {
+      if (!mounted || page != 3 || s.notes.isEmpty) return;
+      final note = s.notes[math.Random().nextInt(s.notes.length)];
+      final random = math.Random();
+      setState(() {
+        note.x = (note.x + (random.nextDouble() - .5) * .14).clamp(0.0, 1.0);
+        note.y = (note.y + (random.nextDouble() - .5) * .10).clamp(0.0, 1.0);
+      });
+      s.saveNote(note);
+    });
   }
 
   Future<void> _refreshCloud() async {
@@ -106,6 +148,13 @@ class _RinconHomeState extends State<RinconHome>
       final member = await Backend.membership();
       if (member != null) {
         await s.connectCloud(member['space_id'] as String);
+        await _scoreSubscription?.cancel();
+        _scoreSubscription =
+            Backend.watchHighscores(member['space_id'] as String).listen((
+              scores,
+            ) {
+              if (mounted) setState(() => _cloudScores = scores);
+            }, onError: (_) {});
       }
       final scores = member == null
           ? <Map<String, dynamic>>[]
@@ -119,66 +168,27 @@ class _RinconHomeState extends State<RinconHome>
       }
     } catch (_) {
       if (mounted) {
-        setState(() => _cloudError = 'No pudimos conectar con Supabase.');
+        setState(
+          () => _cloudError =
+              'No pudimos sincronizar con Firebase. El guardado local se conserva.',
+        );
       }
     }
   }
 
   Future<void> _activateCloud() async {
-    var nickname = '';
-    var code = '';
-    final submitted = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Conectar este dispositivo'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              'Solo tendrás que usar tu código privado una vez. Después la app recordará este dispositivo.',
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              onChanged: (value) => nickname = value,
-              decoration: const InputDecoration(
-                labelText: 'Tu nombre',
-                hintText: 'Maru o Lady',
-              ),
-            ),
-            TextField(
-              onChanged: (value) => code = value,
-              decoration: const InputDecoration(
-                labelText: 'Código de activación',
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Conectar'),
-          ),
-        ],
-      ),
-    );
-    if (submitted != true) return;
     setState(() {
       _cloudBusy = true;
       _cloudError = null;
     });
     try {
-      await Backend.activate(code, nickname);
-      if (s.best > 0) await Backend.submitHighscore('blocks-v1', s.best);
+      await Backend.activate('', '', chooseNickname: _chooseNickname);
       await _refreshCloud();
     } catch (_) {
       if (mounted) {
         setState(
           () => _cloudError =
-              'No se pudo activar. Revisa el código y que Supabase permita acceso anónimo.',
+              'No se pudo iniciar sesión. Comprueba que Google esté habilitado en Firebase y vuelve a intentarlo.',
         );
       }
     } finally {
@@ -186,9 +196,148 @@ class _RinconHomeState extends State<RinconHome>
     }
   }
 
+  Future<String?> _chooseNickname() async {
+    if (!mounted) return null;
+    final controller = TextEditingController(
+      text: _cloudMember?['nickname'] as String? ?? '',
+    );
+    final form = GlobalKey<FormState>();
+    final result = await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text('Tu nombre de usuario'),
+        content: Form(
+          key: form,
+          child: TextFormField(
+            controller: controller,
+            autofocus: true,
+            maxLength: 24,
+            decoration: const InputDecoration(
+              labelText: '¿Cómo quieres aparecer?',
+              helperText: 'Se usará en tu perfil y en los récords.',
+            ),
+            validator: (value) => (value?.trim().length ?? 0) < 2
+                ? 'Escribe al menos 2 caracteres.'
+                : null,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (form.currentState!.validate()) {
+                Navigator.pop(context, controller.text.trim());
+              }
+            },
+            child: const Text('Guardar nombre'),
+          ),
+        ],
+      ),
+    );
+    // The closing dialog can still reference its controller during its transition.
+    Future<void>.delayed(const Duration(seconds: 1), controller.dispose);
+    return result;
+  }
+
+  Future<void> _editNickname() async {
+    final name = await _chooseNickname();
+    if (name == null) return;
+    try {
+      await Backend.updateNickname(name);
+      await _refreshCloud();
+    } catch (_) {
+      if (mounted) {
+        setState(
+          () =>
+              _cloudError = 'No pudimos guardar el nombre. Revisa la conexión.',
+        );
+      }
+    }
+  }
+
+  Future<void> _joinSpace() async {
+    var invitation = '';
+    final join = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Compartir nuestro bloc'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Comparte este código solo con quien quieras invitar. Podrá ver y editar el mural.',
+            ),
+            const SizedBox(height: 12),
+            SelectableText(Backend.space ?? ''),
+            TextButton.icon(
+              onPressed: () =>
+                  Clipboard.setData(ClipboardData(text: Backend.space ?? '')),
+              icon: const Icon(Icons.copy),
+              label: const Text('Copiar mi código'),
+            ),
+            TextField(
+              onChanged: (value) => invitation = value,
+              decoration: const InputDecoration(
+                labelText: 'O pega el código de otra persona',
+              ),
+            ),
+            const Text(
+              'Al unirte verás su mural. Conservaremos una copia local del mural anterior.',
+              style: TextStyle(fontSize: 12),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cerrar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Unirme'),
+          ),
+        ],
+      ),
+    );
+    if (join != true) return;
+    try {
+      await Backend.joinSpace(invitation);
+      await _refreshCloud();
+    } catch (_) {
+      if (mounted) {
+        setState(
+          () => _cloudError =
+              'No pudimos unirnos. Revisa el código y la conexión.',
+        );
+      }
+    }
+  }
+
+  Future<void> _play(Widget screen) async {
+    s.cloud.allowRestore = false;
+    try {
+      await Navigator.push(
+        context,
+        MaterialPageRoute<void>(builder: (_) => screen),
+      );
+    } finally {
+      s.cloud.allowRestore = true;
+      await s.cloud.sync();
+    }
+  }
+
   @override
   void dispose() {
+    _catNoteTimer?.cancel();
+    _scoreSubscription?.cancel();
+    _collectionPlayTimer?.cancel();
     _packAnimation.dispose();
+    _packCarousel.dispose();
+    _packCarouselTimer?.cancel();
     _collectionSearch.dispose();
     super.dispose();
   }
@@ -257,6 +406,157 @@ class _RinconHomeState extends State<RinconHome>
     ),
   );
 
+  Widget _leaderboardButton(String gameId, String title, Color color) =>
+      TextButton.icon(
+        style: TextButton.styleFrom(foregroundColor: color),
+        onPressed: () => showDialog<void>(
+          context: context,
+          builder: (_) => GameLeaderboardDialog(
+            gameId: gameId,
+            title: title,
+            spaceId: _cloudMember?['space_id'] as String?,
+            initialScores: _cloudScores,
+          ),
+        ),
+        icon: const Icon(Icons.leaderboard_outlined),
+        label: const Text('Ver clasificación'),
+      );
+
+  Future<void> _shareBloc() async {
+    if (_cloudMember == null) await _activateCloud();
+    if (mounted && _cloudMember != null) await _joinSpace();
+  }
+
+  Widget _gameSpotlight({
+    required String gameId,
+    required String eyebrow,
+    required String title,
+    required String description,
+    required IconData icon,
+    required List<Color> colors,
+    required Color accent,
+    required VoidCallback onTap,
+  }) => Material(
+    color: Colors.transparent,
+    child: InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(26),
+      child: Ink(
+        padding: const EdgeInsets.all(22),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: colors,
+          ),
+          borderRadius: BorderRadius.circular(26),
+          boxShadow: [
+            BoxShadow(
+              color: colors.first.withValues(alpha: .25),
+              blurRadius: 18,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Stack(
+          children: [
+            Positioned(
+              right: -14,
+              bottom: -24,
+              child: Icon(
+                icon,
+                size: 118,
+                color: Colors.white.withValues(alpha: .09),
+              ),
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: .16),
+                        borderRadius: BorderRadius.circular(15),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: .22),
+                        ),
+                      ),
+                      child: Icon(icon, color: accent, size: 29),
+                    ),
+                    const Spacer(),
+                    Text(
+                      eyebrow,
+                      style: TextStyle(
+                        color: accent,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 1.6,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 25,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -.4,
+                  ),
+                ),
+                const SizedBox(height: 7),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 410),
+                  child: Text(
+                    description,
+                    style: const TextStyle(
+                      color: Color(0xfff4eff8),
+                      fontSize: 13,
+                      height: 1.4,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 17),
+                _leaderboardButton(gameId, title, accent),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 15,
+                    vertical: 9,
+                  ),
+                  decoration: BoxDecoration(
+                    color: accent,
+                    borderRadius: BorderRadius.circular(22),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.play_arrow_rounded, color: ink, size: 19),
+                      SizedBox(width: 5),
+                      Text(
+                        'JUGAR',
+                        style: TextStyle(
+                          color: ink,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 1,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+
   Widget home() => ListView(
     padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
     children: [
@@ -271,7 +571,10 @@ class _RinconHomeState extends State<RinconHome>
         ),
       ),
       const SizedBox(height: 12),
-      const CatRoom(),
+      CatRoom(
+        ownedCards: s.cards.keys.toList(),
+        cardBuilder: (id) => _CardArt(cardId: id),
+      ),
       if (Backend.configured) ...[
         const SizedBox(height: 18),
         Card(
@@ -282,14 +585,14 @@ class _RinconHomeState extends State<RinconHome>
             ),
             title: Text(
               _cloudMember == null
-                  ? 'Conectar nuestro espacio'
+                  ? 'Continuar con Google'
                   : 'Conectado como ${_cloudMember!['nickname']}',
             ),
             subtitle: Text(
               _cloudError ??
                   (_cloudMember == null
-                      ? 'Activación única, sin correo ni contraseña.'
-                      : '${_cloudScores.length} récords compartidos · espacio privado'),
+                      ? 'Guarda tu progreso en tu cuenta.'
+                      : 'Tu cuenta y progreso sincronizado.'),
             ),
             trailing: _cloudBusy
                 ? const CircularProgressIndicator()
@@ -299,15 +602,65 @@ class _RinconHomeState extends State<RinconHome>
             onTap: _cloudMember == null && !_cloudBusy ? _activateCloud : null,
           ),
         ),
-        if (_cloudScores.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-            child: Text(
-              _cloudScores
-                  .where((row) => row['game'] == 'blocks-v1')
-                  .map((row) => '${row['nickname']}: ${row['score']} puntos')
-                  .join('   ·   '),
-              style: const TextStyle(color: green, fontWeight: FontWeight.w700),
+        if (_cloudMember != null)
+          ListenableBuilder(
+            listenable: s.cloud,
+            builder: (context, _) => Column(
+              children: [
+                Text(s.cloud.status, textAlign: TextAlign.center),
+                TextButton.icon(
+                  onPressed: _editNickname,
+                  icon: const Icon(Icons.edit_outlined),
+                  label: const Text('Cambiar nombre de usuario'),
+                ),
+                if (s.pendingNoteCount > 0)
+                  Text(
+                    '${s.pendingNoteCount} nota(s) pendiente(s) de sincronizar',
+                    textAlign: TextAlign.center,
+                  ),
+                Text(
+                  Backend.auth.currentUser?.email ?? '',
+                  style: const TextStyle(fontSize: 12),
+                ),
+                TextButton(
+                  onPressed: _cloudBusy
+                      ? null
+                      : () async {
+                          setState(() => _cloudBusy = true);
+                          try {
+                            await s.disconnectCloud();
+                            await _scoreSubscription?.cancel();
+                            if (mounted) {
+                              setState(() {
+                                _cloudMember = null;
+                                _cloudScores = [];
+                              });
+                            }
+                          } finally {
+                            if (mounted) setState(() => _cloudBusy = false);
+                          }
+                        },
+                  child: const Text('Cerrar sesión'),
+                ),
+                if (s.cloud.conflict != null)
+                  Wrap(
+                    spacing: 8,
+                    children: [
+                      TextButton(
+                        onPressed: () async {
+                          await s.cloud.resolve(keepLocal: true);
+                        },
+                        child: const Text('Conservar este dispositivo'),
+                      ),
+                      TextButton(
+                        onPressed: () async {
+                          await s.cloud.resolve(keepLocal: false);
+                        },
+                        child: const Text('Recuperar el de mi cuenta'),
+                      ),
+                    ],
+                  ),
+              ],
             ),
           ),
       ],
@@ -337,7 +690,7 @@ class _RinconHomeState extends State<RinconHome>
             ),
             const SizedBox(height: 12),
             const Text(
-              'Bloques & bigotes',
+              'Block Blaster Maru Editions',
               style: TextStyle(
                 fontSize: 26,
                 fontWeight: FontWeight.bold,
@@ -350,18 +703,19 @@ class _RinconHomeState extends State<RinconHome>
               style: const TextStyle(color: Color(0xffe0e6dc), height: 1.5),
             ),
             const SizedBox(height: 20),
+            _leaderboardButton(
+              'blocks-v1',
+              'Block Blaster Maru Editions',
+              const Color(0xffffdc83),
+            ),
+            const SizedBox(height: 8),
             FilledButton.icon(
               style: FilledButton.styleFrom(
                 backgroundColor: const Color(0xffedd8a6),
                 foregroundColor: ink,
               ),
               onPressed: () async {
-                await Navigator.push(
-                  context,
-                  MaterialPageRoute<void>(
-                    builder: (_) => BlockScreen(store: s),
-                  ),
-                );
+                await _play(BlockScreen(store: s));
                 if (_cloudMember != null) {
                   try {
                     await Backend.submitHighscore('blocks-v1', s.best);
@@ -385,67 +739,40 @@ class _RinconHomeState extends State<RinconHome>
         ),
       ),
       const SizedBox(height: 24),
-      Card(
-        child: ListTile(
-          contentPadding: const EdgeInsets.all(20),
-          leading: const Icon(Icons.grid_on_rounded, color: green, size: 36),
-          title: const Text(
-            'Palabras & bigotes',
-            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-          ),
-          subtitle: const Text(
-            'Nuestro Wordle en español.\nCinco letras, seis intentos y dos compañeros.',
-          ),
-          trailing: const Icon(Icons.play_arrow_rounded, color: green),
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute<void>(builder: (_) => WordleScreen(store: s)),
-          ),
-        ),
+      _gameSpotlight(
+        gameId: 'wordlady',
+        eyebrow: 'RETO DE PALABRAS',
+        title: 'Wordlady',
+        description:
+            'Nuestro Wordle en español. Cinco letras, seis intentos y Lady como compañera.',
+        icon: Icons.spellcheck_rounded,
+        colors: const [Color(0xff5b3b8c), Color(0xff8b65bd)],
+        accent: const Color(0xffffdc83),
+        onTap: () => _play(WordleScreen(store: s)),
       ),
       const SizedBox(height: 24),
-      Card(
-        color: const Color(0xffffe8ed),
-        child: ListTile(
-          contentPadding: const EdgeInsets.all(20),
-          leading: const Icon(Icons.pets, color: Color(0xff936278), size: 36),
-          title: const Text(
-            'Dulces & bigotes',
-            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-          ),
-          subtitle: const Text(
-            'Combina premios, crea especiales y limpia gelatinas.\n¡Maru y Lady celebran cada combinación!',
-          ),
-          trailing: const Icon(Icons.play_arrow_rounded),
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute<void>(builder: (_) => SweetScreen(store: s)),
-          ),
-        ),
+      _gameSpotlight(
+        gameId: 'candy-churu-cat',
+        eyebrow: 'DULCE DESAFÍO',
+        title: 'Candy Churu Cat',
+        description:
+            'Combina premios, crea especiales y limpia gelatinas junto a Maru y Lady.',
+        icon: Icons.cake_rounded,
+        colors: const [Color(0xffb94975), Color(0xffef779d)],
+        accent: const Color(0xffffe48d),
+        onTap: () => _play(SweetScreen(store: s)),
       ),
       const SizedBox(height: 24),
-      Card(
-        color: const Color(0xffe4edf8),
-        child: ListTile(
-          contentPadding: const EdgeInsets.all(20),
-          leading: const Icon(
-            Icons.rocket_launch,
-            color: Color(0xff355579),
-            size: 36,
-          ),
-          title: const Text(
-            'Maru & Lady: Galactic Leap',
-            style: TextStyle(fontSize: 21, fontWeight: FontWeight.bold),
-          ),
-          subtitle: const Text(
-            'Salta del cielo al espacio.\nRecoge monedas y despega con cohetes.',
-          ),
-          trailing: const Icon(Icons.play_arrow_rounded),
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute<void>(builder: (_) => LeapScreen(store: s)),
-          ),
-        ),
+      _gameSpotlight(
+        gameId: 'ascenso-maruzon',
+        eyebrow: 'AVENTURA VERTICAL',
+        title: 'Ascenso Maruzon',
+        description:
+            'Sube desde las profundidades hasta el espacio, recoge monedas y domina los cielos.',
+        icon: Icons.rocket_launch_rounded,
+        colors: const [Color(0xff244b80), Color(0xff477fba)],
+        accent: const Color(0xff9ee8ff),
+        onTap: () => _play(LeapScreen(store: s)),
       ),
       const SizedBox(height: 24),
       Wrap(
@@ -507,13 +834,28 @@ class _RinconHomeState extends State<RinconHome>
     ],
   );
 
+  void _selectPackVolume(int index) {
+    if (!mounted || index < 0 || index > 1) return;
+    setState(() => _selectedPackVolume = index);
+    if (_packCarousel.hasClients) {
+      _packCarousel.animateToPage(
+        index,
+        duration: const Duration(milliseconds: 1100),
+        curve: Curves.easeInOutCubic,
+      );
+    }
+  }
+
   Future<void> _openPack() async {
     if (_openingPack || s.coins < 20) return;
     final opener = _packCat;
     setState(() => _openingPack = true);
     HapticFeedback.mediumImpact();
     await _packAnimation.forward(from: 0);
-    final id = s.openPack();
+    final collectionId = _selectedPackVolume == 0
+        ? anniversaryCollectionId
+        : anniversaryCollectionV2Id;
+    final id = s.openPack(opener: opener, collectionId: collectionId);
     _packAnimation.reset();
     if (!mounted) return;
     setState(() => _openingPack = false);
@@ -528,6 +870,8 @@ class _RinconHomeState extends State<RinconHome>
         total: s.totalCards,
         opener: opener,
         rarity: s.lastOpenedRarity,
+        collectionId: collectionId,
+        finish: s.lastOpenedFinish,
       ),
     );
   }
@@ -547,7 +891,167 @@ class _RinconHomeState extends State<RinconHome>
         caption: 'Turno de $_packCatName · ¡a abrir!',
         action: CatAction.pack,
       ),
-      const SizedBox(height: 32),
+      const SizedBox(height: 22),
+      SizedBox(
+        height: 160,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            PageView.builder(
+              controller: _packCarousel,
+              itemCount: 2,
+              onPageChanged: (index) =>
+                  setState(() => _selectedPackVolume = index),
+              itemBuilder: (context, index) {
+                final selected = index == _selectedPackVolume;
+                final colors = index == 0
+                    ? const [Color(0xffff6bb6), Color(0xff6f43dc)]
+                    : const [Color(0xff2cc7b5), Color(0xff3154b7)];
+                return Semantics(
+                  button: true,
+                  selected: selected,
+                  label: 'Elegir Momazos volumen ${index + 1}',
+                  child: GestureDetector(
+                    onTap: () => _selectPackVolume(index),
+                    child: AnimatedRotation(
+                      duration: const Duration(milliseconds: 500),
+                      curve: Curves.easeOutBack,
+                      turns: selected ? 0 : (index == 0 ? -.012 : .012),
+                      child: AnimatedScale(
+                        duration: const Duration(milliseconds: 360),
+                        curve: Curves.easeOutBack,
+                        scale: selected ? 1 : .88,
+                        child: Container(
+                          margin: const EdgeInsets.symmetric(
+                            horizontal: 7,
+                            vertical: 5,
+                          ),
+                          padding: const EdgeInsets.all(17),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(colors: colors),
+                            borderRadius: BorderRadius.circular(22),
+                            border: Border.all(
+                              color: selected
+                                  ? const Color(0xffffe991)
+                                  : Colors.white.withValues(alpha: .35),
+                              width: selected ? 3 : 1,
+                            ),
+                            boxShadow: selected
+                                ? [
+                                    BoxShadow(
+                                      color: colors.first.withValues(
+                                        alpha: .32,
+                                      ),
+                                      blurRadius: 18,
+                                      offset: const Offset(0, 8),
+                                    ),
+                                  ]
+                                : null,
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 58,
+                                height: 76,
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: .16),
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                                child: const Icon(
+                                  Icons.card_giftcard_rounded,
+                                  color: Colors.white,
+                                  size: 34,
+                                ),
+                              ),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'MOMAZOS VOL. ${index + 1}',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 17,
+                                        fontWeight: FontWeight.w900,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 5),
+                                    const Text(
+                                      'EDICIÓN ANIVERSARIO',
+                                      style: TextStyle(
+                                        color: Color(0xffffefae),
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.w900,
+                                        letterSpacing: 1.1,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 7),
+                                    Text(
+                                      selected
+                                          ? 'SELECCIONADO'
+                                          : 'DESLIZA PARA ELEGIR',
+                                      style: TextStyle(
+                                        color: Colors.white.withValues(
+                                          alpha: .8,
+                                        ),
+                                        fontSize: 8,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+            Positioned(
+              left: 0,
+              child: _PackCarouselArrow(
+                icon: Icons.chevron_left_rounded,
+                label: 'Ver volumen anterior',
+                onPressed: () =>
+                    _selectPackVolume((_selectedPackVolume - 1).clamp(0, 1)),
+              ),
+            ),
+            Positioned(
+              right: 0,
+              child: _PackCarouselArrow(
+                icon: Icons.chevron_right_rounded,
+                label: 'Ver volumen siguiente',
+                onPressed: () =>
+                    _selectPackVolume((_selectedPackVolume + 1).clamp(0, 1)),
+              ),
+            ),
+          ],
+        ),
+      ),
+      Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: List.generate(
+          2,
+          (index) => AnimatedContainer(
+            duration: const Duration(milliseconds: 220),
+            width: index == _selectedPackVolume ? 22 : 7,
+            height: 7,
+            margin: const EdgeInsets.symmetric(horizontal: 3),
+            decoration: BoxDecoration(
+              color: index == _selectedPackVolume
+                  ? const Color(0xff7045c7)
+                  : const Color(0xffc8c1d4),
+              borderRadius: BorderRadius.circular(9),
+            ),
+          ),
+        ),
+      ),
+      const SizedBox(height: 24),
       Center(
         child: AnimatedBuilder(
           animation: _packAnimation,
@@ -560,7 +1064,7 @@ class _RinconHomeState extends State<RinconHome>
               child: Transform.scale(
                 scale: 1 + math.sin(t * math.pi) * .09,
                 child: SizedBox(
-                  width: 250,
+                  width: 310,
                   height: 286,
                   child: Stack(
                     alignment: Alignment.center,
@@ -584,177 +1088,266 @@ class _RinconHomeState extends State<RinconHome>
                           ],
                         ),
                       ),
-                      Transform(
-                        alignment: Alignment.center,
-                        transform: Matrix4.identity()
-                          ..setEntry(3, 2, .0015)
-                          ..rotateY(
-                            t > .55
-                                ? (t - .55) * math.pi * .72
-                                : math.sin(t * math.pi * 2) * .12,
-                          )
-                          ..rotateZ(math.sin(t * math.pi * 4) * .035),
-                        child: Container(
-                          width: 202,
-                          height: 258,
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                              colors: [
-                                Color(0xffffd46b),
-                                Color(0xffff6bb6),
-                                Color(0xff8152ff),
-                                Color(0xff372780),
+                      Positioned(
+                        left: 9,
+                        top: 23,
+                        child: Transform.rotate(
+                          angle: -.105 - math.sin(t * math.pi * 2) * .02,
+                          child: Container(
+                            width: 164,
+                            height: 226,
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: _selectedPackVolume == 1
+                                    ? const [
+                                        Color(0xff8dffcf),
+                                        Color(0xff29c8bb),
+                                        Color(0xff365bc4),
+                                        Color(0xff28256f),
+                                      ]
+                                    : const [
+                                        Color(0xffffe37c),
+                                        Color(0xffff83c4),
+                                        Color(0xff9564ef),
+                                        Color(0xff432884),
+                                      ],
+                              ),
+                              borderRadius: BorderRadius.circular(22),
+                              border: Border.all(
+                                color: const Color(0xffd8fff0),
+                                width: 2.2,
+                              ),
+                              boxShadow: const [
+                                BoxShadow(
+                                  color: Color(0x7736aee2),
+                                  blurRadius: 24,
+                                  offset: Offset(-7, 13),
+                                ),
                               ],
                             ),
-                            borderRadius: BorderRadius.circular(24),
-                            border: Border.all(
-                              color: const Color(0xfffff0bb),
-                              width: 2.4,
-                            ),
-                            boxShadow: const [
-                              BoxShadow(
-                                color: Color(0x995b23bd),
-                                blurRadius: 28,
-                                offset: Offset(0, 15),
-                              ),
-                              BoxShadow(
-                                color: Color(0x88fff7d5),
-                                blurRadius: 12,
-                                spreadRadius: -4,
-                              ),
-                            ],
-                          ),
-                          child: Stack(
-                            clipBehavior: Clip.none,
-                            children: [
-                              Positioned.fill(
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(22),
-                                  child: CustomPaint(
-                                    painter: HoloPatternPainter(progress: t),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(
+                                  Icons.pets,
+                                  color: Colors.white70,
+                                  size: 42,
+                                ),
+                                const SizedBox(height: 12),
+                                Text(
+                                  'MOMAZOS\nVOL. ${_selectedPackVolume + 1}',
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: 1,
                                   ),
                                 ),
+                                const SizedBox(height: 12),
+                                Text(
+                                  _selectedPackVolume == 1
+                                      ? 'EDICIÓN PAPU'
+                                      : 'BRILLIBRILLI',
+                                  style: const TextStyle(
+                                    color: Color(0xfffff09e),
+                                    fontSize: 8,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: 1,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      Transform.translate(
+                        offset: Offset(48, 5),
+                        child: Transform(
+                          alignment: Alignment.center,
+                          transform: Matrix4.identity()
+                            ..setEntry(3, 2, .0015)
+                            ..rotateY(
+                              t > .55
+                                  ? (t - .55) * math.pi * .72
+                                  : math.sin(t * math.pi * 2) * .12,
+                            )
+                            ..rotateZ(math.sin(t * math.pi * 4) * .035),
+                          child: Container(
+                            width: 202,
+                            height: 258,
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: _selectedPackVolume == 1
+                                    ? const [
+                                        Color(0xffffef77),
+                                        Color(0xff46dbc1),
+                                        Color(0xff3880dd),
+                                        Color(0xff382777),
+                                      ]
+                                    : const [
+                                        Color(0xffffd46b),
+                                        Color(0xffff6bb6),
+                                        Color(0xff8152ff),
+                                        Color(0xff372780),
+                                      ],
                               ),
-                              Center(
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    const Icon(
-                                      Icons.pets,
-                                      size: 61,
-                                      color: Colors.white,
+                              borderRadius: BorderRadius.circular(24),
+                              border: Border.all(
+                                color: const Color(0xfffff0bb),
+                                width: 2.4,
+                              ),
+                              boxShadow: const [
+                                BoxShadow(
+                                  color: Color(0x995b23bd),
+                                  blurRadius: 28,
+                                  offset: Offset(0, 15),
+                                ),
+                                BoxShadow(
+                                  color: Color(0x88fff7d5),
+                                  blurRadius: 12,
+                                  spreadRadius: -4,
+                                ),
+                              ],
+                            ),
+                            child: Stack(
+                              clipBehavior: Clip.none,
+                              children: [
+                                Positioned.fill(
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(22),
+                                    child: CustomPaint(
+                                      painter: HoloPatternPainter(progress: t),
                                     ),
-                                    const SizedBox(height: 15),
-                                    const Text(
-                                      'MOMAZOS VOL. 1\nEDICIÓN\nANIVERSARIO',
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        fontSize: 18,
-                                        height: 1,
-                                        fontWeight: FontWeight.w900,
-                                        letterSpacing: 1.2,
+                                  ),
+                                ),
+                                Center(
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      const Icon(
+                                        Icons.pets,
+                                        size: 61,
                                         color: Colors.white,
-                                        shadows: [
-                                          Shadow(
-                                            color: Color(0xff48217b),
-                                            blurRadius: 8,
-                                            offset: Offset(0, 3),
-                                          ),
-                                        ],
                                       ),
-                                    ),
-                                    const SizedBox(height: 16),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 12,
-                                        vertical: 5,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xfffff3c7),
-                                        borderRadius: BorderRadius.circular(30),
-                                      ),
-                                      child: const Text(
-                                        '✨  EDICIÓN BRILLIBRILLI  ✨',
+                                      const SizedBox(height: 15),
+                                      Text(
+                                        'MOMAZOS VOL. ${_selectedPackVolume + 1}\nEDICIÓN\n${_selectedPackVolume == 1 ? 'PAPU' : 'ANIVERSARIO'}',
+                                        textAlign: TextAlign.center,
                                         style: TextStyle(
-                                          fontSize: 8,
+                                          fontSize: 18,
+                                          height: 1,
                                           fontWeight: FontWeight.w900,
-                                          color: Color(0xff57278d),
-                                          letterSpacing: 1,
+                                          letterSpacing: 1.2,
+                                          color: Colors.white,
+                                          shadows: [
+                                            Shadow(
+                                              color: Color(0xff48217b),
+                                              blurRadius: 8,
+                                              offset: Offset(0, 3),
+                                            ),
+                                          ],
                                         ),
                                       ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              Positioned(
-                                left: 7,
-                                right: 7,
-                                top: 43,
-                                child: Container(
-                                  height: 4 + tear * 5,
-                                  decoration: BoxDecoration(
-                                    gradient: const LinearGradient(
-                                      colors: [
-                                        Color(0xff56f8ff),
-                                        Colors.white,
-                                        Color(0xff5689ff),
-                                      ],
-                                    ),
-                                    borderRadius: BorderRadius.circular(8),
-                                    boxShadow: const [
-                                      BoxShadow(
-                                        color: Color(0xff53d9ff),
-                                        blurRadius: 15,
-                                        spreadRadius: 3,
+                                      const SizedBox(height: 16),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 12,
+                                          vertical: 5,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xfffff3c7),
+                                          borderRadius: BorderRadius.circular(
+                                            30,
+                                          ),
+                                        ),
+                                        child: Text(
+                                          _selectedPackVolume == 1
+                                              ? '😎  EDICIÓN PAPU  😎'
+                                              : '✨  EDICIÓN BRILLIBRILLI  ✨',
+                                          style: const TextStyle(
+                                            fontSize: 8,
+                                            fontWeight: FontWeight.w900,
+                                            color: Color(0xff57278d),
+                                            letterSpacing: 1,
+                                          ),
+                                        ),
                                       ),
                                     ],
                                   ),
                                 ),
-                              ),
-                              Positioned(
-                                top: 0,
-                                left: 0,
-                                right: 0,
-                                child: Opacity(
-                                  opacity:
-                                      (1 - ((t - .83) / .17).clamp(0.0, 1.0))
-                                          .clamp(0.0, 1.0),
-                                  child: Transform.translate(
-                                    offset: Offset(
-                                      (_packCat == CatKind.lady ? -1 : 1) *
-                                          tear *
-                                          25,
-                                      -tear * 78,
+                                Positioned(
+                                  left: 7,
+                                  right: 7,
+                                  top: 43,
+                                  child: Container(
+                                    height: 4 + tear * 5,
+                                    decoration: BoxDecoration(
+                                      gradient: const LinearGradient(
+                                        colors: [
+                                          Color(0xff56f8ff),
+                                          Colors.white,
+                                          Color(0xff5689ff),
+                                        ],
+                                      ),
+                                      borderRadius: BorderRadius.circular(8),
+                                      boxShadow: const [
+                                        BoxShadow(
+                                          color: Color(0xff53d9ff),
+                                          blurRadius: 15,
+                                          spreadRadius: 3,
+                                        ),
+                                      ],
                                     ),
-                                    child: Transform.rotate(
-                                      angle:
-                                          (_packCat == CatKind.lady
-                                              ? -.28
-                                              : .28) *
-                                          tear,
-                                      child: ClipPath(
-                                        clipper: _TornSealClipper(),
-                                        child: Container(
-                                          height: 52,
-                                          decoration: const BoxDecoration(
-                                            gradient: LinearGradient(
-                                              colors: [
-                                                Color(0xff3a2daf),
-                                                Color(0xff3ea9f5),
-                                                Color(0xffa954df),
-                                              ],
+                                  ),
+                                ),
+                                Positioned(
+                                  top: 0,
+                                  left: 0,
+                                  right: 0,
+                                  child: Opacity(
+                                    opacity:
+                                        (1 - ((t - .83) / .17).clamp(0.0, 1.0))
+                                            .clamp(0.0, 1.0),
+                                    child: Transform.translate(
+                                      offset: Offset(
+                                        (_packCat == CatKind.lady ? -1 : 1) *
+                                            tear *
+                                            25,
+                                        -tear * 78,
+                                      ),
+                                      child: Transform.rotate(
+                                        angle:
+                                            (_packCat == CatKind.lady
+                                                ? -.28
+                                                : .28) *
+                                            tear,
+                                        child: ClipPath(
+                                          clipper: _TornSealClipper(),
+                                          child: Container(
+                                            height: 52,
+                                            decoration: const BoxDecoration(
+                                              gradient: LinearGradient(
+                                                colors: [
+                                                  Color(0xff3a2daf),
+                                                  Color(0xff3ea9f5),
+                                                  Color(0xffa954df),
+                                                ],
+                                              ),
                                             ),
-                                          ),
-                                          child: const Center(
-                                            child: Text(
-                                              '✦  SOBRE SORPRESA  ✦',
-                                              style: TextStyle(
-                                                fontSize: 10,
-                                                fontWeight: FontWeight.w900,
-                                                color: Colors.white,
-                                                letterSpacing: 1,
+                                            child: const Center(
+                                              child: Text(
+                                                '✦  SOBRE SORPRESA  ✦',
+                                                style: TextStyle(
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.w900,
+                                                  color: Colors.white,
+                                                  letterSpacing: 1,
+                                                ),
                                               ),
                                             ),
                                           ),
@@ -763,16 +1356,18 @@ class _RinconHomeState extends State<RinconHome>
                                     ),
                                   ),
                                 ),
-                              ),
-                              if (_openingPack)
-                                Positioned.fill(
-                                  child: IgnorePointer(
-                                    child: CustomPaint(
-                                      painter: PackSparklePainter(progress: t),
+                                if (_openingPack)
+                                  Positioned.fill(
+                                    child: IgnorePointer(
+                                      child: CustomPaint(
+                                        painter: PackSparklePainter(
+                                          progress: t,
+                                        ),
+                                      ),
                                     ),
                                   ),
-                                ),
-                            ],
+                              ],
+                            ),
                           ),
                         ),
                       ),
@@ -910,16 +1505,105 @@ class _RinconHomeState extends State<RinconHome>
       ),
       const SizedBox(height: 16),
       Text(
+        'Legendaria asegurada en ${25 - s.packsSinceLegendary} aperturas como máximo.\n6 rarezas · Clásica, Foil plateada y Foil dorada',
+        textAlign: TextAlign.center,
+        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+      ),
+      Text(
         s.coins < 20
             ? 'Te faltan ${20 - s.coins} monedas. ¡Consíguelas jugando!'
-            : '${cardNames.length - sampleCardCount} memes · misma probabilidad para todos.\nLas repetidas se conservan en tu colección.',
+            : '${cardsForCollection(_selectedPackVolume == 0 ? anniversaryCollectionId : anniversaryCollectionV2Id).length} memes · misma probabilidad para todos.\nLas repetidas se conservan en tu colección.',
         textAlign: TextAlign.center,
         style: const TextStyle(fontSize: 12, height: 1.6),
       ),
     ],
   );
+  Future<void> _viewCardVariants(int id) async {
+    final variants = s.variantsFor(id);
+    String? selected;
+    if (variants.length > 1) {
+      selected = await showModalBottomSheet<String>(
+        context: context,
+        showDragHandle: true,
+        builder: (context) => SafeArea(
+          child: ListView(
+            shrinkWrap: true,
+            children: [
+              ListTile(
+                title: Text(cardNames[id]),
+                subtitle: const Text('Elige una variante para verla'),
+              ),
+              for (final key in variants)
+                ListTile(
+                  title: Text(
+                    '${CardRarity.values.byName(key.split(':')[1]).label} · ${CardFinish.values.byName(key.split(':')[2]).label}',
+                  ),
+                  trailing: Text('×${s.cardVariants[key]}'),
+                  onTap: () => Navigator.pop(context, key),
+                ),
+            ],
+          ),
+        ),
+      );
+      if (selected == null || !mounted) return;
+    } else if (variants.isNotEmpty) {
+      selected = variants.first;
+    }
+    if (!mounted) return;
+    setState(() => _inspectingCollection = true);
+    Uint8List? arPhoto;
+    try {
+      arPhoto = await showDialog<Uint8List>(
+        context: context,
+        builder: (_) => _InspectCardDialog(
+          cardId: id,
+          copies: selected == null ? s.cards[id]! : s.cardVariants[selected]!,
+          rarity: selected == null
+              ? s.rarities[id] ?? CardRarity.common
+              : CardRarity.values.byName(selected.split(':')[1]),
+          finish: selected == null
+              ? CardFinish.normal
+              : CardFinish.values.byName(selected.split(':')[2]),
+          opener: s.cardOpeners[id] == null
+              ? null
+              : CatKind.values[s.cardOpeners[id]!],
+          collectionId: s.cardCollections[id] ?? anniversaryCollectionId,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _inspectingCollection = false);
+    }
+    if (arPhoto == null || !mounted) return;
+    final note = _newMediaNote(
+      'Carta AR · ${cardNames[id]}',
+      base64Encode(arPhoto),
+      'photo',
+    );
+    setState(() => s.notes.add(note));
+    try {
+      await s.saveNote(note);
+      if (mounted) {
+        setState(() => page = 3);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Foto AR guardada en Nuestro bloc.')),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'No pudimos guardar la foto. Revisa el espacio disponible y vuelve a intentar.',
+            ),
+          ),
+        );
+      }
+    }
+  }
+
   Widget collection() {
     final query = _collectionQuery.trim().toLowerCase();
+    final volumeSelected = _selectedCollection != null;
     final rarityCounts = {
       for (final rarity in CardRarity.values)
         rarity: s.cards.keys
@@ -929,6 +1613,10 @@ class _RinconHomeState extends State<RinconHome>
     final order = List<int>.generate(cardNames.length, (i) => i)
       ..removeWhere((i) {
         final owned = s.cards.containsKey(i);
+        if (_selectedCollection != null &&
+            !cardsForCollection(_selectedCollection!).contains(i)) {
+          return true;
+        }
         if (_collectionOwnedOnly && !owned) return true;
         if (_collectionRarity != null &&
             (!owned ||
@@ -944,8 +1632,8 @@ class _RinconHomeState extends State<RinconHome>
         if (owned != 0) return owned;
         return switch (_collectionSort) {
           _CollectionSort.rarity =>
-            (s.rarities[b] ?? CardRarity.common).index.compareTo(
-              (s.rarities[a] ?? CardRarity.common).index,
+            (s.rarities[b] ?? CardRarity.common).rank.compareTo(
+              (s.rarities[a] ?? CardRarity.common).rank,
             ),
           _CollectionSort.name => cardNames[a].toLowerCase().compareTo(
             cardNames[b].toLowerCase(),
@@ -955,6 +1643,15 @@ class _RinconHomeState extends State<RinconHome>
           ),
         };
       });
+    final playfulOwned = order.where(s.cards.containsKey).toList();
+    if (_collectionShuffle > 0 && playfulOwned.length > 1) {
+      final a = _collectionShuffle % playfulOwned.length;
+      final b = (a + 1) % playfulOwned.length;
+      final positionA = order.indexOf(playfulOwned[a]);
+      final positionB = order.indexOf(playfulOwned[b]);
+      order[positionA] = playfulOwned[b];
+      order[positionB] = playfulOwned[a];
+    }
     return ListView(
       padding: const EdgeInsets.all(24),
       children: [
@@ -979,6 +1676,185 @@ class _RinconHomeState extends State<RinconHome>
             _CollectionBadge(label: '+9', unlocked: s.totalCards >= 9),
           ],
         ),
+        const SizedBox(height: 12),
+        for (final volumeId in [
+          anniversaryCollectionId,
+          anniversaryCollectionV2Id,
+        ])
+          Builder(
+            builder: (context) {
+              final volumeCards = cardsForCollection(volumeId);
+              final volumeOwned = volumeCards.where(s.cards.containsKey).length;
+              final volumeSelected = _selectedCollection == volumeId;
+              final isV2 = volumeId == anniversaryCollectionV2Id;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: InkWell(
+                  onTap: () => setState(() {
+                    _selectedCollection = volumeSelected ? null : volumeId;
+                    if (!volumeSelected) {
+                      _collectionOwnedOnly = false;
+                      _collectionRarity = null;
+                      _collectionQuery = '';
+                      _collectionSearch.clear();
+                    }
+                  }),
+                  borderRadius: BorderRadius.circular(22),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 250),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: volumeSelected
+                            ? const [Color(0xff3b8eea), Color(0xffcb61ed)]
+                            : isV2
+                            ? const [Color(0xff147d78), Color(0xff274b9e)]
+                            : const [Color(0xff39236d), Color(0xff7040aa)],
+                      ),
+                      borderRadius: BorderRadius.circular(22),
+                      border: Border.all(
+                        color: volumeSelected
+                            ? const Color(0xffffdf78)
+                            : const Color(0xffb9e8f5),
+                        width: volumeSelected ? 2.5 : 1.5,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(
+                            0xff8f4ddb,
+                          ).withValues(alpha: volumeSelected ? .35 : .16),
+                          blurRadius: 18,
+                          offset: const Offset(0, 7),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 66,
+                          height: 82,
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [Color(0xff3c91ee), Color(0xffdf6de2)],
+                            ),
+                            borderRadius: BorderRadius.circular(13),
+                            border: Border.all(color: const Color(0xffffe17d)),
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.pets, color: Colors.white, size: 30),
+                              SizedBox(height: 5),
+                              Text(
+                                isV2 ? 'VOL. 2' : 'VOL. 1',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'SOBRE SORPRESA',
+                                style: TextStyle(
+                                  color: Color(0xffbdefff),
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 1.4,
+                                ),
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                isV2 ? 'Momazos Vol. 2' : 'Momazos Vol. 1',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                              Text(
+                                isV2
+                                    ? 'Edición Papu · Aniversario'
+                                    : 'Edición Aniversario',
+                                style: TextStyle(
+                                  color: Color(0xffffe49a),
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(height: 9),
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(9),
+                                child: LinearProgressIndicator(
+                                  value: volumeCards.isEmpty
+                                      ? 0
+                                      : volumeOwned / volumeCards.length,
+                                  minHeight: 7,
+                                  backgroundColor: Colors.white.withValues(
+                                    alpha: .18,
+                                  ),
+                                  valueColor: const AlwaysStoppedAnimation(
+                                    Color(0xffffdf78),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 5),
+                              Text(
+                                '$volumeOwned / ${volumeCards.length} descubiertas',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Icon(
+                          volumeSelected
+                              ? Icons.grid_view_rounded
+                              : Icons.arrow_forward_ios_rounded,
+                          color: Colors.white,
+                          size: 21,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        if (volumeSelected) ...[
+          const SizedBox(height: 9),
+          Row(
+            children: [
+              const Icon(Icons.visibility_off_outlined, size: 17, color: ink),
+              const SizedBox(width: 6),
+              const Expanded(
+                child: Text(
+                  'Las cartas no descubiertas permanecen ocultas para evitar spoilers.',
+                  style: TextStyle(fontSize: 11, color: Color(0xff69776d)),
+                ),
+              ),
+              TextButton(
+                onPressed: () => setState(() => _selectedCollection = null),
+                child: const Text('Ver todas'),
+              ),
+            ],
+          ),
+        ],
         const SizedBox(height: 12),
         TextField(
           controller: _collectionSearch,
@@ -1060,10 +1936,9 @@ class _RinconHomeState extends State<RinconHome>
           ],
         ),
         const SizedBox(height: 12),
-        const _CatPair(
-          compact: true,
-          caption: 'Maru y Lady vigilan la colección.',
-          action: CatAction.collection,
+        const Text(
+          'Tus dos compañeros juegan con las cartas 🐾',
+          style: TextStyle(color: ink, fontSize: 12),
         ),
         const SizedBox(height: 24),
         if (order.isEmpty)
@@ -1091,75 +1966,99 @@ class _RinconHomeState extends State<RinconHome>
                     : constraints.maxWidth >= 520
                     ? 3
                     : 2,
-                childAspectRatio: .73,
+                childAspectRatio: .58,
                 crossAxisSpacing: 12,
                 mainAxisSpacing: 12,
               ),
               itemBuilder: (context, displayIndex) {
                 final i = order[displayIndex];
                 final unlocked = s.cards.containsKey(i);
-                return InkWell(
-                  onTap: unlocked
-                      ? () => showDialog<void>(
-                          context: context,
-                          builder: (_) => _InspectCardDialog(
-                            cardId: i,
-                            copies: s.cards[i]!,
-                            rarity: s.rarities[i] ?? CardRarity.common,
-                          ),
-                        )
-                      : null,
-                  borderRadius: BorderRadius.circular(20),
-                  child: _RarityFrame(
-                    rarity: unlocked
-                        ? s.rarities[i] ?? CardRarity.common
-                        : CardRarity.common,
-                    locked: !unlocked,
-                    child: Container(
-                      padding: const EdgeInsets.all(12),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Expanded(
-                            child: unlocked
-                                ? _CardArt(cardId: i)
-                                : const Center(
-                                    child: Text(
-                                      '?',
-                                      style: TextStyle(
-                                        fontSize: 46,
-                                        color: green,
+                return _CollectionCatPlay(
+                  key: ValueKey('cat-card-$i'),
+                  cardId: i,
+                  enabled:
+                      !_inspectingCollection &&
+                      playfulOwned.take(2).contains(i),
+                  cat: playfulOwned.isNotEmpty && i == playfulOwned.first
+                      ? CatKind.maru
+                      : CatKind.lady,
+                  routine: (_collectionShuffle + i) % 3,
+                  delay: playfulOwned.isNotEmpty && i == playfulOwned.first
+                      ? 0
+                      : 1,
+                  child: InkWell(
+                    onTap: unlocked ? () => _viewCardVariants(i) : null,
+                    borderRadius: BorderRadius.circular(20),
+                    child: _RarityFrame(
+                      rarity: unlocked
+                          ? s.rarities[i] ?? CardRarity.common
+                          : CardRarity.common,
+                      locked: !unlocked,
+                      child: _PaletteSurface(
+                        cardId: i,
+                        enabled: unlocked,
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Expanded(
+                                child: unlocked
+                                    ? _CardArt(cardId: i)
+                                    : const Center(
+                                        child: Text(
+                                          '?',
+                                          style: TextStyle(
+                                            fontSize: 46,
+                                            color: green,
+                                          ),
+                                        ),
                                       ),
-                                    ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                unlocked ? cardNames[i] : 'Por descubrir',
+                                textAlign: TextAlign.center,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: unlocked ? Colors.white : ink,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                unlocked
+                                    ? '${(s.rarities[i] ?? CardRarity.common).label.toUpperCase()}  ·  ×${s.cards[i]} · ${s.variantsFor(i).length} variantes'
+                                    : 'Abre un sobre',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w900,
+                                  color: unlocked
+                                      ? rarityColor(
+                                          s.rarities[i] ?? CardRarity.common,
+                                        )
+                                      : ink,
+                                ),
+                              ),
+                              if (unlocked) ...[
+                                const SizedBox(height: 4),
+                                Text(
+                                  s.cardOpeners[i] == null
+                                      ? 'Descubierta por Maru & Lady'
+                                      : 'La abrió ${CatKind.values[s.cardOpeners[i]!] == CatKind.maru ? 'Maru' : 'Lady'}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: Color(0xffffedbe),
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w700,
                                   ),
+                                ),
+                              ],
+                            ],
                           ),
-                          const SizedBox(height: 8),
-                          Text(
-                            unlocked ? cardNames[i] : 'Por descubrir',
-                            textAlign: TextAlign.center,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: unlocked ? Colors.white : ink,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            unlocked
-                                ? '${(s.rarities[i] ?? CardRarity.common).label.toUpperCase()}  ·  ×${s.cards[i]}'
-                                : 'Abre un sobre',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w900,
-                              color: unlocked
-                                  ? rarityColor(
-                                      s.rarities[i] ?? CardRarity.common,
-                                    )
-                                  : ink,
-                            ),
-                          ),
-                        ],
+                        ),
                       ),
                     ),
                   ),
@@ -1199,7 +2098,7 @@ class _RinconHomeState extends State<RinconHome>
         ],
       ),
     );
-    if (result != null && result.isNotEmpty) {
+    if (result != null && (result.isNotEmpty || note?.imageBase64 != null)) {
       PocketNote edited;
       if (note == null) {
         edited = PocketNote(
@@ -1214,6 +2113,159 @@ class _RinconHomeState extends State<RinconHome>
       }
       s.saveNote(edited);
     }
+  }
+
+  PocketNote _newMediaNote(
+    String label,
+    String imageBase64,
+    String mediaKind,
+  ) => PocketNote(
+    label,
+    .08 + (s.notes.length % 3) * .12,
+    .05 + (s.notes.length % 4) * .18,
+    imageBase64: imageBase64,
+    mediaKind: mediaKind,
+  );
+
+  Future<void> _pickNoteImage(ImageSource source) async {
+    try {
+      final photo = await ImagePicker().pickImage(
+        source: source,
+        imageQuality: 68,
+        maxWidth: 1200,
+        maxHeight: 1200,
+      );
+      if (photo == null || !mounted) return;
+      final bytes = await photo.readAsBytes();
+      final note = _newMediaNote(
+        source == ImageSource.camera ? 'Nuestra foto' : 'Un recuerdo',
+        base64Encode(bytes),
+        'photo',
+      );
+      setState(() => s.notes.add(note));
+      await s.saveNote(note);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No pudimos adjuntar esa imagen.')),
+      );
+    }
+  }
+
+  Future<void> _choosePhotoSource() async {
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: Wrap(
+          children: [
+            const ListTile(
+              title: Text(
+                'Añadir una foto',
+                style: TextStyle(fontWeight: FontWeight.w800),
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_camera_outlined),
+              title: const Text('Sacar una foto'),
+              onTap: () => Navigator.pop(context, ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('Elegir de la galería'),
+              onTap: () => Navigator.pop(context, ImageSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (source != null) await _pickNoteImage(source);
+  }
+
+  Future<void> _drawNote([PocketNote? note]) async {
+    final bytes = await showDialog<Uint8List>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => _DrawingDialog(
+        initialImage: note?.imageBase64 == null
+            ? null
+            : base64Decode(note!.imageBase64!),
+      ),
+    );
+    if (bytes == null || !mounted) return;
+    if (note == null) {
+      final created = _newMediaNote(
+        'Nuestro dibujo',
+        base64Encode(bytes),
+        'drawing',
+      );
+      setState(() => s.notes.add(created));
+      await s.saveNote(created);
+    } else {
+      setState(() {
+        note.imageBase64 = base64Encode(bytes);
+        note.mediaKind = 'drawing';
+      });
+      await s.saveNote(note);
+    }
+  }
+
+  bool _isDrawing(PocketNote note) =>
+      note.mediaKind == 'drawing' ||
+      (note.mediaKind == null && note.text == 'Nuestro dibujo');
+
+  Widget _noteImage(PocketNote note) {
+    try {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(4),
+        child: Image.memory(
+          base64Decode(note.imageBase64!),
+          width: double.infinity,
+          fit: BoxFit.cover,
+          gaplessPlayback: true,
+        ),
+      );
+    } catch (_) {
+      return const Center(child: Icon(Icons.broken_image_outlined));
+    }
+  }
+
+  Future<void> _resizeNote(PocketNote note) async {
+    final scale = await showModalBottomSheet<double>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const ListTile(
+              title: Text(
+                'Tamaño de la nota',
+                style: TextStyle(fontWeight: FontWeight.w900),
+              ),
+              subtitle: Text('Mantén pulsada cualquier nota para cambiarlo.'),
+            ),
+            for (final option in const [
+              (0.46, 'Mini', Icons.crop_square),
+              (0.68, 'Pequeña', Icons.check_box_outline_blank),
+              (1.0, 'Mediana', Icons.rectangle_outlined),
+              (1.28, 'Grande', Icons.aspect_ratio),
+            ])
+              ListTile(
+                leading: Icon(option.$3),
+                title: Text(option.$2),
+                trailing: (note.scale - option.$1).abs() < .02
+                    ? const Icon(Icons.check_circle, color: Color(0xff138267))
+                    : null,
+                onTap: () => Navigator.pop(context, option.$1),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (scale == null) return;
+    setState(() => note.scale = scale);
+    await s.saveNote(note);
   }
 
   Widget notes() => Column(
@@ -1232,19 +2284,52 @@ class _RinconHomeState extends State<RinconHome>
                 color: ink,
               ),
             ),
+            ...[
+              TextButton.icon(
+                onPressed: _cloudBusy || !Backend.configured
+                    ? null
+                    : _shareBloc,
+                icon: const Icon(Icons.group_add_outlined),
+                label: const Text('Compartir / unirme al bloc'),
+              ),
+              if (_cloudError != null)
+                Text(_cloudError!, style: const TextStyle(color: Colors.red)),
+              if (_cloudMember != null)
+                ValueListenableBuilder<String>(
+                  valueListenable: Backend.presenceStatus,
+                  builder: (context, value, _) =>
+                      Text(value, style: const TextStyle(fontSize: 12)),
+                ),
+            ],
             Text(
               _cloudMember == null
-                  ? 'Arrastra las notas. Tócalas para editar.\nConecta el espacio para compartirlas.'
-                  : 'Arrastra las notas. Tócalas para editar.\nLos cambios se comparten entre ambos dispositivos.',
+                  ? 'Arrastra para explorar el mural. Mantén una nota para cambiar su tamaño.\nConecta el espacio para compartirlas.'
+                  : 'Arrastra para explorar el mural. Mantén una nota para cambiar su tamaño.\nLos cambios se comparten entre ambos dispositivos.',
               style: const TextStyle(fontSize: 12, height: 1.5),
             ),
             const SizedBox(height: 8),
             const LaserMouse(),
             const SizedBox(height: 12),
-            FilledButton.icon(
-              onPressed: () => editNote(),
-              icon: const Icon(Icons.add),
-              label: const Text('Una notita'),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                FilledButton.icon(
+                  onPressed: () => editNote(),
+                  icon: const Icon(Icons.add),
+                  label: const Text('Una notita'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: _drawNote,
+                  icon: const Icon(Icons.draw_outlined),
+                  label: const Text('Pintar'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: _choosePhotoSource,
+                  icon: const Icon(Icons.add_a_photo_outlined),
+                  label: const Text('Foto'),
+                ),
+              ],
             ),
           ],
         ),
@@ -1252,75 +2337,116 @@ class _RinconHomeState extends State<RinconHome>
       Expanded(
         child: LayoutBuilder(
           builder: (context, c) {
-            final maxX = (c.maxWidth - 170).clamp(0.0, double.infinity);
-            final maxY = (c.maxHeight - 160).clamp(0.0, double.infinity);
+            final muralWidth = math.max(c.maxWidth * 2.4, 1050.0);
+            final muralHeight = math.max(c.maxHeight * 2.8, 1350.0);
             return Container(
               color: const Color(0xffeae8dc),
-              child: Stack(
-                children: [
-                  if (s.notes.isEmpty)
-                    const Center(
-                      child: Text(
-                        'Aquí empieza nuestro pequeño mural ♡',
-                        textAlign: TextAlign.center,
+              child: InteractiveViewer(
+                constrained: false,
+                minScale: .55,
+                maxScale: 1.8,
+                boundaryMargin: const EdgeInsets.all(80),
+                child: SizedBox(
+                  width: muralWidth,
+                  height: muralHeight,
+                  child: Stack(
+                    children: [
+                      Positioned.fill(
+                        child: CustomPaint(painter: _MuralGridPainter()),
                       ),
-                    ),
-                  for (final n in s.notes)
-                    Positioned(
-                      left: n.x * maxX,
-                      top: n.y * maxY,
-                      child: GestureDetector(
-                        onTap: () => editNote(n),
-                        onPanUpdate: (d) => setState(() {
-                          n.x = maxX == 0
-                              ? 0
-                              : (n.x + d.delta.dx / maxX).clamp(0.0, 1.0);
-                          n.y = maxY == 0
-                              ? 0
-                              : (n.y + d.delta.dy / maxY).clamp(0.0, 1.0);
-                        }),
-                        onPanEnd: (_) => s.saveNote(n),
-                        child: Container(
-                          width: 170,
-                          height: 160,
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: const Color(0xffffe8ac),
-                            borderRadius: BorderRadius.circular(4),
-                            boxShadow: const [
-                              BoxShadow(
-                                color: Color(0x18000000),
-                                blurRadius: 8,
-                                offset: Offset(0, 4),
-                              ),
-                            ],
+                      if (s.notes.isEmpty)
+                        const Positioned(
+                          left: 40,
+                          top: 40,
+                          child: Text(
+                            'Aquí empieza nuestro gran mural ♡',
+                            textAlign: TextAlign.center,
                           ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Icon(
-                                Icons.favorite,
-                                size: 15,
-                                color: Color(0xffb77661),
-                              ),
-                              const SizedBox(height: 10),
-                              Expanded(
-                                child: Text(
-                                  n.text,
-                                  overflow: TextOverflow.ellipsis,
-                                  maxLines: 5,
-                                  style: const TextStyle(
-                                    color: ink,
-                                    fontSize: 14,
+                        ),
+                      for (final n in s.notes)
+                        Builder(
+                          builder: (context) {
+                            final noteWidth = 170 * n.scale;
+                            final noteHeight = 160 * n.scale;
+                            final maxX = muralWidth - noteWidth;
+                            final maxY = muralHeight - noteHeight;
+                            return AnimatedPositioned(
+                              duration: const Duration(milliseconds: 650),
+                              curve: Curves.easeInOutCubic,
+                              left: n.x * maxX,
+                              top: n.y * maxY,
+                              child: GestureDetector(
+                                onTap: () =>
+                                    _isDrawing(n) ? _drawNote(n) : editNote(n),
+                                onLongPress: () => _resizeNote(n),
+                                onPanUpdate: (d) => setState(() {
+                                  n.x = (n.x + d.delta.dx / maxX).clamp(
+                                    0.0,
+                                    1.0,
+                                  );
+                                  n.y = (n.y + d.delta.dy / maxY).clamp(
+                                    0.0,
+                                    1.0,
+                                  );
+                                }),
+                                onPanEnd: (_) => s.saveNote(n),
+                                child: Container(
+                                  width: noteWidth,
+                                  height: noteHeight,
+                                  padding: EdgeInsets.all(
+                                    math.max(7, 16 * n.scale),
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xffffe8ac),
+                                    borderRadius: BorderRadius.circular(4),
+                                    boxShadow: const [
+                                      BoxShadow(
+                                        color: Color(0x18000000),
+                                        blurRadius: 8,
+                                        offset: Offset(0, 4),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      const Icon(
+                                        Icons.favorite,
+                                        size: 15,
+                                        color: Color(0xffb77661),
+                                      ),
+                                      SizedBox(
+                                        height: n.imageBase64 == null ? 10 : 5,
+                                      ),
+                                      if (n.imageBase64 != null)
+                                        Expanded(flex: 3, child: _noteImage(n)),
+                                      if (n.imageBase64 != null)
+                                        const SizedBox(height: 5),
+                                      Expanded(
+                                        flex: n.imageBase64 == null ? 5 : 1,
+                                        child: Text(
+                                          n.text,
+                                          overflow: TextOverflow.ellipsis,
+                                          maxLines: n.imageBase64 == null
+                                              ? 5
+                                              : 1,
+                                          style: const TextStyle(
+                                            color: ink,
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ),
-                            ],
-                          ),
+                            );
+                          },
                         ),
-                      ),
-                    ),
-                ],
+                    ],
+                  ),
+                ),
               ),
             );
           },
@@ -1328,6 +2454,474 @@ class _RinconHomeState extends State<RinconHome>
       ),
     ],
   );
+}
+
+class _CollectionCatPlay extends StatefulWidget {
+  final Widget child;
+  final int cardId, delay;
+  final bool enabled;
+  final CatKind cat;
+  final int routine;
+  const _CollectionCatPlay({
+    super.key,
+    required this.child,
+    required this.cardId,
+    required this.delay,
+    required this.enabled,
+    required this.cat,
+    required this.routine,
+  });
+  @override
+  State<_CollectionCatPlay> createState() => _CollectionCatPlayState();
+}
+
+class _CollectionCatPlayState extends State<_CollectionCatPlay>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _play = AnimationController(
+    vsync: this,
+    duration: Duration(seconds: 24 + widget.delay * 4),
+  );
+  @override
+  void initState() {
+    super.initState();
+    if (widget.enabled) _play.repeat();
+  }
+
+  @override
+  void didUpdateWidget(_CollectionCatPlay oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.enabled && !oldWidget.enabled) {
+      _play.repeat();
+    } else if (!widget.enabled && oldWidget.enabled) {
+      _play.stop();
+      _play.value = 0;
+    }
+  }
+
+  @override
+  void dispose() {
+    _play.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: _play,
+    builder: (context, _) {
+      final t = _play.value;
+      final active = widget.enabled && t > .55;
+      final p = active ? ((t - .55) / .45) : 0.0;
+      final arrive = Curves.easeOutCubic.transform((p / .22).clamp(0.0, 1.0));
+      final leave = Curves.easeInCubic.transform(
+        ((p - .78) / .22).clamp(0.0, 1.0),
+      );
+      final contact = ((p - .22) / .56).clamp(0.0, 1.0);
+      final lift = active && p > .22 && p < .78
+          ? math.sin(contact * math.pi)
+          : 0.0;
+      final stealing = widget.routine == 0;
+      final batting = widget.routine == 1;
+      final side = widget.cat == CatKind.maru ? -1.0 : 1.0;
+      final nudge = batting ? math.sin(contact * math.pi * 4) * lift : lift;
+      return Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned.fill(
+            child: Transform.translate(
+              offset: Offset(
+                side *
+                    nudge *
+                    (stealing
+                        ? 15
+                        : batting
+                        ? 8
+                        : 2),
+                -lift *
+                    (stealing
+                        ? 14
+                        : batting
+                        ? 3
+                        : 7),
+              ),
+              child: Transform.rotate(
+                angle: side * nudge * (stealing ? .08 : .035),
+                child: widget.child,
+              ),
+            ),
+          ),
+          if (active)
+            Positioned(
+              right: widget.cat == CatKind.lady
+                  ? -8 - (1 - arrive + leave) * 32
+                  : null,
+              left: widget.cat == CatKind.maru
+                  ? -8 - (1 - arrive + leave) * 32
+                  : null,
+              bottom: -4 + (widget.routine == 2 ? lift * 15 : lift * 5),
+              child: IgnorePointer(
+                child: Opacity(
+                  opacity: (arrive * (1 - leave)).clamp(0.0, 1.0),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (stealing && lift > .05)
+                        Transform.rotate(
+                          angle: side * -.12,
+                          child: Opacity(
+                            opacity: lift,
+                            child: Container(
+                              width: 33,
+                              height: 43,
+                              padding: const EdgeInsets.all(2),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(5),
+                                boxShadow: const [
+                                  BoxShadow(
+                                    color: Color(0x33000000),
+                                    blurRadius: 5,
+                                  ),
+                                ],
+                              ),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(3),
+                                child: _CardArt(cardId: widget.cardId),
+                              ),
+                            ),
+                          ),
+                        ),
+                      CatActor(
+                        cat: widget.cat,
+                        size: 70,
+                        action: CatAction.collection,
+                        active: p > .22 && p < .78,
+                        packProgress: contact,
+                        focus: -side * .7,
+                        showLabel: false,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+        ],
+      );
+    },
+  );
+}
+
+class _PackCarouselArrow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onPressed;
+  const _PackCarouselArrow({
+    required this.icon,
+    required this.label,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    button: true,
+    label: label,
+    child: Material(
+      color: const Color(0xeefffaf1),
+      shape: const CircleBorder(),
+      elevation: 5,
+      child: IconButton(
+        onPressed: onPressed,
+        icon: Icon(icon),
+        color: const Color(0xff57338f),
+        tooltip: label,
+      ),
+    ),
+  );
+}
+
+class _MuralGridPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = const Color(0x18a49e8c)
+      ..strokeWidth = 1;
+    for (double x = 0; x < size.width; x += 80) {
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
+    }
+    for (double y = 0; y < size.height; y += 80) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _DrawingDialog extends StatefulWidget {
+  final Uint8List? initialImage;
+  const _DrawingDialog({this.initialImage});
+
+  @override
+  State<_DrawingDialog> createState() => _DrawingDialogState();
+}
+
+class _DrawingDialogState extends State<_DrawingDialog> {
+  final GlobalKey _canvasKey = GlobalKey();
+  final List<_DrawStroke> _strokes = [];
+  final List<_DrawStroke> _redo = [];
+  Color _color = const Color(0xff34245f);
+  double _width = 5;
+  _DrawingTool _tool = _DrawingTool.pencil;
+  bool _saving = false;
+
+  void _start(DragStartDetails details) => setState(() {
+    _redo.clear();
+    _strokes.add(
+      _DrawStroke(
+        _tool == _DrawingTool.eraser ? const Color(0xfffffcf3) : _color,
+        _tool == _DrawingTool.eraser ? _width * 2 : _width,
+        [details.localPosition],
+        opacity: _tool == _DrawingTool.marker ? .42 : 1,
+      ),
+    );
+  });
+
+  void _update(DragUpdateDetails details) =>
+      setState(() => _strokes.last.points.add(details.localPosition));
+
+  Future<void> _save() async {
+    if (_saving) return;
+    setState(() => _saving = true);
+    try {
+      await WidgetsBinding.instance.endOfFrame;
+      final boundary =
+          _canvasKey.currentContext!.findRenderObject()!
+              as RenderRepaintBoundary;
+      final image = await boundary.toImage(pixelRatio: 2);
+      final data = await image.toByteData(format: ui.ImageByteFormat.png);
+      image.dispose();
+      if (mounted && data != null) {
+        Navigator.pop(context, data.buffer.asUint8List());
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => Dialog(
+    insetPadding: const EdgeInsets.all(14),
+    child: ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 430),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                const Expanded(
+                  child: Text(
+                    'Pinta algo para el mural',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
+                  ),
+                ),
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.close),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            AspectRatio(
+              aspectRatio: 4 / 3,
+              child: RepaintBoundary(
+                key: _canvasKey,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onPanStart: _start,
+                  onPanUpdate: _update,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      if (widget.initialImage != null)
+                        Image.memory(widget.initialImage!, fit: BoxFit.fill),
+                      CustomPaint(
+                        painter: _DrawingPainter(
+                          _strokes,
+                          paintBackground: widget.initialImage == null,
+                        ),
+                        child: const SizedBox.expand(),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            SegmentedButton<_DrawingTool>(
+              segments: const [
+                ButtonSegment(
+                  value: _DrawingTool.pencil,
+                  icon: Icon(Icons.edit_outlined),
+                  label: Text('Lápiz'),
+                ),
+                ButtonSegment(
+                  value: _DrawingTool.marker,
+                  icon: Icon(Icons.brush_outlined),
+                  label: Text('Marcador'),
+                ),
+                ButtonSegment(
+                  value: _DrawingTool.eraser,
+                  icon: Icon(Icons.auto_fix_normal_outlined),
+                  label: Text('Goma'),
+                ),
+              ],
+              selected: {_tool},
+              onSelectionChanged: (value) =>
+                  setState(() => _tool = value.first),
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                for (final color in const [
+                  Color(0xff34245f),
+                  Color(0xffe65d74),
+                  Color(0xff397fc4),
+                  Color(0xff36a56f),
+                  Color(0xffffb83f),
+                  Color(0xffff8a45),
+                  Color(0xff8e5ac7),
+                  Color(0xffef7fb0),
+                  Color(0xff22aeb8),
+                  Color(0xff6d4c41),
+                  Colors.black,
+                  Colors.white,
+                ])
+                  InkWell(
+                    onTap: () => setState(() {
+                      _color = color;
+                      if (_tool == _DrawingTool.eraser) {
+                        _tool = _DrawingTool.pencil;
+                      }
+                    }),
+                    borderRadius: BorderRadius.circular(20),
+                    child: Container(
+                      width: 30,
+                      height: 30,
+                      decoration: BoxDecoration(
+                        color: color,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: _color == color
+                              ? const Color(0xff34245f)
+                              : const Color(0xffcbc4b7),
+                          width: _color == color ? 3 : 1,
+                        ),
+                      ),
+                    ),
+                  ),
+                DropdownButton<double>(
+                  value: _width,
+                  items: const [
+                    DropdownMenuItem(value: 3, child: Text('Fino')),
+                    DropdownMenuItem(value: 5, child: Text('Medio')),
+                    DropdownMenuItem(value: 9, child: Text('Grueso')),
+                    DropdownMenuItem(value: 14, child: Text('Extra grueso')),
+                  ],
+                  onChanged: (value) => setState(() => _width = value ?? 5),
+                ),
+                IconButton(
+                  onPressed: _strokes.isEmpty
+                      ? null
+                      : () => setState(() => _redo.add(_strokes.removeLast())),
+                  icon: const Icon(Icons.undo),
+                  tooltip: 'Deshacer',
+                ),
+                IconButton(
+                  onPressed: _redo.isEmpty
+                      ? null
+                      : () => setState(() => _strokes.add(_redo.removeLast())),
+                  icon: const Icon(Icons.redo),
+                  tooltip: 'Rehacer',
+                ),
+                IconButton(
+                  onPressed: _strokes.isEmpty
+                      ? null
+                      : () => setState(() {
+                          _redo.addAll(_strokes.reversed);
+                          _strokes.clear();
+                        }),
+                  icon: const Icon(Icons.delete_outline),
+                  tooltip: 'Limpiar',
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            FilledButton.icon(
+              onPressed: _strokes.isEmpty || _saving ? null : _save,
+              icon: _saving
+                  ? const SizedBox.square(
+                      dimension: 17,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.push_pin_outlined),
+              label: const Text('Pegar en el mural'),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+class _DrawStroke {
+  final Color color;
+  final double width;
+  final List<Offset> points;
+  final double opacity;
+  _DrawStroke(this.color, this.width, this.points, {this.opacity = 1});
+}
+
+enum _DrawingTool { pencil, marker, eraser }
+
+class _DrawingPainter extends CustomPainter {
+  final List<_DrawStroke> strokes;
+  final bool paintBackground;
+  _DrawingPainter(this.strokes, {this.paintBackground = true});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (paintBackground) {
+      canvas.drawRect(
+        Offset.zero & size,
+        Paint()..color = const Color(0xfffffcf3),
+      );
+    }
+    for (final stroke in strokes) {
+      final paint = Paint()
+        ..color = stroke.color.withValues(alpha: stroke.opacity)
+        ..strokeWidth = stroke.width
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round
+        ..style = PaintingStyle.stroke;
+      if (stroke.points.length == 1) {
+        canvas.drawCircle(stroke.points.first, stroke.width / 2, paint);
+        continue;
+      }
+      final path = Path()
+        ..moveTo(stroke.points.first.dx, stroke.points.first.dy);
+      for (final point in stroke.points.skip(1)) {
+        path.lineTo(point.dx, point.dy);
+      }
+      canvas.drawPath(path, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _DrawingPainter oldDelegate) => true;
 }
 
 class BlockScreen extends StatefulWidget {
@@ -1546,7 +3140,7 @@ class _BlockScreenState extends State<BlockScreen>
         backgroundColor: const Color(0xff211342),
         appBar: AppBar(
           title: const Text(
-            'BLOQUES & BIGOTES',
+            'BLOCK BLASTER MARU EDITIONS',
             style: TextStyle(
               fontWeight: FontWeight.w900,
               letterSpacing: 1.4,
@@ -2634,6 +4228,47 @@ class HoloPatternPainter extends CustomPainter {
       old.progress != progress;
 }
 
+class _RevealSparklePainter extends CustomPainter {
+  final double progress;
+  final Color color;
+  const _RevealSparklePainter({required this.progress, required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    for (var i = 0; i < 9; i++) {
+      final phase = (progress * 1.35 + i * .137) % 1;
+      if (phase > .56) continue;
+      final x = (i * 73.0 + size.width * .12) % size.width;
+      final y = (i * 109.0 + size.height * .08) % size.height;
+      final strength = math.sin(phase / .56 * math.pi).clamp(0.0, 1.0);
+      final radius = 2.2 + strength * (i.isEven ? 4.2 : 2.6);
+      final paint = Paint()
+        ..color = Color.lerp(
+          color,
+          Colors.white,
+          .55,
+        )!.withValues(alpha: strength * .78)
+        ..strokeWidth = 1.4
+        ..strokeCap = StrokeCap.round;
+      canvas.drawLine(Offset(x - radius, y), Offset(x + radius, y), paint);
+      canvas.drawLine(Offset(x, y - radius), Offset(x, y + radius), paint);
+      if (i % 3 == 0) {
+        canvas.drawCircle(
+          Offset(x, y),
+          radius * 1.7,
+          Paint()
+            ..color = color.withValues(alpha: strength * .15)
+            ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5),
+        );
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _RevealSparklePainter oldDelegate) =>
+      oldDelegate.progress != progress || oldDelegate.color != color;
+}
+
 class PackSparklePainter extends CustomPainter {
   final double progress;
   const PackSparklePainter({required this.progress});
@@ -2720,6 +4355,46 @@ class _CollectionBadge extends StatelessWidget {
   );
 }
 
+class _PaletteSurface extends StatelessWidget {
+  final int cardId;
+  final bool enabled;
+  final Widget child;
+  const _PaletteSurface({
+    required this.cardId,
+    required this.enabled,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (!enabled) return child;
+    final fallback = cardColor(cardId);
+    return FutureBuilder<CardPalette>(
+      future: CardPaletteExtractor.load(cardId, fallback),
+      builder: (context, snapshot) {
+        final palette =
+            snapshot.data ??
+            CardPalette(
+              primary: fallback,
+              secondary: Color.lerp(fallback, const Color(0xff26304b), .62)!,
+              accent: Color.lerp(fallback, Colors.white, .45)!,
+            );
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 420),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [palette.primary, palette.secondary],
+            ),
+          ),
+          child: child,
+        );
+      },
+    );
+  }
+}
+
 class _RarityFrame extends StatefulWidget {
   final CardRarity rarity;
   final bool locked;
@@ -2745,7 +4420,7 @@ class _RarityFrameState extends State<_RarityFrame>
     _shine = AnimationController(
       vsync: this,
       duration: Duration(
-        milliseconds: widget.rarity == CardRarity.legendary ? 2200 : 3500,
+        milliseconds: widget.rarity == CardRarity.legendary ? 6500 : 8000,
       ),
     );
     if ((widget.rarity != CardRarity.common || widget.forceShine) &&
@@ -2886,37 +4561,164 @@ class _CardArt extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final asset = cardAsset(cardId);
-    if (asset == null) {
-      return Center(
-        child: Text(cardIcons[cardId], style: const TextStyle(fontSize: 62)),
-      );
-    }
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(10),
-      child: Container(
-        width: double.infinity,
-        color: const Color(0xff281a43),
-        child: Image.asset(
-          asset,
-          fit: BoxFit.contain,
-          filterQuality: FilterQuality.medium,
-          errorBuilder: (_, _, _) => const Center(
-            child: Icon(Icons.broken_image, color: Colors.white),
+    return Container(
+      width: double.infinity,
+      height: double.infinity,
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white, width: 2),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x44000000),
+            blurRadius: 5,
+            offset: Offset(0, 2),
           ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(7),
+        child: ColoredBox(
+          color: const Color(0xff281a43),
+          child: asset == null
+              ? Center(
+                  child: Text(
+                    cardIcons[cardId],
+                    style: const TextStyle(fontSize: 62),
+                  ),
+                )
+              : Image.asset(
+                  asset,
+                  fit: BoxFit.contain,
+                  filterQuality: FilterQuality.medium,
+                  errorBuilder: (_, _, _) => const Center(
+                    child: Icon(Icons.broken_image, color: Colors.white),
+                  ),
+                ),
         ),
       ),
     );
   }
 }
 
+class _RarityBurstPainter extends CustomPainter {
+  final double progress;
+  final CardRarity rarity;
+  _RarityBurstPainter({required this.progress, required this.rarity});
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final paint = Paint()
+      ..color = rarityColor(rarity).withValues(alpha: .12 + rarity.rank * .025)
+      ..strokeWidth = 1.5 + rarity.rank;
+    final count = 5 + rarity.rank * 4;
+    for (var i = 0; i < count; i++) {
+      final angle = i * math.pi * 2 / count + progress * math.pi * 2;
+      final direction = Offset(math.cos(angle), math.sin(angle));
+      final pulse = .55 + .45 * math.sin(progress * math.pi * 2 + i);
+      canvas.drawLine(
+        center + direction * 72,
+        center + direction * (90 + pulse * (20 + rarity.rank * 14)),
+        paint,
+      );
+    }
+    if (rarity.rank >= 3) {
+      canvas.drawCircle(
+        center,
+        85 + progress * 50,
+        paint..style = PaintingStyle.stroke,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _RarityBurstPainter oldDelegate) => true;
+}
+
+class _FoilArt extends StatefulWidget {
+  final int cardId;
+  final CardFinish finish;
+  const _FoilArt({required this.cardId, required this.finish});
+  @override
+  State<_FoilArt> createState() => _FoilArtState();
+}
+
+class _FoilArtState extends State<_FoilArt>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _shine = AnimationController(
+    vsync: this,
+    duration: const Duration(seconds: 7),
+  );
+  @override
+  void initState() {
+    super.initState();
+    if (widget.finish != CardFinish.normal) _shine.repeat();
+  }
+
+  @override
+  void dispose() {
+    _shine.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: _shine,
+    builder: (context, _) => ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          _CardArt(cardId: widget.cardId),
+          if (widget.finish != CardFinish.normal) ...[
+            IgnorePointer(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  border: Border.all(
+                    width: 4,
+                    color: widget.finish == CardFinish.gold
+                        ? const Color(0xffffda68)
+                        : const Color(0xffdce9f6),
+                  ),
+                  gradient: LinearGradient(
+                    begin: Alignment(-3 + _shine.value * 6, -1),
+                    end: Alignment(-1 + _shine.value * 6, 1),
+                    colors: [
+                      Colors.transparent,
+                      (widget.finish == CardFinish.gold
+                              ? const Color(0xffffdd68)
+                              : const Color(0xffd9f0ff))
+                          .withValues(alpha: .48),
+                      Colors.white.withValues(alpha: .65),
+                      Colors.transparent,
+                    ],
+                    stops: const [0, .4, .5, 1],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    ),
+  );
+}
+
 class _InspectCardDialog extends StatefulWidget {
   final int cardId;
   final int copies;
   final CardRarity rarity;
+  final CatKind? opener;
+  final String collectionId;
+  final CardFinish finish;
   const _InspectCardDialog({
     required this.cardId,
     required this.copies,
     required this.rarity,
+    required this.opener,
+    required this.collectionId,
+    this.finish = CardFinish.normal,
   });
 
   @override
@@ -2927,15 +4729,170 @@ class _InspectCardDialogState extends State<_InspectCardDialog>
     with SingleTickerProviderStateMixin {
   double _turn = 0;
   double _tilt = 0;
+  double _zoom = 1;
+  double _zoomBase = 1;
   late final AnimationController _auto;
+  late CardPalette _palette;
   Timer? _idle;
   double _spinBase = 0;
+  final _arTextureKey = GlobalKey();
+  bool _arBusy = false;
+
+  Future<void> _openAr() async {
+    if (_arBusy) return;
+    _pauseSpin();
+    if (!CardAr.supportedPlatform) {
+      await showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Realidad aumentada'),
+          content: const Text(
+            'Abre esta opción en la app Android, en un teléfono compatible con ARCore. La versión web y iOS todavía no incluyen este modo.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Entendido'),
+            ),
+          ],
+        ),
+      );
+      if (mounted) _scheduleSpin();
+      return;
+    }
+    final consent = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Tu carta en el mundo real'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Usaremos tu cámara para detectar una mesa o el suelo. Toca la superficie para colocar la carta y pellizca para cambiar su tamaño.\n\nEste modo utiliza Google Play Services para AR (ARCore), un servicio de Google sujeto a su Política de Privacidad.\n\nSolo guardaremos la foto si eliges «Guardar en el bloc». Si tu bloc está conectado, esa foto se sincronizará con Firebase y será visible para las personas de tu espacio compartido.',
+              ),
+              TextButton(
+                onPressed: () async {
+                  try {
+                    await CardAr.channel.invokeMethod<void>('privacy');
+                  } on PlatformException catch (_) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Puedes consultar la política en https://policies.google.com/privacy',
+                          ),
+                        ),
+                      );
+                    }
+                  }
+                },
+                child: const Text('Política de Privacidad de Google'),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Abrir cámara AR'),
+          ),
+        ],
+      ),
+    );
+    if (consent != true || !mounted) {
+      if (mounted) _scheduleSpin();
+      return;
+    }
+    setState(() {
+      _arBusy = true;
+      _turn = 0;
+      _tilt = 0;
+      _zoom = 1;
+    });
+    try {
+      await WidgetsBinding.instance.endOfFrame;
+      final boundary =
+          _arTextureKey.currentContext!.findRenderObject()!
+              as RenderRepaintBoundary;
+      final image = await boundary.toImage(pixelRatio: 2);
+      late Uint8List texture;
+      try {
+        texture = (await image.toByteData(
+          format: ui.ImageByteFormat.png,
+        ))!.buffer.asUint8List();
+      } finally {
+        image.dispose();
+      }
+      final photo = await CardAr.capture(texture);
+      if (photo == null || !mounted) return;
+      final save = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => CardArPhotoReview(photo: photo),
+      );
+      if (save == true && mounted) Navigator.pop(context, photo);
+    } on PlatformException catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error.message ?? 'No se pudo abrir AR.')),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'No pudimos preparar la carta para AR. Vuelve a intentar.',
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _arBusy = false);
+        _scheduleSpin();
+      }
+    }
+  }
+
+  String get _openerName => widget.opener == null
+      ? 'Maru & Lady'
+      : widget.opener == CatKind.maru
+      ? 'Maru'
+      : 'Lady';
+
+  String get _collectionTitle => switch (widget.collectionId) {
+    anniversaryCollectionId => anniversaryCollectionTitle,
+    anniversaryCollectionV2Id => anniversaryCollectionV2Title,
+    _ => anniversaryCollectionTitle,
+  };
+
+  String get _collectionEdition => switch (widget.collectionId) {
+    anniversaryCollectionId => anniversaryCollectionEdition,
+    anniversaryCollectionV2Id => 'EDICIÓN PAPU',
+    _ => anniversaryCollectionEdition,
+  };
 
   @override
   void initState() {
     super.initState();
+    _palette = CardPalette(
+      primary: cardColor(widget.cardId),
+      secondary: const Color(0xff49317b),
+      accent: Color.lerp(cardColor(widget.cardId), Colors.white, .48)!,
+    );
+    CardPaletteExtractor.load(widget.cardId, cardColor(widget.cardId)).then((
+      palette,
+    ) {
+      if (mounted) setState(() => _palette = palette);
+    });
     _auto =
-        AnimationController(vsync: this, duration: const Duration(seconds: 6))
+        AnimationController(vsync: this, duration: const Duration(seconds: 14))
           ..addListener(
             () => setState(() {
               _turn = _spinBase + _auto.value * math.pi * 2;
@@ -2964,6 +4921,268 @@ class _InspectCardDialogState extends State<_InspectCardDialog>
     _auto.stop();
   }
 
+  Widget _collectionBack() => Stack(
+    fit: StackFit.expand,
+    children: [
+      Positioned(
+        top: -65,
+        right: -48,
+        child: Container(
+          width: 190,
+          height: 190,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: const Color(0xffd76dff).withValues(alpha: .16),
+          ),
+        ),
+      ),
+      Positioned(
+        bottom: -72,
+        left: -55,
+        child: Container(
+          width: 185,
+          height: 185,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: const Color(0xff54d9ff).withValues(alpha: .13),
+          ),
+        ),
+      ),
+      Positioned(
+        top: -20,
+        left: 126,
+        child: Transform.rotate(
+          angle: .18,
+          child: Container(
+            width: 42,
+            height: 410,
+            color: Colors.white.withValues(alpha: .055),
+          ),
+        ),
+      ),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(22, 22, 22, 18),
+        child: Column(
+          children: [
+            const Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.auto_awesome, color: Color(0xffa8edff), size: 13),
+                SizedBox(width: 7),
+                Text(
+                  'SOBRE SORPRESA',
+                  style: TextStyle(
+                    color: Color(0xffbdefff),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1.5,
+                  ),
+                ),
+                SizedBox(width: 7),
+                Icon(Icons.auto_awesome, color: Color(0xffa8edff), size: 13),
+              ],
+            ),
+            const SizedBox(height: 18),
+            Container(
+              width: 82,
+              height: 82,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: const LinearGradient(
+                  colors: [Color(0xffff80d7), Color(0xff8c65ff)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                border: Border.all(color: const Color(0xffffed9c), width: 2),
+                boxShadow: const [
+                  BoxShadow(color: Color(0x88dc56ff), blurRadius: 22),
+                ],
+              ),
+              child: const Icon(
+                Icons.pets_rounded,
+                color: Colors.white,
+                size: 48,
+              ),
+            ),
+            const SizedBox(height: 19),
+            Text(
+              _collectionTitle,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 23,
+                height: 1,
+                fontWeight: FontWeight.w900,
+                letterSpacing: .7,
+                shadows: [Shadow(color: Color(0xffe55cfa), blurRadius: 12)],
+              ),
+            ),
+            const SizedBox(height: 5),
+            Text(
+              _collectionEdition,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: Color(0xffffe48d),
+                fontSize: 14,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 1.1,
+              ),
+            ),
+            const Spacer(),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: .1),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: const Color(0xffffed9c).withValues(alpha: .75),
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.auto_awesome,
+                    color: Color(0xffffed9c),
+                    size: 14,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    widget.opener == null
+                        ? 'DESCUBIERTA POR MARU & LADY'
+                        : 'LA ABRIÓ ${_openerName.toUpperCase()}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 9,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: .7,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    ],
+  );
+
+  Widget _collectionFront() => Stack(
+    fit: StackFit.expand,
+    children: [
+      Positioned.fill(
+        child: CustomPaint(
+          painter: HoloPatternPainter(
+            progress: ((_turn / (math.pi * 2)) % 1).abs(),
+          ),
+        ),
+      ),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(12, 38, 12, 10),
+        child: Column(
+          children: [
+            Expanded(
+              child: _FoilArt(cardId: widget.cardId, finish: widget.finish),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              cardNames[widget.cardId],
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 19,
+                fontWeight: FontWeight.w900,
+                shadows: [Shadow(color: Color(0xff321453), blurRadius: 8)],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (widget.opener != null)
+                  CatActor(
+                    cat: widget.opener!,
+                    size: 28,
+                    action: CatAction.collection,
+                    active: true,
+                    showLabel: false,
+                  )
+                else
+                  const Icon(Icons.pets, color: Color(0xffffe79b), size: 20),
+                const SizedBox(width: 5),
+                Text(
+                  widget.opener == null
+                      ? 'Descubierta por $_openerName'
+                      : 'La abrió $_openerName',
+                  style: const TextStyle(
+                    color: Color(0xffffedbe),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 5),
+            Text(
+              '$_collectionTitle · ${widget.collectionId == anniversaryCollectionV2Id ? 'VOL. 02' : 'VOL. 01'}',
+              style: const TextStyle(
+                color: Color(0xfffff0bf),
+                fontSize: 9,
+                letterSpacing: .8,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
+        ),
+      ),
+      Positioned(
+        top: 7,
+        right: 8,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                _palette.accent,
+                Color.lerp(_palette.primary, Colors.black, .28)!,
+              ],
+            ),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: Colors.white.withValues(alpha: .75)),
+            boxShadow: const [
+              BoxShadow(color: Color(0x66000000), blurRadius: 9),
+            ],
+          ),
+          child: Text(
+            '${widget.rarity.label.toUpperCase()} · ×${widget.copies}',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 8,
+              fontWeight: FontWeight.w900,
+              letterSpacing: .6,
+            ),
+          ),
+        ),
+      ),
+      Positioned.fill(
+        child: IgnorePointer(
+          child: Container(
+            margin: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(17),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: .32),
+                width: 1.2,
+              ),
+            ),
+          ),
+        ),
+      ),
+    ],
+  );
+
   @override
   void dispose() {
     _idle?.cancel();
@@ -2977,14 +5196,11 @@ class _InspectCardDialogState extends State<_InspectCardDialog>
     final card = Container(
       width: 270,
       height: 355,
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         gradient: front
             ? LinearGradient(
-                colors: [
-                  Color.lerp(cardColor(widget.cardId), Colors.white, .48)!,
-                  cardColor(widget.cardId),
-                  const Color(0xff49317b),
-                ],
+                colors: [_palette.accent, _palette.primary, _palette.secondary],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               )
@@ -2995,80 +5211,12 @@ class _InspectCardDialogState extends State<_InspectCardDialog>
         border: Border.all(color: rarityColor(widget.rarity), width: 4),
         boxShadow: [
           BoxShadow(
-            color: rarityColor(widget.rarity).withValues(alpha: .6),
+            color: _palette.accent.withValues(alpha: .58),
             blurRadius: 30,
           ),
         ],
       ),
-      child: front
-          ? Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
-                    child: _CardArt(cardId: widget.cardId),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 18),
-                  child: Text(
-                    cardNames[widget.cardId],
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 19,
-                      fontWeight: FontWeight.w900,
-                      shadows: [
-                        Shadow(color: Color(0xff321453), blurRadius: 8),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  'SOBRE SORPRESA · VOL. 01',
-                  style: TextStyle(
-                    color: Color(0xfffff0bf),
-                    fontSize: 10,
-                    letterSpacing: 1,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  '×${widget.copies}',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 17,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 12),
-              ],
-            )
-          : Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: const [
-                Icon(Icons.pets, color: Color(0xffffe79b), size: 92),
-                SizedBox(height: 22),
-                Text(
-                  'MARU & LADY',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 24,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 2,
-                  ),
-                ),
-                SizedBox(height: 8),
-                Text(
-                  'Un recuerdo para guardar',
-                  style: TextStyle(color: Color(0xffffe79b), fontSize: 13),
-                ),
-              ],
-            ),
+      child: front ? _collectionFront() : _collectionBack(),
     );
     return Dialog(
       backgroundColor: const Color(0xff21183e),
@@ -3084,7 +5232,9 @@ class _InspectCardDialogState extends State<_InspectCardDialog>
                 children: [
                   Expanded(
                     child: Text(
-                      '${widget.rarity.label} · Tu carta',
+                      '${widget.rarity.label} · ${cardNames[widget.cardId]}',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: 20,
@@ -3102,34 +5252,51 @@ class _InspectCardDialogState extends State<_InspectCardDialog>
               const SizedBox(height: 10),
               GestureDetector(
                 behavior: HitTestBehavior.opaque,
-                onHorizontalDragStart: (_) => _pauseSpin(),
-                onHorizontalDragEnd: (_) => _scheduleSpin(),
-                onVerticalDragStart: (_) => _pauseSpin(),
-                onVerticalDragEnd: (_) => _scheduleSpin(),
-                onHorizontalDragUpdate: (details) =>
-                    setState(() => _turn += details.delta.dx * .015),
-                onVerticalDragUpdate: (details) => setState(
-                  () => _tilt = (_tilt - details.delta.dy * .007).clamp(
-                    -.35,
-                    .35,
-                  ),
-                ),
+                onDoubleTap: () {
+                  _touch();
+                  setState(() => _zoom = _zoom > 1.1 ? 1 : 1.38);
+                },
+                onScaleStart: (_) {
+                  _pauseSpin();
+                  _zoomBase = _zoom;
+                },
+                onScaleEnd: (_) => _scheduleSpin(),
+                onScaleUpdate: (details) => setState(() {
+                  if (details.pointerCount >= 2) {
+                    _zoom = (_zoomBase * details.scale).clamp(.72, 1.5);
+                  } else {
+                    _turn += details.focalPointDelta.dx * .015;
+                    _tilt = (_tilt - details.focalPointDelta.dy * .007).clamp(
+                      -.35,
+                      .35,
+                    );
+                  }
+                }),
                 child: Transform(
                   alignment: Alignment.center,
                   transform: Matrix4.identity()
                     ..setEntry(3, 2, .0012)
+                    ..scaleByDouble(_zoom, _zoom, _zoom, 1)
                     ..rotateX(_tilt)
                     ..rotateY(front ? _turn : _turn + math.pi),
                   child: _RarityFrame(
                     rarity: widget.rarity,
                     forceShine: _auto.isAnimating,
-                    child: card,
+                    child: RepaintBoundary(key: _arTextureKey, child: card),
                   ),
                 ),
               ),
-              const SizedBox(height: 40),
+              const SizedBox(height: 16),
+              TextButton.icon(
+                onPressed: _arBusy ? null : _openAr,
+                icon: const Icon(Icons.view_in_ar, color: Color(0xffffe79b)),
+                label: Text(
+                  _arBusy ? 'Preparando AR…' : 'Ver en realidad aumentada',
+                  style: const TextStyle(color: Color(0xffffe79b)),
+                ),
+              ),
               const Text(
-                'Desliza a los lados para girarla 360°',
+                'Desliza para girar · pellizca para acercar',
                 style: TextStyle(color: Color(0xffffe79b), fontSize: 12),
               ),
               Row(
@@ -3142,6 +5309,30 @@ class _InspectCardDialogState extends State<_InspectCardDialog>
                     },
                     icon: const Icon(Icons.rotate_left, color: Colors.white),
                     tooltip: 'Girar a la izquierda',
+                  ),
+                  IconButton(
+                    onPressed: () {
+                      _touch();
+                      setState(() => _zoom = (_zoom - .15).clamp(.72, 1.5));
+                    },
+                    icon: const Icon(Icons.zoom_out, color: Colors.white),
+                    tooltip: 'Alejar',
+                  ),
+                  Text(
+                    '${(_zoom * 100).round()}%',
+                    style: const TextStyle(
+                      color: Color(0xffffe79b),
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () {
+                      _touch();
+                      setState(() => _zoom = (_zoom + .15).clamp(.72, 1.5));
+                    },
+                    icon: const Icon(Icons.zoom_in, color: Colors.white),
+                    tooltip: 'Acercar',
                   ),
                   IconButton(
                     onPressed: () {
@@ -3165,6 +5356,8 @@ class CardRevealDialog extends StatefulWidget {
   final int cardId, copies, total;
   final CatKind opener;
   final CardRarity rarity;
+  final CardFinish finish;
+  final String collectionId;
   const CardRevealDialog({
     super.key,
     required this.cardId,
@@ -3172,6 +5365,8 @@ class CardRevealDialog extends StatefulWidget {
     required this.total,
     required this.opener,
     required this.rarity,
+    this.finish = CardFinish.normal,
+    this.collectionId = anniversaryCollectionId,
   });
 
   @override
@@ -3181,6 +5376,7 @@ class CardRevealDialog extends StatefulWidget {
 class _CardRevealDialogState extends State<CardRevealDialog>
     with SingleTickerProviderStateMixin {
   late final AnimationController _foil;
+  late CardPalette _palette;
   double _pointerX = 0;
   double _pointerY = 0;
 
@@ -3202,10 +5398,22 @@ class _CardRevealDialogState extends State<CardRevealDialog>
   @override
   void initState() {
     super.initState();
+    _palette = CardPalette(
+      primary: cardColor(cardId),
+      secondary: const Color(0xff49317b),
+      accent: Color.lerp(cardColor(cardId), Colors.white, .48)!,
+    );
+    CardPaletteExtractor.load(cardId, cardColor(cardId)).then((palette) {
+      if (mounted) setState(() => _palette = palette);
+    });
     _foil = AnimationController(
       vsync: this,
       duration: Duration(
-        milliseconds: widget.rarity == CardRarity.legendary ? 850 : 1850,
+        milliseconds: widget.rarity == CardRarity.legendary
+            ? 7200
+            : widget.rarity == CardRarity.epic
+            ? 8200
+            : 9400,
       ),
     )..repeat();
   }
@@ -3225,8 +5433,8 @@ class _CardRevealDialogState extends State<CardRevealDialog>
       insetPadding: const EdgeInsets.all(18),
       child: TweenAnimationBuilder<double>(
         tween: Tween(begin: -math.pi / 2, end: 0),
-        duration: const Duration(milliseconds: 720),
-        curve: Curves.easeOutBack,
+        duration: Duration(milliseconds: 700 + widget.rarity.rank * 230),
+        curve: widget.rarity.rank >= 3 ? Curves.elasticOut : Curves.easeOutBack,
         builder: (context, angle, child) {
           final turn = angle.abs() < .15 ? 0.0 : angle;
           return Transform(
@@ -3260,11 +5468,7 @@ class _CardRevealDialogState extends State<CardRevealDialog>
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                widget.rarity == CardRarity.legendary
-                    ? '✦ ¡LEGENDARIA! ✦'
-                    : widget.rarity == CardRarity.epic
-                    ? '✦ ¡ÉPICA! ✦'
-                    : '¡NUEVA CARTA!',
+                '✦ ¡${widget.rarity.label.toUpperCase()}! ✦',
                 style: TextStyle(
                   color: rarityColor(widget.rarity),
                   fontWeight: FontWeight.w900,
@@ -3274,6 +5478,13 @@ class _CardRevealDialogState extends State<CardRevealDialog>
                 ),
               ),
               const SizedBox(height: 5),
+              Text(
+                widget.finish.label,
+                style: const TextStyle(
+                  color: Color(0xffffedbe),
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -3306,13 +5517,17 @@ class _CardRevealDialogState extends State<CardRevealDialog>
                     animation: _foil,
                     builder: (context, child) {
                       final orbit = _foil.value * math.pi * 2;
+                      final breathe = 1 + math.sin(orbit - math.pi / 2) * .018;
+                      final float = math.sin(orbit * 2) * 3;
                       return Transform(
                         alignment: Alignment.center,
                         transform: Matrix4.identity()
                           ..setEntry(3, 2, .0018)
-                          ..rotateX(_pointerX + math.sin(orbit) * .075)
-                          ..rotateY(_pointerY + math.cos(orbit) * .12)
-                          ..rotateZ(math.sin(orbit + .8) * .025),
+                          ..translateByDouble(0, float, 0, 1)
+                          ..scaleByDouble(breathe, breathe, breathe, 1)
+                          ..rotateX(_pointerX + math.sin(orbit) * .05)
+                          ..rotateY(_pointerY + math.cos(orbit) * .085)
+                          ..rotateZ(math.sin(orbit * 2 + .8) * .018),
                         child: child,
                       );
                     },
@@ -3326,9 +5541,9 @@ class _CardRevealDialogState extends State<CardRevealDialog>
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                             colors: [
-                              Color.lerp(cardColor(cardId), Colors.white, .48)!,
-                              cardColor(cardId),
-                              const Color(0xff49317b),
+                              _palette.accent,
+                              _palette.primary,
+                              _palette.secondary,
                             ],
                           ),
                           borderRadius: BorderRadius.circular(20),
@@ -3338,7 +5553,7 @@ class _CardRevealDialogState extends State<CardRevealDialog>
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: cardColor(cardId).withValues(alpha: .65),
+                              color: _palette.accent.withValues(alpha: .65),
                               blurRadius: 25,
                               spreadRadius: 1,
                             ),
@@ -3354,10 +5569,27 @@ class _CardRevealDialogState extends State<CardRevealDialog>
                             Positioned.fill(
                               child: AnimatedBuilder(
                                 animation: _foil,
-                                builder: (context, _) => CustomPaint(
-                                  painter: HoloPatternPainter(
-                                    progress: _foil.value,
-                                  ),
+                                builder: (context, _) => Stack(
+                                  fit: StackFit.expand,
+                                  children: [
+                                    CustomPaint(
+                                      painter: HoloPatternPainter(
+                                        progress: _foil.value,
+                                      ),
+                                    ),
+                                    CustomPaint(
+                                      painter: _RevealSparklePainter(
+                                        progress: _foil.value,
+                                        color: rarityColor(widget.rarity),
+                                      ),
+                                    ),
+                                    CustomPaint(
+                                      painter: _RarityBurstPainter(
+                                        progress: _foil.value,
+                                        rarity: widget.rarity,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ),
@@ -3371,7 +5603,10 @@ class _CardRevealDialogState extends State<CardRevealDialog>
                                       padding: const EdgeInsets.symmetric(
                                         horizontal: 10,
                                       ),
-                                      child: _CardArt(cardId: cardId),
+                                      child: _FoilArt(
+                                        cardId: cardId,
+                                        finish: widget.finish,
+                                      ),
                                     ),
                                   ),
                                   const SizedBox(height: 8),
@@ -3382,6 +5617,8 @@ class _CardRevealDialogState extends State<CardRevealDialog>
                                     child: Text(
                                       cardNames[cardId],
                                       textAlign: TextAlign.center,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
                                       style: const TextStyle(
                                         color: Colors.white,
                                         fontSize: 16,
@@ -3396,9 +5633,9 @@ class _CardRevealDialogState extends State<CardRevealDialog>
                                     ),
                                   ),
                                   const SizedBox(height: 10),
-                                  const Text(
-                                    'SOBRE SORPRESA · VOL. 01',
-                                    style: TextStyle(
+                                  Text(
+                                    'SOBRE SORPRESA · ${widget.collectionId == anniversaryCollectionV2Id ? 'VOL. 02' : 'VOL. 01'}',
+                                    style: const TextStyle(
                                       color: Color(0xfffff0bf),
                                       fontSize: 8,
                                       letterSpacing: 1.2,
@@ -3688,8 +5925,9 @@ class _LaserMouseState extends State<LaserMouse>
           cat: CatKind.lady,
           size: 76,
           action: CatAction.notes,
-          active: _run.value < .35,
+          active: _run.value < .13,
           focus: 1,
+          showLabel: false,
         ),
         const SizedBox(width: 4),
         Expanded(
@@ -3711,30 +5949,10 @@ class _LaserMouseState extends State<LaserMouse>
                     ),
                     Positioned(
                       left: travel * _run.value,
-                      top: 32 + math.sin(_run.value * math.pi * 2) * 7,
-                      child: const Icon(
-                        Icons.mouse,
-                        size: 19,
-                        color: Color(0xff76635e),
-                      ),
-                    ),
-                    Positioned(
-                      left: travel * _run.value + 14,
-                      top: 40,
-                      child: Container(
-                        width: 8,
-                        height: 8,
-                        decoration: const BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Color(0xffff4d65),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Color(0xffff4d65),
-                              blurRadius: 9,
-                              spreadRadius: 2,
-                            ),
-                          ],
-                        ),
+                      top: 27 + math.sin(_run.value * math.pi * 2) * 6,
+                      child: Transform.flip(
+                        flipX: _run.status == AnimationStatus.reverse,
+                        child: const _RealMouse(size: 30),
                       ),
                     ),
                   ],
@@ -3748,10 +5966,82 @@ class _LaserMouseState extends State<LaserMouse>
           cat: CatKind.maru,
           size: 76,
           action: CatAction.notes,
-          active: _run.value > .65,
+          active: _run.value > .87,
           focus: -1,
+          showLabel: false,
         ),
       ],
     ),
   );
+}
+
+class _RealMouse extends StatelessWidget {
+  final double size;
+  const _RealMouse({required this.size});
+
+  @override
+  Widget build(BuildContext context) => SizedBox.square(
+    dimension: size,
+    child: CustomPaint(painter: _RealMousePainter()),
+  );
+}
+
+class _RealMousePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final body = Paint()..color = const Color(0xff81726d);
+    final pink = Paint()..color = const Color(0xffe8a0aa);
+    final line = Paint()
+      ..color = const Color(0xff5b4b47)
+      ..strokeWidth = size.width * .065
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+    canvas.drawPath(
+      Path()
+        ..moveTo(size.width * .18, size.height * .58)
+        ..cubicTo(
+          -size.width * .12,
+          size.height * .34,
+          size.width * .04,
+          size.height * .12,
+          size.width * .22,
+          size.height * .28,
+        ),
+      line,
+    );
+    canvas.drawOval(
+      Rect.fromLTWH(
+        size.width * .18,
+        size.height * .30,
+        size.width * .68,
+        size.height * .48,
+      ),
+      body,
+    );
+    canvas.drawCircle(
+      Offset(size.width * .63, size.height * .30),
+      size.width * .12,
+      pink,
+    );
+    canvas.drawCircle(
+      Offset(size.width * .80, size.height * .47),
+      size.width * .04,
+      Paint()..color = Colors.black,
+    );
+    canvas.drawCircle(
+      Offset(size.width * .88, size.height * .57),
+      size.width * .045,
+      pink,
+    );
+    for (final dy in [-.06, .03, .12]) {
+      canvas.drawLine(
+        Offset(size.width * .82, size.height * (.58 + dy)),
+        Offset(size.width, size.height * (.52 + dy)),
+        line..strokeWidth = 1,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

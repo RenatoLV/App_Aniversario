@@ -1,0 +1,51 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function member(space) {
+      return signedIn() && exists(/databases/$(database)/documents/spaces/$(space)/members/$(request.auth.uid));
+    }
+    match /players/{uid} {
+      allow read, write: if signedIn() && request.auth.uid == uid;
+      match /progress/{id} {
+        allow read: if signedIn() && request.auth.uid == uid;
+        allow create: if signedIn() && request.auth.uid == uid && request.resource.data.revision == 1 && request.resource.data.payload is string && request.resource.data.payload.size() < 850000;
+        allow update: if signedIn() && request.auth.uid == uid && request.resource.data.revision == resource.data.revision + 1 && request.resource.data.payload is string && request.resource.data.payload.size() < 850000;
+        match /recovery/{backup} { allow read, create: if signedIn() && request.auth.uid == uid; }
+      }
+    }
+    match /spaces/{space} {
+      // Knowing the 20-character random room ID is the invitation capability.
+      allow get: if signedIn();
+      allow create: if signedIn() && space.size() == 20 && request.resource.data.owner == request.auth.uid;
+      match /members/{uid} {
+        allow read: if member(space);
+        allow create: if signedIn() && request.auth.uid == uid && existsAfter(/databases/$(database)/documents/spaces/$(space));
+        allow update: if signedIn() && request.auth.uid == uid && request.resource.data.keys().hasOnly(['nickname']);
+      }
+      match /notes/{id} {
+        allow read: if member(space);
+        allow create, update: if member(space)
+          && request.resource.data.keys().hasOnly(['body','x','y','scale','mediaKind','mediaPath','editor','updatedAt'])
+          && request.resource.data.editor == request.auth.uid
+          && request.resource.data.body is string && request.resource.data.body.size() <= 20000
+          && request.resource.data.x is number && request.resource.data.y is number
+          && request.resource.data.scale is number && request.resource.data.scale > 0 && request.resource.data.scale <= 5
+          && (request.resource.data.mediaPath == null || request.resource.data.mediaPath.matches('spaces/' + space + '/notes/' + id + '/[^/]+'));
+      }
+      match /scores/{id} {
+        function validScore() {
+          return request.resource.data.keys().hasOnly(['user_id','nickname','game','score','updated_at'])
+            && request.resource.data.user_id == request.auth.uid
+            && request.resource.data.game in ['blocks-v1','wordlady','candy-churu-cat','ascenso-maruzon']
+            && id == request.auth.uid + '_' + request.resource.data.game
+            && request.resource.data.nickname is string && request.resource.data.nickname.size() <= 200
+            && request.resource.data.score is int && request.resource.data.score >= 0;
+        }
+        allow read: if member(space);
+        allow create: if member(space) && validScore();
+        allow update: if member(space) && resource.data.user_id == request.auth.uid && validScore() && request.resource.data.score >= resource.data.score;
+      }
+    }
+  }
+}

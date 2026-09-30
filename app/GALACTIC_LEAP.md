@@ -27,10 +27,22 @@ código; no se utilizan imágenes en este juego.
   hasta 1/120 s para detectar el cruce de los pies sobre las plataformas.
 - La cámara asciende y nunca retrocede. Se generan plataformas por encima del
   campo visible y se descartan objetos que quedan muy abajo.
+- El viaje visual es extenso y está dividido en siete zonas: subsuelo, pradera,
+  barrio, ciudad, rascacielos, cielo alto y espacio. Cada cambio muestra el
+  nombre de la zona. Los planetas comienzan recién alrededor de los 13.200
+  puntos, después de atravesar todos los paisajes.
 - La separación vertical máxima permanece por debajo de la altura de salto.
   La ruta principal contiene nubes o rocas; los peligros aparecen a un lado.
   Al ascender aumentan la separación y las plataformas móviles, y disminuye
   el ancho de apoyo.
+- Las nubes normales sirven una sola vez: se deshacen con una animación al
+  tocarlas y desaparecen después del rebote.
+- El subsuelo usa plataformas de roca gris y contiene fósiles. Desde la zona
+  de rascacielos la ruta utiliza únicamente nubes y aviones móviles; ya no
+  aparecen bloques de tierra flotando en el cielo.
+- El OVNI es un poder raro disponible desde la ciudad. Teletransporta al gato
+  más de 500 unidades hacia una plataforma segura y, durante unos segundos,
+  lo transforma en alienígena verde con ojos negros y un haz luminoso.
 - `lib/leap_screen.dart`: controles, interfaz, captura y pintor del mundo.
   El escenario se adapta al ancho disponible y respeta `SafeArea`, con un
   ancho máximo de 480 px en pantallas grandes.
