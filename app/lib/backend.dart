@@ -39,7 +39,9 @@ class Backend {
 
   static Future<Map<String, dynamic>?> membership() async {
     if (uid == null) return null;
-    final data = (await profile.get()).data();
+    final data = (await profile.get().timeout(
+      const Duration(seconds: 8),
+    )).data();
     if (data == null) return null;
     space = data['spaceId'] as String?;
     _nickname = data['nickname'] as String?;
@@ -108,6 +110,13 @@ class Backend {
     if (uid == null) throw StateError('Inicia sesión primero.');
     final batch = db.batch();
     batch.update(profile, {'nickname': name});
+    final publicScores = await db
+        .collection('game_scores')
+        .where('user_id', isEqualTo: uid)
+        .get();
+    for (final score in publicScores.docs) {
+      batch.update(score.reference, {'nickname': name});
+    }
     if (space != null) {
       batch.set(
         db.collection('spaces').doc(space).collection('members').doc(uid),
@@ -149,7 +158,12 @@ class Backend {
     await stopPresence();
     if (uid == null) return;
     final root = FirebaseDatabase.instance.ref('spaces/$spaceId');
-    await root.child('members/$uid').set(true);
+    // RTDB keeps this write queued offline; do not block installing reconnect listeners.
+    unawaited(
+      root.child('members/$uid').set(true).catchError((_) {
+        presenceStatus.value = 'Presencia sin conexión';
+      }),
+    );
     final connection = root.child('presence/$uid').push();
     _connection = connection;
     _presence = FirebaseDatabase.instance.ref('.info/connected').onValue.listen(
@@ -210,28 +224,55 @@ class Backend {
   static CollectionReference<Map<String, dynamic>> notesRef(String spaceId) =>
       db.collection('spaces').doc(spaceId).collection('notes');
 
-  static Stream<List<Map<String, dynamic>>> notes(String spaceId) =>
-      notesRef(spaceId).snapshots().asyncMap((snapshot) async {
-        return Future.wait(
-          snapshot.docs.map((doc) async {
-            final data = doc.data();
-            final path = data['mediaPath'] as String?;
-            String? image;
-            if (path != null) {
-              image = _mediaCache[path];
-              if (image == null) {
-                final bytes = await FirebaseStorage.instance
-                    .ref(path)
-                    .getData(6 * 1024 * 1024);
-                if (bytes != null) {
-                  image = _mediaCache[path] = base64Encode(bytes);
-                }
+  static Stream<List<Map<String, dynamic>>> notes(
+    String spaceId,
+  ) => notesRef(spaceId).snapshots(includeMetadataChanges: true).asyncExpand((
+    snapshot,
+  ) async* {
+    // An empty offline cache is not proof that the shared mural was deleted.
+    if (snapshot.metadata.isFromCache && snapshot.docs.isEmpty) return;
+    // Text and positions remain available even while one image is downloading.
+    yield snapshot.docs
+        .map(
+          (doc) => {
+            ...doc.data(),
+            'id': doc.id,
+            'fromCache': snapshot.metadata.isFromCache,
+          },
+        )
+        .toList();
+    yield await Future.wait(
+      snapshot.docs.map((doc) async {
+        final data = doc.data();
+        final path = data['mediaPath'] as String?;
+        String? image;
+        String? mediaError;
+        if (path != null) {
+          image = _mediaCache[path];
+          if (image == null) {
+            try {
+              final bytes = await FirebaseStorage.instance
+                  .ref(path)
+                  .getData(6 * 1024 * 1024)
+                  .timeout(const Duration(seconds: 30));
+              if (bytes != null) {
+                image = _mediaCache[path] = base64Encode(bytes);
               }
+            } catch (error) {
+              mediaError = noteErrorMessage(error);
             }
-            return {...data, 'id': doc.id, 'imageBase64': image};
-          }),
-        );
-      });
+          }
+        }
+        return {
+          ...data,
+          'id': doc.id,
+          'fromCache': snapshot.metadata.isFromCache,
+          'imageBase64': image,
+          'mediaLoadError': mediaError,
+        };
+      }),
+    );
+  });
 
   static Future<void> putNote(
     String spaceId,
@@ -239,12 +280,26 @@ class Backend {
     Map<String, dynamic> note,
   ) async {
     final author = uid;
+    if (author == null) {
+      throw StateError('Inicia sesión para sincronizar el bloc.');
+    }
     final image = note['imageBase64'] as String?;
     String? path = note['mediaPath'] as String?;
+    if (image != null && path != null && !_mediaCache.containsKey(path)) {
+      try {
+        final uploaded = await FirebaseStorage.instance
+            .ref(path)
+            .getData(6 * 1024 * 1024)
+            .timeout(const Duration(seconds: 30));
+        if (uploaded != null) _mediaCache[path] = base64Encode(uploaded);
+      } on FirebaseException catch (error) {
+        if (error.code != 'object-not-found') rethrow;
+      }
+    }
     if (image != null && (path == null || _mediaCache[path] != image)) {
       final bytes = base64Decode(image);
-      if (bytes.length > 6 * 1024 * 1024) {
-        throw StateError('La imagen supera 6 MB.');
+      if (bytes.length >= 6 * 1024 * 1024) {
+        throw StateError('La imagen debe ocupar menos de 6 MB.');
       }
       final version = db.collection('spaces').doc().id;
       path = 'spaces/$spaceId/notes/$id/$version';
@@ -259,16 +314,20 @@ class Backend {
             ),
           );
       await task.timeout(
-        const Duration(seconds: 20),
+        const Duration(seconds: 90),
         onTimeout: () async {
-          await task.cancel();
+          try {
+            await task.cancel().timeout(const Duration(seconds: 2));
+          } catch (_) {
+            /* The local attachment remains queued. */
+          }
           throw TimeoutException('Adjunto pendiente');
         },
       );
       _mediaCache[path] = image;
       note['mediaPath'] = path;
     }
-    if (author == null || uid != author) {
+    if (uid != author) {
       throw StateError('La cuenta cambió durante la subida');
     }
     await notesRef(spaceId)
@@ -286,41 +345,89 @@ class Backend {
         .timeout(const Duration(seconds: 20));
   }
 
+  static String noteErrorMessage(Object error) {
+    const prefix = 'Nota guardada aquí. ';
+    if (error is FirebaseException) {
+      final storage = error.plugin == 'firebase_storage';
+      final service = storage ? 'Storage' : 'Firebase';
+      switch (error.code) {
+        case 'unauthorized':
+        case 'permission-denied':
+          return '${prefix}Faltan permisos en $service para sincronizar el bloc.';
+        case 'bucket-not-found':
+        case 'no-default-bucket':
+          return '${prefix}El almacenamiento de fotos no está configurado.';
+        case 'object-not-found':
+          return '${prefix}No se encontró una imagen del bloc en la nube.';
+        case 'unauthenticated':
+          return '${prefix}Vuelve a iniciar sesión para sincronizar.';
+        case 'quota-exceeded':
+          return '${prefix}El almacenamiento alcanzó su cuota. La foto sigue pendiente.';
+        default:
+          return '${prefix}Sincronización pendiente ($service: ${error.code}). Se reintentará automáticamente.';
+      }
+    }
+    if (error is TimeoutException) {
+      return '${prefix}La conexión tardó demasiado; se reintentará automáticamente.';
+    }
+    if (error is StateError && error.message.toString().contains('6 MB')) {
+      return '${prefix}La imagen debe ocupar menos de 6 MB.';
+    }
+    return '${prefix}La sincronización está pendiente y se reintentará automáticamente.';
+  }
+
   static Future<List<Map<String, dynamic>>> highscores() async {
-    if (space == null || uid == null) return [];
-    final rows = await db
-        .collection('spaces')
-        .doc(space)
-        .collection('scores')
-        .get();
+    if (uid == null) return [];
+    final rows = await db.collection('game_scores').get();
     return rows.docs.map((d) => d.data()).toList();
   }
 
-  static Stream<List<Map<String, dynamic>>> watchHighscores(String spaceId) =>
-      db
-          .collection('spaces')
-          .doc(spaceId)
-          .collection('scores')
+  static Stream<List<Map<String, dynamic>>> watchHighscores({String? gameId}) =>
+      (gameId == null
+              ? db.collection('game_scores')
+              : db.collection('game_scores').where('game', isEqualTo: gameId))
           .snapshots()
           .map((s) => s.docs.map((d) => d.data()).toList());
 
   static Future<void> submitHighscore(String game, int score) async {
-    if (uid == null || space == null) return;
-    final ref = db
-        .collection('spaces')
-        .doc(space)
-        .collection('scores')
-        .doc('${uid}_$game');
-    await db.runTransaction((tx) async {
-      final previous = (await tx.get(ref)).data()?['score'] as int? ?? 0;
-      if (score <= previous) return;
-      tx.set(ref, {
-        'user_id': uid,
-        'nickname': _nickname ?? auth.currentUser!.displayName ?? 'Jugador',
-        'game': game,
-        'score': score,
-        'updated_at': FieldValue.serverTimestamp(),
-      });
-    });
+    final author = uid;
+    if (author == null || score <= 0) return;
+    final ref = db.collection('game_scores').doc('${author}_$game');
+    final legacy = space == null
+        ? null
+        : db
+              .collection('spaces')
+              .doc(space)
+              .collection('scores')
+              .doc('${author}_$game');
+    await db.runTransaction(
+      (tx) async {
+        final current = (await tx.get(ref)).data();
+        final old = legacy == null ? null : (await tx.get(legacy)).data();
+        final best = [
+          score,
+          current?['score'] as int? ?? 0,
+          old?['score'] as int? ?? 0,
+        ].reduce((a, b) => a > b ? a : b);
+        final name = _nickname ?? auth.currentUser!.displayName ?? 'Jugador';
+        final data = {
+          'user_id': author,
+          'nickname': name,
+          'game': game,
+          'score': best,
+          'updated_at': FieldValue.serverTimestamp(),
+        };
+        if (current?['score'] != best || current?['nickname'] != name) {
+          tx.set(ref, data);
+        }
+        // Keep older app versions and private-space rankings compatible.
+        if (legacy != null &&
+            (old?['score'] != best || old?['nickname'] != name)) {
+          tx.set(legacy, data);
+        }
+      },
+      timeout: const Duration(seconds: 12),
+      maxAttempts: 3,
+    );
   }
 }

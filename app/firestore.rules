@@ -5,6 +5,20 @@ service cloud.firestore {
     function member(space) {
       return signedIn() && exists(/databases/$(database)/documents/spaces/$(space)/members/$(request.auth.uid));
     }
+    match /game_scores/{id} {
+      function validScore() {
+        return request.resource.data.keys().hasOnly(['user_id','nickname','game','score','updated_at'])
+          && request.resource.data.user_id == request.auth.uid
+          && request.resource.data.game in ['blocks-v1','wordlady','candy-churu-cat','ascenso-maruzon']
+          && id == request.auth.uid + '_' + request.resource.data.game
+          && request.resource.data.nickname is string && request.resource.data.nickname.size() <= 200
+          && request.resource.data.score is int && request.resource.data.score >= 0;
+      }
+      allow read: if signedIn();
+      allow create: if signedIn() && validScore();
+      allow update: if signedIn() && resource.data.user_id == request.auth.uid
+        && validScore() && request.resource.data.score >= resource.data.score;
+    }
     match /players/{uid} {
       allow read, write: if signedIn() && request.auth.uid == uid;
       match /progress/{id} {

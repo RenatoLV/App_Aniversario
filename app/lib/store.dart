@@ -10,6 +10,7 @@ import 'backend.dart';
 import 'meme_cards.dart';
 import 'cat_character.dart';
 import 'progress_sync.dart';
+import 'note_cloud.dart';
 
 const anniversaryCollectionId = 'momazos-v1-anniversary';
 const anniversaryCollectionTitle = 'MOMAZOS VOL. 1';
@@ -108,6 +109,7 @@ class PocketNote {
 
 class GameStore extends ChangeNotifier {
   final SharedPreferences prefs;
+  final NoteCloud _noteCloud;
   BlockGame game = BlockGame();
   int coins = 30, best = 0;
   final Set<String> _wordleRewards = {};
@@ -129,6 +131,10 @@ class GameStore extends ChangeNotifier {
   final Set<String> _dirtyNotes = {};
   int get pendingNoteCount => _dirtyNotes.length;
   String? saveError;
+  String? _noteReadError;
+  String? _noteWriteError;
+  String? get noteSyncError => _noteWriteError ?? _noteReadError;
+  bool _noteWatchFailed = false;
   Future<void> _pending = Future.value();
   late final ProgressSync cloud = ProgressSync(
     prefs,
@@ -138,7 +144,8 @@ class GameStore extends ChangeNotifier {
   Timer? _noteRetry;
   bool _sendingNotes = false;
   Completer<void>? _noteIdle;
-  GameStore(this.prefs) {
+  GameStore(this.prefs, {NoteCloud? noteCloud})
+    : _noteCloud = noteCloud ?? FirebaseNoteCloud() {
     final raw = prefs.getString('rincon.v1');
     if (raw == null) return;
     try {
@@ -222,31 +229,65 @@ class GameStore extends ChangeNotifier {
     }
     for (final note in notes) {
       if (oldSpace == null || note.cloudId == null) {
-        note.cloudId = Backend.newNoteId();
+        _dirtyNotes.remove(note.cloudId);
+        note.cloudId = _noteCloud.newId();
+        note.mediaPath = null;
         _dirtyNotes.add(note.cloudId!);
       }
     }
+    _dirtyNotes.retainAll(
+      notes.map((note) => note.cloudId).whereType<String>(),
+    );
     await prefs.setString('firebase.noteSpace', spaceId);
     await save();
     _cloudSpaceId = spaceId;
-    _notesSubscription = Backend.notes(spaceId).listen(
-      (rows) {
-        _latestCloudNotes = rows;
-        _mergeCloudNotes();
-      },
-      onError: (_) {
-        saveError =
-            'Las notas siguen guardadas aquí, pero se interrumpió la sincronización.';
-        notifyListeners();
-      },
-    );
+    _latestCloudNotes = [];
+    _noteReadError = null;
+    _noteWriteError = null;
+    _watchNotes(spaceId);
     _noteRetry?.cancel();
     _noteRetry = Timer.periodic(
       const Duration(seconds: 12),
-      (_) => _flushNotes(),
+      (_) => retryNotes(),
     );
     unawaited(_flushNotes());
-    unawaited(Backend.startPresence(spaceId).catchError((_) {}));
+    unawaited(_noteCloud.startPresence(spaceId).catchError((_) {}));
+  }
+
+  void _watchNotes(String spaceId) {
+    _noteWatchFailed = false;
+    _notesSubscription = _noteCloud
+        .watch(spaceId)
+        .listen(
+          (rows) {
+            _latestCloudNotes = rows;
+            final errors = rows
+                .map((r) => r['mediaLoadError'])
+                .whereType<String>();
+            _noteReadError = errors.isEmpty ? null : errors.first;
+            _noteWatchFailed = errors.isNotEmpty;
+            _mergeCloudNotes();
+          },
+          onError: (Object error) {
+            _noteWatchFailed = true;
+            _noteReadError = Backend.noteErrorMessage(error);
+            notifyListeners();
+          },
+        );
+  }
+
+  Future<void> retryNotes() async {
+    if (_cloudSpaceId == null || _noteCloud.userId == null) return;
+    if (_noteWatchFailed) {
+      await _notesSubscription?.cancel();
+      _watchNotes(_cloudSpaceId!);
+    }
+    await _flushNotes();
+  }
+
+  Future<void> retrySavedData() async {
+    await save();
+    await retryNotes();
   }
 
   void _mergeCloudNotes() {
@@ -267,7 +308,10 @@ class GameStore extends ChangeNotifier {
                 (row['y'] as num).toDouble(),
                 cloudId: id,
                 imageBase64:
-                    row['imageBase64'] as String? ?? local?.imageBase64,
+                    row['imageBase64'] as String? ??
+                    (local?.mediaPath == row['mediaPath']
+                        ? local?.imageBase64
+                        : null),
                 mediaKind: row['mediaKind'] as String?,
                 mediaPath: row['mediaPath'] as String?,
                 scale: (row['scale'] as num?)?.toDouble() ?? 1,
@@ -278,7 +322,8 @@ class GameStore extends ChangeNotifier {
       notes.where(
         (note) =>
             note.cloudId == null ||
-            (_dirtyNotes.contains(note.cloudId) &&
+            ((_dirtyNotes.contains(note.cloudId) ||
+                    _latestCloudNotes.any((row) => row['fromCache'] == true)) &&
                 !_latestCloudNotes.any((row) => row['id'] == note.cloudId)),
       ),
     );
@@ -286,39 +331,52 @@ class GameStore extends ChangeNotifier {
     save();
   }
 
-  Future<void> saveNote(PocketNote note) async {
-    if (_cloudSpaceId != null) {
-      note.cloudId ??= Backend.newNoteId();
+  Future<void> saveNote(PocketNote note, {bool waitForSync = true}) async {
+    if (_cloudSpaceId != null || note.cloudId != null) {
+      note.cloudId ??= _noteCloud.newId();
       _dirtyNotes.add(note.cloudId!);
     }
     await save();
-    await _flushNotes();
+    if (waitForSync) {
+      await _flushNotes();
+    } else {
+      unawaited(_flushNotes());
+    }
   }
 
   Future<void> _flushNotes() async {
-    if (_cloudSpaceId == null || _sendingNotes || Backend.uid == null) return;
+    if (_cloudSpaceId == null || _sendingNotes || _noteCloud.userId == null) {
+      return;
+    }
     _sendingNotes = true;
     _noteIdle = Completer<void>();
+    String? errorMessage;
     try {
       for (final note
           in notes.where((n) => _dirtyNotes.contains(n.cloudId)).toList()) {
         final data = note.toJson();
         final before = jsonEncode(data);
-        await Backend.putNote(_cloudSpaceId!, note.cloudId!, data);
-        if (jsonEncode(note.toJson()) == before) {
-          note.mediaPath = data['mediaPath'] as String?;
-          _dirtyNotes.remove(note.cloudId);
+        var uploaded = false;
+        try {
+          await _noteCloud.put(_cloudSpaceId!, note.cloudId!, data);
+          uploaded = true;
+        } catch (error) {
+          errorMessage ??= Backend.noteErrorMessage(error);
         }
+        final unchanged = jsonEncode(note.toJson()) == before;
+        // Reuse a successfully uploaded attachment even if the document write failed.
+        if (data['imageBase64'] == note.imageBase64) {
+          note.mediaPath = data['mediaPath'] as String?;
+        }
+        if (uploaded && unchanged) _dirtyNotes.remove(note.cloudId);
         await save();
       }
-    } catch (_) {
-      saveError =
-          'Nota guardada aquí; la sincronización con Firebase está pendiente.';
-      notifyListeners();
     } finally {
+      _noteWriteError = errorMessage;
       _sendingNotes = false;
       _noteIdle?.complete();
       _noteIdle = null;
+      notifyListeners();
     }
   }
 
@@ -349,6 +407,8 @@ class GameStore extends ChangeNotifier {
     await _noteIdle?.future;
     await cloud.stop();
     _cloudSpaceId = null;
+    _noteReadError = null;
+    _noteWriteError = null;
     await save();
     await Backend.signOut();
   }

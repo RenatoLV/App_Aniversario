@@ -60,7 +60,7 @@ void main() {
       await tester.tap(find.text(cardNames[6]));
       await tester.pump(const Duration(milliseconds: 400));
       checkCats();
-      expect(find.text('Ver en realidad aumentada'), findsOneWidget);
+      expect(find.text('AR · Cámara 3D'), findsOneWidget);
       expect(tester.takeException(), isNull);
       await tester.tap(find.byTooltip('Cerrar'));
       await tester.pump(const Duration(milliseconds: 400));
@@ -191,7 +191,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400));
     expect(find.text('Legendaria · ${cardNames[6]}'), findsOneWidget);
     expect(find.text('La abrió Maru'), findsWidgets);
-    expect(find.text('Ver en realidad aumentada'), findsOneWidget);
+    expect(find.text('AR · Cámara 3D'), findsOneWidget);
     await tester.tap(find.byTooltip('Girar a la derecha'));
     await tester.pump();
     await tester.tap(find.byTooltip('Girar a la derecha'));

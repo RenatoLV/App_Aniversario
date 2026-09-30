@@ -20,6 +20,7 @@ import 'card_palette.dart';
 import 'card_ar.dart';
 import 'card_ar_photo_review.dart';
 import 'game_leaderboard.dart';
+import 'menu_swipe.dart';
 
 const ink = Color(0xff293f39),
     cream = Color(0xfffaf6ee),
@@ -52,7 +53,7 @@ class RinconApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) => MaterialApp(
     debugShowCheckedModeBanner: false,
-    title: 'Maruversario',
+    title: 'Anivermaru',
     theme: ThemeData(
       useMaterial3: true,
       scaffoldBackgroundColor: cream,
@@ -84,7 +85,9 @@ class RinconHome extends StatefulWidget {
 }
 
 class _RinconHomeState extends State<RinconHome>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
+  Timer? _cloudRetry;
+  bool _refreshingCloud = false;
   int page = 0;
   String _collectionQuery = '';
   final TextEditingController _collectionSearch = TextEditingController();
@@ -113,6 +116,13 @@ class _RinconHomeState extends State<RinconHome>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _cloudRetry = Timer.periodic(const Duration(seconds: 12), (_) {
+      if (Backend.uid != null &&
+          (_cloudMember == null || _cloudError != null)) {
+        unawaited(_refreshCloud());
+      }
+    });
     _packAnimation = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 3100),
@@ -143,26 +153,45 @@ class _RinconHomeState extends State<RinconHome>
   }
 
   Future<void> _refreshCloud() async {
-    if (!Backend.configured) return;
+    if (!Backend.configured || _refreshingCloud || !mounted) return;
+    _refreshingCloud = true;
     try {
+      // A remembered login and room must work even on a fully offline launch.
+      await s.cloud.start();
+      final uid = Backend.uid;
+      final cached = uid == null
+          ? null
+          : s.prefs.getString('firebase.membership.$uid') ??
+                (s.prefs.getString('firebase.owner') == uid &&
+                        s.prefs.getString('firebase.noteSpace') != null
+                    ? jsonEncode({
+                        'user_id': uid,
+                        'space_id': s.prefs.getString('firebase.noteSpace'),
+                        'nickname':
+                            Backend.auth.currentUser?.displayName ?? 'Jugador',
+                      })
+                    : null);
+      if (cached != null && _cloudMember == null) {
+        final member = jsonDecode(cached) as Map<String, dynamic>;
+        if (member['user_id'] == uid && member['space_id'] is String) {
+          await s.connectCloud(member['space_id'] as String);
+          if (mounted) setState(() => _cloudMember = member);
+          _watchScores();
+        }
+      }
       final member = await Backend.membership();
       if (member != null) {
+        await s.prefs.setString(
+          'firebase.membership.${member['user_id']}',
+          jsonEncode(member),
+        );
         await s.connectCloud(member['space_id'] as String);
-        await _scoreSubscription?.cancel();
-        _scoreSubscription =
-            Backend.watchHighscores(member['space_id'] as String).listen((
-              scores,
-            ) {
-              if (mounted) setState(() => _cloudScores = scores);
-            }, onError: (_) {});
+        _watchScores();
       }
-      final scores = member == null
-          ? <Map<String, dynamic>>[]
-          : await Backend.highscores();
       if (mounted) {
         setState(() {
           _cloudMember = member;
-          _cloudScores = scores;
+          if (member == null) _cloudScores = [];
           _cloudError = null;
         });
       }
@@ -173,6 +202,30 @@ class _RinconHomeState extends State<RinconHome>
               'No pudimos sincronizar con Firebase. El guardado local se conserva.',
         );
       }
+    } finally {
+      _refreshingCloud = false;
+    }
+  }
+
+  void _watchScores() {
+    if (_scoreSubscription != null) return;
+    _scoreSubscription = Backend.watchHighscores().listen(
+      (scores) {
+        if (mounted) setState(() => _cloudScores = scores);
+      },
+      onError: (_) {
+        _scoreSubscription?.cancel();
+        _scoreSubscription = null;
+      },
+    );
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_refreshCloud());
+      unawaited(s.cloud.sync());
+      unawaited(s.retryNotes());
     }
   }
 
@@ -332,6 +385,8 @@ class _RinconHomeState extends State<RinconHome>
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _cloudRetry?.cancel();
     _catNoteTimer?.cancel();
     _scoreSubscription?.cancel();
     _collectionPlayTimer?.cancel();
@@ -345,63 +400,66 @@ class _RinconHomeState extends State<RinconHome>
   @override
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: s,
-    builder: (context, _) => Scaffold(
-      appBar: AppBar(
-        title: const _MaruversarioTitle(),
-        actions: [
-          Chip(
-            avatar: const Icon(Icons.toll, size: 18),
-            label: Text('${s.coins}'),
-          ),
-          const SizedBox(width: 16),
-        ],
-      ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            if (s.saveError != null)
-              MaterialBanner(
-                content: Text(s.saveError!),
-                actions: [
-                  TextButton(
-                    onPressed: s.save,
-                    child: const Text('Reintentar'),
+    builder: (context, _) => MenuSwipe(
+      onStep: (step) => setState(() => page = (page + step).clamp(0, 3)),
+      child: Scaffold(
+        appBar: AppBar(
+          title: const _MaruversarioTitle(),
+          actions: [
+            Chip(
+              avatar: const Icon(Icons.toll, size: 18),
+              label: Text('${s.coins}'),
+            ),
+            const SizedBox(width: 16),
+          ],
+        ),
+        body: SafeArea(
+          child: Column(
+            children: [
+              if (s.saveError != null || s.noteSyncError != null)
+                MaterialBanner(
+                  content: Text((s.saveError ?? s.noteSyncError)!),
+                  actions: [
+                    TextButton(
+                      onPressed: s.retrySavedData,
+                      child: const Text('Reintentar'),
+                    ),
+                  ],
+                ),
+              Expanded(
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 650),
+                    child: [home(), packs(), collection(), notes()][page],
                   ),
-                ],
-              ),
-            Expanded(
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 650),
-                  child: [home(), packs(), collection(), notes()][page],
                 ),
               ),
+            ],
+          ),
+        ),
+        bottomNavigationBar: NavigationBar(
+          selectedIndex: page,
+          onDestinationSelected: (i) => setState(() => page = i),
+          destinations: const [
+            NavigationDestination(
+              icon: Icon(Icons.cottage_outlined),
+              selectedIcon: Icon(Icons.cottage),
+              label: 'Inicio',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.auto_awesome),
+              label: 'Sobres',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.style_outlined),
+              label: 'Colección',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.edit_note),
+              label: 'Nuestro bloc',
             ),
           ],
         ),
-      ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: page,
-        onDestinationSelected: (i) => setState(() => page = i),
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.cottage_outlined),
-            selectedIcon: Icon(Icons.cottage),
-            label: 'Inicio',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.auto_awesome),
-            label: 'Sobres',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.style_outlined),
-            label: 'Colección',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.edit_note),
-            label: 'Nuestro bloc',
-          ),
-        ],
       ),
     ),
   );
@@ -630,6 +688,7 @@ class _RinconHomeState extends State<RinconHome>
                           try {
                             await s.disconnectCloud();
                             await _scoreSubscription?.cancel();
+                            _scoreSubscription = null;
                             if (mounted) {
                               setState(() {
                                 _cloudMember = null;
@@ -1581,7 +1640,7 @@ class _RinconHomeState extends State<RinconHome>
     );
     setState(() => s.notes.add(note));
     try {
-      await s.saveNote(note);
+      await s.saveNote(note, waitForSync: false);
       if (mounted) {
         setState(() => page = 3);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -2143,7 +2202,7 @@ class _RinconHomeState extends State<RinconHome>
         'photo',
       );
       setState(() => s.notes.add(note));
-      await s.saveNote(note);
+      await s.saveNote(note, waitForSync: false);
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -2200,13 +2259,13 @@ class _RinconHomeState extends State<RinconHome>
         'drawing',
       );
       setState(() => s.notes.add(created));
-      await s.saveNote(created);
+      await s.saveNote(created, waitForSync: false);
     } else {
       setState(() {
         note.imageBase64 = base64Encode(bytes);
         note.mediaKind = 'drawing';
       });
-      await s.saveNote(note);
+      await s.saveNote(note, waitForSync: false);
     }
   }
 
@@ -2265,7 +2324,7 @@ class _RinconHomeState extends State<RinconHome>
     );
     if (scale == null) return;
     setState(() => note.scale = scale);
-    await s.saveNote(note);
+    await s.saveNote(note, waitForSync: false);
   }
 
   Widget notes() => Column(
@@ -2942,6 +3001,18 @@ class _BlockScreenState extends State<BlockScreen>
   int? _hover;
   GameStore get store => widget.store;
 
+  Future<void> _playBlockSound(bool clear) async {
+    try {
+      await const MethodChannel(
+        'anivermaru/sfx',
+      ).invokeMethod<void>('play', {'clear': clear});
+    } on MissingPluginException {
+      await SystemSound.play(SystemSoundType.click);
+    } on PlatformException {
+      // Audio must never interrupt a placement.
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -2967,6 +3038,7 @@ class _BlockScreenState extends State<BlockScreen>
       return;
     }
     _juice.forward(from: 0);
+    unawaited(_playBlockSound(store.game.lastClearedCount > 0));
     if (store.game.lastClearedCount > 0) {
       _clearCat = _clearCat == CatKind.lady ? CatKind.maru : CatKind.lady;
       _clearVariation = (_clearVariation + 1) % 3;
@@ -3136,6 +3208,8 @@ class _BlockScreenState extends State<BlockScreen>
     listenable: store,
     builder: (context, _) {
       final g = store.game;
+      final boardStep =
+          (math.min(MediaQuery.sizeOf(context).width, 520.0) - 50) / 8;
       return Scaffold(
         backgroundColor: const Color(0xff211342),
         appBar: AppBar(
@@ -3311,8 +3385,8 @@ class _BlockScreenState extends State<BlockScreen>
                               gridDelegate:
                                   const SliverGridDelegateWithFixedCrossAxisCount(
                                     crossAxisCount: 8,
-                                    crossAxisSpacing: 3,
-                                    mainAxisSpacing: 3,
+                                    crossAxisSpacing: 0,
+                                    mainAxisSpacing: 0,
                                   ),
                               itemBuilder: (context, i) {
                                 final x = i % 8,
@@ -3361,119 +3435,130 @@ class _BlockScreenState extends State<BlockScreen>
                                         'Casilla ${x + 1}, ${y + 1}${g.board[i] > 0 ? ', ocupada' : ''}',
                                     button: true,
                                     child: GestureDetector(
+                                      behavior: HitTestBehavior.opaque,
                                       onTap: () => _place(x, y),
-                                      child: AnimatedContainer(
-                                        key: ValueKey(
-                                          'tile-$i-${g.board[i]}-${ghost ? 1 : 0}',
-                                        ),
-                                        duration: const Duration(
-                                          milliseconds: 155,
-                                        ),
-                                        curve: Curves.easeOutBack,
-                                        decoration: BoxDecoration(
-                                          gradient: ghost
-                                              ? const LinearGradient(
-                                                  begin: Alignment.topLeft,
-                                                  end: Alignment.bottomRight,
-                                                  colors: [
-                                                    Color(0xff92fff4),
-                                                    Color(0xff32d9ff),
-                                                    Color(0xff536cff),
-                                                  ],
-                                                )
-                                              : g.board[i] > 0
-                                              ? _gemGradient(g.board[i])
-                                              : const LinearGradient(
-                                                  begin: Alignment.topLeft,
-                                                  end: Alignment.bottomRight,
-                                                  colors: [
-                                                    Color(0xff292249),
-                                                    Color(0xff302650),
-                                                  ],
-                                                ),
-                                          borderRadius: BorderRadius.circular(
-                                            5,
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(1.5),
+                                        child: AnimatedContainer(
+                                          key: ValueKey(
+                                            'tile-$i-${g.board[i]}-${ghost ? 1 : 0}',
                                           ),
-                                          border: Border(
-                                            top: BorderSide(
-                                              color: ghost
-                                                  ? Colors.white
-                                                  : g.board[i] > 0
-                                                  ? Colors.white.withValues(
-                                                      alpha: .84,
-                                                    )
-                                                  : const Color(0xff473a71),
-                                              width: ghost ? 2 : 1.2,
-                                            ),
-                                            left: BorderSide(
-                                              color: ghost
-                                                  ? Colors.white
-                                                  : g.board[i] > 0
-                                                  ? Colors.white.withValues(
-                                                      alpha: .60,
-                                                    )
-                                                  : const Color(0xff413461),
-                                              width: ghost ? 2 : 1,
-                                            ),
-                                            bottom: BorderSide(
-                                              color: g.board[i] > 0
-                                                  ? Colors.black.withValues(
-                                                      alpha: .24,
-                                                    )
-                                                  : Colors.black.withValues(
-                                                      alpha: .16,
-                                                    ),
-                                              width: 2,
-                                            ),
-                                            right: BorderSide(
-                                              color: g.board[i] > 0
-                                                  ? Colors.black.withValues(
-                                                      alpha: .19,
-                                                    )
-                                                  : Colors.black.withValues(
-                                                      alpha: .10,
-                                                    ),
-                                              width: 1.5,
-                                            ),
+                                          duration: const Duration(
+                                            milliseconds: 155,
                                           ),
-                                          boxShadow: ghost || g.board[i] > 0
-                                              ? [
-                                                  BoxShadow(
-                                                    color:
-                                                        (ghost
-                                                                ? const Color(
-                                                                    0xff3affeb,
-                                                                  )
-                                                                : tileColors[g
-                                                                      .board[i]])
-                                                            .withValues(
-                                                              alpha: .42,
-                                                            ),
-                                                    blurRadius: ghost ? 12 : 7,
-                                                    spreadRadius: ghost ? 1 : 0,
-                                                    offset: const Offset(0, 2),
+                                          curve: Curves.easeOutBack,
+                                          decoration: BoxDecoration(
+                                            gradient: ghost
+                                                ? const LinearGradient(
+                                                    begin: Alignment.topLeft,
+                                                    end: Alignment.bottomRight,
+                                                    colors: [
+                                                      Color(0xff92fff4),
+                                                      Color(0xff32d9ff),
+                                                      Color(0xff536cff),
+                                                    ],
+                                                  )
+                                                : g.board[i] > 0
+                                                ? _gemGradient(g.board[i])
+                                                : const LinearGradient(
+                                                    begin: Alignment.topLeft,
+                                                    end: Alignment.bottomRight,
+                                                    colors: [
+                                                      Color(0xff292249),
+                                                      Color(0xff302650),
+                                                    ],
                                                   ),
-                                                ]
+                                            borderRadius: BorderRadius.circular(
+                                              5,
+                                            ),
+                                            border: Border(
+                                              top: BorderSide(
+                                                color: ghost
+                                                    ? Colors.white
+                                                    : g.board[i] > 0
+                                                    ? Colors.white.withValues(
+                                                        alpha: .84,
+                                                      )
+                                                    : const Color(0xff473a71),
+                                                width: ghost ? 2 : 1.2,
+                                              ),
+                                              left: BorderSide(
+                                                color: ghost
+                                                    ? Colors.white
+                                                    : g.board[i] > 0
+                                                    ? Colors.white.withValues(
+                                                        alpha: .60,
+                                                      )
+                                                    : const Color(0xff413461),
+                                                width: ghost ? 2 : 1,
+                                              ),
+                                              bottom: BorderSide(
+                                                color: g.board[i] > 0
+                                                    ? Colors.black.withValues(
+                                                        alpha: .24,
+                                                      )
+                                                    : Colors.black.withValues(
+                                                        alpha: .16,
+                                                      ),
+                                                width: 2,
+                                              ),
+                                              right: BorderSide(
+                                                color: g.board[i] > 0
+                                                    ? Colors.black.withValues(
+                                                        alpha: .19,
+                                                      )
+                                                    : Colors.black.withValues(
+                                                        alpha: .10,
+                                                      ),
+                                                width: 1.5,
+                                              ),
+                                            ),
+                                            boxShadow: ghost || g.board[i] > 0
+                                                ? [
+                                                    BoxShadow(
+                                                      color:
+                                                          (ghost
+                                                                  ? const Color(
+                                                                      0xff3affeb,
+                                                                    )
+                                                                  : tileColors[g
+                                                                        .board[i]])
+                                                              .withValues(
+                                                                alpha: .42,
+                                                              ),
+                                                      blurRadius: ghost
+                                                          ? 12
+                                                          : 7,
+                                                      spreadRadius: ghost
+                                                          ? 1
+                                                          : 0,
+                                                      offset: const Offset(
+                                                        0,
+                                                        2,
+                                                      ),
+                                                    ),
+                                                  ]
+                                                : null,
+                                          ),
+                                          child: g.board[i] > 0
+                                              ? Center(
+                                                  child: Icon(
+                                                    Icons.pets,
+                                                    size: 13,
+                                                    color: Colors.white
+                                                        .withValues(alpha: .48),
+                                                  ),
+                                                )
+                                              : ghost
+                                              ? const Center(
+                                                  child: Icon(
+                                                    Icons.pets,
+                                                    size: 13,
+                                                    color: Color(0xff294078),
+                                                  ),
+                                                )
                                               : null,
                                         ),
-                                        child: g.board[i] > 0
-                                            ? Center(
-                                                child: Icon(
-                                                  Icons.pets,
-                                                  size: 13,
-                                                  color: Colors.white
-                                                      .withValues(alpha: .48),
-                                                ),
-                                              )
-                                            : ghost
-                                            ? const Center(
-                                                child: Icon(
-                                                  Icons.pets,
-                                                  size: 13,
-                                                  color: Color(0xff294078),
-                                                ),
-                                              )
-                                            : null,
                                       ),
                                     ),
                                   ),
@@ -3617,6 +3702,13 @@ class _BlockScreenState extends State<BlockScreen>
                                     )
                                   : Draggable<int>(
                                       data: t,
+                                      dragAnchorStrategy:
+                                          (draggable, context, position) =>
+                                              Offset(
+                                                boardStep / 2,
+                                                boardStep / 2 + 72,
+                                              ),
+                                      feedbackOffset: const Offset(0, -72),
                                       onDragStarted: () => store.selectPiece(t),
                                       onDraggableCanceled: (_, _) =>
                                           setState(() => _hover = null),
@@ -3626,8 +3718,18 @@ class _BlockScreenState extends State<BlockScreen>
                                         color: Colors.transparent,
                                         child: _PiecePreview(
                                           shape: g.tray[t]!,
-                                          width: 70,
-                                          height: 62,
+                                          width:
+                                              boardStep *
+                                              (BlockGame.shapes[g.tray[t]!]
+                                                      .map((c) => c.x)
+                                                      .reduce(math.max) +
+                                                  1),
+                                          height:
+                                              boardStep *
+                                              (BlockGame.shapes[g.tray[t]!]
+                                                      .map((c) => c.y)
+                                                      .reduce(math.max) +
+                                                  1),
                                           elevated: true,
                                         ),
                                       ),
@@ -3635,7 +3737,10 @@ class _BlockScreenState extends State<BlockScreen>
                                         opacity: .24,
                                         child: _pieceCard(g, t),
                                       ),
-                                      child: _pieceCard(g, t),
+                                      child: GestureDetector(
+                                        onTap: () => store.selectPiece(t),
+                                        child: _pieceCard(g, t),
+                                      ),
                                     ),
                             ),
                           ),
@@ -4747,7 +4852,7 @@ class _InspectCardDialogState extends State<_InspectCardDialog>
         builder: (context) => AlertDialog(
           title: const Text('Realidad aumentada'),
           content: const Text(
-            'Abre esta opción en la app Android, en un teléfono compatible con ARCore. La versión web y iOS todavía no incluyen este modo.',
+            'Abre esta opción en la app Android. La versión web y iOS todavía no incluyen este modo.',
           ),
           actions: [
             TextButton(
@@ -4769,25 +4874,7 @@ class _InspectCardDialogState extends State<_InspectCardDialog>
             mainAxisSize: MainAxisSize.min,
             children: [
               const Text(
-                'Usaremos tu cámara para detectar una mesa o el suelo. Toca la superficie para colocar la carta y pellizca para cambiar su tamaño.\n\nEste modo utiliza Google Play Services para AR (ARCore), un servicio de Google sujeto a su Política de Privacidad.\n\nSolo guardaremos la foto si eliges «Guardar en el bloc». Si tu bloc está conectado, esa foto se sincronizará con Firebase y será visible para las personas de tu espacio compartido.',
-              ),
-              TextButton(
-                onPressed: () async {
-                  try {
-                    await CardAr.channel.invokeMethod<void>('privacy');
-                  } on PlatformException catch (_) {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                            'Puedes consultar la política en https://policies.google.com/privacy',
-                          ),
-                        ),
-                      );
-                    }
-                  }
-                },
-                child: const Text('Política de Privacidad de Google'),
+                'La carta aparece directamente sobre tu cámara, sin buscar superficies. Desliza para girarla 360°, pellizca para cambiar su tamaño y usa Mover para colocarla donde quieras.\n\nSolo guardaremos la foto si eliges «Guardar en el bloc». Si tu bloc está conectado, esa foto se sincronizará con Firebase y será visible para las personas de tu espacio compartido.',
               ),
             ],
           ),
@@ -4828,7 +4915,19 @@ class _InspectCardDialogState extends State<_InspectCardDialog>
       } finally {
         image.dispose();
       }
-      final photo = await CardAr.capture(texture);
+      setState(() => _turn = math.pi);
+      await WidgetsBinding.instance.endOfFrame;
+      final backImage = await boundary.toImage(pixelRatio: 2);
+      late Uint8List backTexture;
+      try {
+        backTexture = (await backImage.toByteData(
+          format: ui.ImageByteFormat.png,
+        ))!.buffer.asUint8List();
+      } finally {
+        backImage.dispose();
+      }
+      setState(() => _turn = 0);
+      final photo = await CardAr.capture(texture, backTexture: backTexture);
       if (photo == null || !mounted) return;
       final save = await showDialog<bool>(
         context: context,
@@ -5291,7 +5390,7 @@ class _InspectCardDialogState extends State<_InspectCardDialog>
                 onPressed: _arBusy ? null : _openAr,
                 icon: const Icon(Icons.view_in_ar, color: Color(0xffffe79b)),
                 label: Text(
-                  _arBusy ? 'Preparando AR…' : 'Ver en realidad aumentada',
+                  _arBusy ? 'Preparando cámara…' : 'AR · Cámara 3D',
                   style: const TextStyle(color: Color(0xffffe79b)),
                 ),
               ),
@@ -5760,7 +5859,7 @@ class _MaruversarioTitleState extends State<_MaruversarioTitle>
             child: FittedBox(
               fit: BoxFit.scaleDown,
               child: Text(
-                'Maruversario',
+                'Anivermaru',
                 style: TextStyle(fontWeight: FontWeight.w900, fontSize: 20),
               ),
             ),

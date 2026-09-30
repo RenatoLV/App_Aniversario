@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'backend.dart';
+import 'highscore_outbox.dart';
 
 /// Local preferences remain the durable offline save. A revision check prevents
 /// two devices from silently replacing each other's progress.
@@ -101,24 +102,29 @@ class ProgressSync extends ChangeNotifier {
       },
     );
     _timer = Timer.periodic(const Duration(seconds: 8), (_) => sync());
-    await sync();
+    unawaited(sync());
   }
 
   Future<void> sync() async {
-    if (_user == null ||
-        Backend.uid != _user ||
-        _busy ||
-        conflict != null ||
-        _stopping) {
+    if (_user == null || Backend.uid != _user || _busy || _stopping) {
       return;
     }
     _busy = true;
     _idle = Completer<void>();
+    bool scoresPending = false;
     try {
       final local = snapshot();
       final base = prefs.getString('firebase.base.$_user');
-      await _syncScores();
-      if (!_remoteChanged && local == base) return;
+      try {
+        await _syncScores();
+      } catch (_) {
+        scoresPending = true;
+      }
+      if (conflict != null) return;
+      if (!_remoteChanged && local == base) {
+        status = 'Progreso sincronizado';
+        return;
+      }
       _remoteChanged = false;
       // Server reads ensure a stale cache cannot authorize an overwrite.
       final remote =
@@ -153,6 +159,9 @@ class ProgressSync extends ChangeNotifier {
       _remoteChanged = true;
       status = 'Guardado local · sincronización pendiente';
     } finally {
+      if (scoresPending && conflict == null) {
+        status = 'Guardado local · récords pendientes de sincronizar';
+      }
       _busy = false;
       _idle?.complete();
       _idle = null;
@@ -164,44 +173,32 @@ class ProgressSync extends ChangeNotifier {
     if (utf8.encode(payload).length > 850000) {
       throw StateError('Guardado demasiado grande');
     }
-    await Backend.db.runTransaction((tx) async {
-      final current = (await tx.get(_ref)).data();
-      if ((current?['revision'] ?? 0) != revision) {
-        throw StateError('Nueva revisión remota');
-      }
-      tx.set(_ref, {
-        'payload': payload,
-        'revision': revision + 1,
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
-    });
+    await Backend.db.runTransaction(
+      (tx) async {
+        final current = (await tx.get(_ref)).data();
+        if ((current?['revision'] ?? 0) != revision) {
+          throw StateError('Nueva revisión remota');
+        }
+        tx.set(_ref, {
+          'payload': payload,
+          'revision': revision + 1,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      },
+      timeout: const Duration(seconds: 12),
+      maxAttempts: 3,
+    );
     await prefs.setString('firebase.base.$_user', payload);
   }
 
   Future<void> _syncScores() async {
-    if (Backend.space == null) return;
-    final core =
-        jsonDecode(prefs.getString('rincon.v1') ?? '{}')
-            as Map<String, dynamic>;
-    final wordle =
-        jsonDecode(prefs.getString('wordle.v1') ?? '{}')
-            as Map<String, dynamic>;
-    final sweet =
-        jsonDecode(prefs.getString('sweet.v1') ?? '{}') as Map<String, dynamic>;
-    final scores = <String, int>{
-      'blocks-v1': core['best'] as int? ?? 0,
-      'wordlady': wordle['wins'] as int? ?? 0,
-      'candy-churu-cat':
-          prefs.getInt('sweet.best') ?? sweet['score'] as int? ?? 0,
-      'ascenso-maruzon': prefs.getInt('leap.best') ?? 0,
-    };
-    for (final entry in scores.entries) {
-      final key = 'firebase.score.$_user.${Backend.space}.${entry.key}';
-      if (entry.value > (prefs.getInt(key) ?? 0)) {
-        await Backend.submitHighscore(entry.key, entry.value);
-        await prefs.setInt(key, entry.value);
-      }
-    }
+    final user = _user!;
+    await HighscoreOutbox(prefs).flush(
+      user,
+      Backend.submitHighscore,
+      isCurrentAccount: () =>
+          !_stopping && _user == user && Backend.uid == user,
+    );
   }
 
   Future<void> _restore(String payload, {String? expectedLocal}) async {

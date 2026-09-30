@@ -32,6 +32,57 @@ class _LeapScreenState extends State<LeapScreen>
   Timer? _blinkTimer;
   final _focus = FocusNode(), _captureKey = GlobalKey();
   final Map<int, double> _touches = {};
+  StreamSubscription<dynamic>? _tiltSubscription;
+  bool _tiltEnabled = false;
+  double _tiltDirection = 0;
+  double? _tiltNeutral;
+
+  Future<void> _toggleTilt() async {
+    if (_tiltEnabled) {
+      await _tiltSubscription?.cancel();
+      _tiltSubscription = null;
+      if (mounted) {
+        setState(() {
+          _tiltEnabled = false;
+          _tiltDirection = 0;
+        });
+      }
+      return;
+    }
+    _tiltNeutral = null;
+    setState(() => _tiltEnabled = true);
+    _tiltSubscription = const EventChannel('anivermaru/tilt')
+        .receiveBroadcastStream()
+        .listen(
+          (value) {
+            if (!_tiltEnabled) return;
+            final x = (value as num).toDouble();
+            _tiltNeutral ??= x;
+            final delta = -(x - _tiltNeutral!);
+            final target = delta.abs() < .45
+                ? 0.0
+                : (delta / 3.6).clamp(-1.0, 1.0);
+            _tiltDirection += (target - _tiltDirection) * .18;
+          },
+          onError: (Object error) {
+            _tiltSubscription?.cancel();
+            _tiltSubscription = null;
+            if (!mounted) return;
+            setState(() {
+              _tiltEnabled = false;
+              _tiltDirection = 0;
+            });
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'La inclinación requiere el APK en un teléfono con sensor. Las flechas siguen disponibles.',
+                ),
+              ),
+            );
+          },
+        );
+  }
+
   bool _left = false,
       _right = false,
       _started = false,
@@ -43,7 +94,8 @@ class _LeapScreenState extends State<LeapScreen>
   LeapWorldZone _lastZone = LeapWorldZone.underground;
   double _zoneMessageUntil = 0;
   double get _direction =>
-      (_touches.values.fold(0.0, (a, b) => a + b) +
+      (_tiltDirection +
+              _touches.values.fold(0.0, (a, b) => a + b) +
               (_left ? -1 : 0) +
               (_right ? 1 : 0))
           .clamp(-1.0, 1.0);
@@ -55,7 +107,7 @@ class _LeapScreenState extends State<LeapScreen>
     LeapWorldZone.neighborhood => 'Las compañias',
     LeapWorldZone.city => 'Ciudad gatuna',
     LeapWorldZone.skyscrapers => 'Cima de Santiago',
-    LeapWorldZone.upperSky => 'Cielo estelar',
+    LeapWorldZone.upperSky => 'Cielo estrellado',
     LeapWorldZone.space => 'Universo',
     LeapWorldZone.heaven => 'Cielo',
   };
@@ -211,6 +263,8 @@ class _LeapScreenState extends State<LeapScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    _tiltNeutral = null;
+    _tiltDirection = 0;
     if (state != AppLifecycleState.resumed && _running) _pause(true);
   }
 
@@ -273,6 +327,7 @@ class _LeapScreenState extends State<LeapScreen>
 
   @override
   void dispose() {
+    _tiltSubscription?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     _blinkTimer?.cancel();
     _physics.dispose();
@@ -759,15 +814,22 @@ class _LeapScreenState extends State<LeapScreen>
                                   padding: const EdgeInsets.symmetric(
                                     horizontal: 8,
                                   ),
-                                  child: Text(
-                                    _game.boosting
-                                        ? '¡Cohete de bigotes!'
-                                        : 'Mantén pulsado para moverte',
-                                    textAlign: TextAlign.center,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w600,
+                                  child: TextButton.icon(
+                                    onPressed: _toggleTilt,
+                                    icon: Icon(
+                                      Icons.screen_rotation,
+                                      color: _tiltEnabled
+                                          ? Colors.lightGreenAccent
+                                          : Colors.white,
+                                    ),
+                                    label: Text(
+                                      _tiltEnabled
+                                          ? 'Inclinación ON'
+                                          : 'Inclinación OFF',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 11,
+                                      ),
                                     ),
                                   ),
                                 ),

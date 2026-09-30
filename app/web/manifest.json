@@ -1,11 +1,11 @@
 {
-    "name": "nuestro_rincon",
-    "short_name": "nuestro_rincon",
+    "name": "Anivermaru",
+    "short_name": "Anivermaru",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "description": "Anivermaru: juegos, cartas y recuerdos para compartir.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

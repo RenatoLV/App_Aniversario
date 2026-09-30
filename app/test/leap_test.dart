@@ -4,6 +4,20 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:nuestro_rincon/leap.dart';
 
 void main() {
+  test('Crossing either side wraps without losing horizontal speed', () {
+    final game = LeapGame()
+      ..x = LeapGame.width - 1
+      ..vx = 230;
+    game.step(.02, 1, 640);
+    expect(game.x, lessThan(10));
+    expect(game.vx, greaterThan(200));
+    game
+      ..x = 1
+      ..vx = -230;
+    game.step(.02, -1, 640);
+    expect(game.x, greaterThan(LeapGame.width - 10));
+    expect(game.vx, lessThan(-200));
+  });
   test('Rocket ascent still collides with electric clouds', () {
     final game = LeapGame();
     game.platforms

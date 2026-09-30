@@ -195,7 +195,7 @@ class LeapGame {
       if ((p.x - oldX).abs() > .0001) p.facingRight = p.x > oldX;
     }
     vx += (direction * 230 - vx) * math.min(1, dt * 12);
-    x = (x + vx * dt).clamp(catWidth / 2, width - catWidth / 2);
+    x = (x + vx * dt) % width;
     final previousY = y;
     if (boosting) {
       rocketTime = math.max(0, rocketTime - dt);

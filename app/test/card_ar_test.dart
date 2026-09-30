@@ -33,6 +33,25 @@ void main() {
     }
   });
 
+  test(
+    'Camera viewer receives both faces for a full 360-degree turn',
+    () async {
+      final back = Uint8List.fromList([1, 2, 3]);
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(CardAr.channel, (call) async {
+            expect(call.arguments['texture'], png);
+            expect(call.arguments['backTexture'], back);
+            return png;
+          });
+      try {
+        expect(await CardAr.capture(png, backTexture: back), png);
+      } finally {
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(CardAr.channel, null);
+      }
+    },
+  );
+
   for (final save in [false, true]) {
     testWidgets(
       'Photo review ${save ? 'saves only with consent' : 'can be discarded'}',

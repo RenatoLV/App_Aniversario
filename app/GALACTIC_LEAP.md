@@ -1,9 +1,11 @@
-# Maru & Lady: Galactic Leap
+# Ascenso Maruzon
+
+Actualización: Android incluye inclinación ON/OFF entre flechas, calibrada al activar y combinable con teclado/touch. Cruzar un lateral reaparece por el otro manteniendo velocidad. El viaje incluye ocho zonas, terminando en el Cielo con puerta dorada. Las tormentas dañan también durante el impulso del cohete.
 
 Juego de saltos verticales infinitos integrado al menú principal. No requiere
 dependencias nuevas: utiliza Flutter, `CustomPainter`, `Ticker` y `dart:math`.
 Los personajes, plataformas, monedas, cohetes, planetas y fondos se dibujan con
-código; no se utilizan imágenes en este juego.
+código; se incluye además el recurso `assets/gato_cohete.png` para el efecto de recogida del cohete.
 
 ## Jugar
 
@@ -15,7 +17,7 @@ código; no se utilizan imágenes en este juego.
 - Recoge monedas para el monedero de los sobres. Se guardan al recogerlas,
   incluso si la partida termina después.
 - Los cohetes desactivan la gravedad y dan impulso durante 2,4 segundos.
-- Las nubes eléctricas terminan la partida al aterrizar en ellas.
+- Las nubes eléctricas terminan la partida al tocarlas desde cualquier dirección, incluso usando un cohete.
 - El botón de cámara congela la partida y muestra una captura en un diálogo.
   Al cerrar la vista previa, la partida continúa si estaba en marcha.
 - La pausa también se activa cuando la app pasa a segundo plano.
@@ -27,8 +29,8 @@ código; no se utilizan imágenes en este juego.
   hasta 1/120 s para detectar el cruce de los pies sobre las plataformas.
 - La cámara asciende y nunca retrocede. Se generan plataformas por encima del
   campo visible y se descartan objetos que quedan muy abajo.
-- El viaje visual es extenso y está dividido en siete zonas: subsuelo, pradera,
-  barrio, ciudad, rascacielos, cielo alto y espacio. Cada cambio muestra el
+- El viaje visual es extenso y está dividido en ocho zonas: subsuelo, pradera,
+  barrio, ciudad, rascacielos, cielo alto, espacio y Cielo. Cada cambio muestra el
   nombre de la zona. Los planetas comienzan recién alrededor de los 13.200
   puntos, después de atravesar todos los paisajes.
 - La separación vertical máxima permanece por debajo de la altura de salto.

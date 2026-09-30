@@ -20,12 +20,14 @@ class GameLeaderboardDialog extends StatefulWidget {
   final String gameId, title;
   final String? spaceId;
   final List<Map<String, dynamic>> initialScores;
+  final Stream<List<Map<String, dynamic>>>? scoresStream;
   const GameLeaderboardDialog({
     super.key,
     required this.gameId,
     required this.title,
     required this.spaceId,
     this.initialScores = const [],
+    this.scoresStream,
   });
 
   @override
@@ -34,16 +36,19 @@ class GameLeaderboardDialog extends StatefulWidget {
 
 class _GameLeaderboardDialogState extends State<GameLeaderboardDialog> {
   late final Stream<List<Map<String, dynamic>>>? _scores =
-      widget.spaceId == null ? null : Backend.watchHighscores(widget.spaceId!);
+      widget.scoresStream ??
+      (widget.spaceId == null && Backend.uid == null
+          ? null
+          : Backend.watchHighscores(gameId: widget.gameId));
 
   @override
   Widget build(BuildContext context) => AlertDialog(
     title: Text('Clasificación · ${widget.title}'),
     content: SizedBox(
       width: 340,
-      child: widget.spaceId == null
+      child: _scores == null
           ? const Text(
-              'Inicia sesión desde Inicio para guardar tus récords. Comparte o únete a un espacio desde Nuestro bloc para competir con sus integrantes.',
+              'Inicia sesión desde Inicio para guardar tus récords y competir con todos los jugadores desde celular o PC.',
             )
           : StreamBuilder<List<Map<String, dynamic>>>(
               stream: _scores,
@@ -55,37 +60,55 @@ class _GameLeaderboardDialogState extends State<GameLeaderboardDialog> {
                   );
                 }
                 final rows = rankGameScores(snapshot.data ?? [], widget.gameId);
+                if (rows.isEmpty &&
+                    snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
                 if (rows.isEmpty) {
                   return const Text(
-                    'Todavía no hay récords de este juego en tu espacio. ¡Sé el primero!',
+                    'Todavía no hay récords de este juego. ¡Sé el primero!',
                   );
                 }
-                return ConstrainedBox(
-                  constraints: BoxConstraints(
-                    maxHeight: MediaQuery.sizeOf(context).height * .5,
-                  ),
-                  child: ListView.separated(
-                    shrinkWrap: true,
-                    itemCount: rows.length,
-                    separatorBuilder: (_, _) => const Divider(height: 1),
-                    itemBuilder: (context, index) {
-                      final row = rows[index];
-                      final yours = row['user_id'] == Backend.uid;
-                      return ListTile(
-                        leading: Text(
-                          '${index + 1}',
-                          style: const TextStyle(fontWeight: FontWeight.bold),
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      'Todos los jugadores · En vivo',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                    const SizedBox(height: 12),
+                    Flexible(
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxHeight: MediaQuery.sizeOf(context).height * .5,
                         ),
-                        title: Text(
-                          '${row['nickname']}${yours ? ' · tú' : ''}',
+                        child: ListView.separated(
+                          shrinkWrap: true,
+                          itemCount: rows.length,
+                          separatorBuilder: (_, _) => const Divider(height: 1),
+                          itemBuilder: (context, index) {
+                            final row = rows[index];
+                            final yours = row['user_id'] == Backend.uid;
+                            return ListTile(
+                              leading: Text(
+                                '${index + 1}',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              title: Text(
+                                '${row['nickname']}${yours ? ' · tú' : ''}',
+                              ),
+                              subtitle: Text(
+                                '${row['score']} ${widget.gameId == 'wordlady' ? 'victorias' : 'puntos'}',
+                              ),
+                              tileColor: yours ? const Color(0xffe1eee7) : null,
+                            );
+                          },
                         ),
-                        subtitle: Text(
-                          '${row['score']} ${widget.gameId == 'wordlady' ? 'victorias' : 'puntos'}',
-                        ),
-                        tileColor: yours ? const Color(0xffe1eee7) : null,
-                      );
-                    },
-                  ),
+                      ),
+                    ),
+                  ],
                 );
               },
             ),

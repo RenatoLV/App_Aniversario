@@ -1,23 +1,25 @@
-# Maruversario
+# Anivermaru
+
+Estado actualizado (30/09/2026): el backend activo es **Firebase**, no Supabase. Android y web conservan datos locales sin internet y reintentan sincronizar al recuperar conexión con la app abierta o al volver a abrirla. Ver [ESTADO_SISTEMA.md](ESTADO_SISTEMA.md) para el resumen completo de cambios, verificaciones y pendientes; [app/FIREBASE.md](app/FIREBASE.md) para configuración.
 
 Aplicación Flutter de aniversario con juegos, Maru y Lady animados, sobres holográficos y una colección local de memes convertidos en cartas. El mismo proyecto funciona en web y Android.
 
-El repositorio incluye **244 memes** y sus imágenes WebP, además de seis cartas de ejemplo dibujadas con código (250 entradas en el álbum). No hace falta descargar los memes por separado para ejecutar la aplicación.
+El repositorio incluye **334 memes** de Momazos vol. 1 y vol. 2 y sus imágenes WebP, además de seis cartas de ejemplo dibujadas con código (340 entradas en el álbum). No hace falta descargar los memes por separado para ejecutar la aplicación.
 
 ## Qué incluye
 
-- Maru & Lady: Galactic Leap: saltos verticales infinitos con selección de mascota,
+- Ascenso Maruzon: saltos verticales infinitos con selección de mascota,
   nubes, rocas, plataformas móviles, tormentas, monedas y cohetes. El cielo
   cambia al espacio al ascender; Lady deja una estela arcoíris. Controles táctiles
   y de teclado, pausa, captura con vista previa y récord local.
   Funcionamiento: [app/GALACTIC_LEAP.md](app/GALACTIC_LEAP.md).
 
-- Dulces & bigotes: combina premios en un tablero 9×9, crea especiales,
+- Candy Churu Cat: combina premios en un tablero 9×9, crea especiales,
   encadena cascadas y limpia gelatinas junto a Maru y Lady. Incluye niveles
   progresivos, glaseado, chocolate, lazos, huecos, potenciadores y guardado local.
   Arquitectura y reglas: [app/MATCH3.md](app/MATCH3.md).
 
-- Palabras & bigotes: Wordle de cinco letras con vocabulario español y chileno,
+- Wordlady: Wordle de cinco letras con vocabulario español y chileno,
   100 monedas por victoria y dos pistas al día por dispositivo (fecha local).
   La partida, las victorias y las pistas se conservan localmente.
   Los diccionarios Hunspell incluidos provienen de
@@ -27,12 +29,14 @@ El repositorio incluye **244 memes** y sus imágenes WebP, además de seis carta
   están en `app/assets/wordle_dictionary_license.txt`.
 
 - Escena interactiva de Maru y Lady: caricias, movimiento, siestas, pensamientos, churu y caja de arena.
-- Juego de bloques 8×8 con puntuación, combos, récord y monedas.
+- Block Blaster Maru Editions: juego de bloques 8×8 con puntuación, combos, récord, monedas y SFX Android.
 - Sobres con animación de apertura, rarezas y carta holográfica inclinable.
-- Colección con 244 memes y seis cartas de ejemplo; conserva copias repetidas y la mejor rareza obtenida.
-- Bloc de notas local.
+- Colección con 334 memes y seis cartas de ejemplo; variantes foil, filtros, álbum por volumen y visor con giro/zoom.
+- Bloc de notas local y compartido con fotos y dibujos editables.
 - Persistencia local del tablero, monedas, colección y notas.
-- Integración opcional con Supabase para el espacio privado, récords y notas compartidas.
+- Firebase: Google/nombre de usuario, progreso por cuenta, rankings globales, notas compartidas, Storage y presencia.
+- Cámara 3D: carta visible sin detección de superficies, giro 360°, brillos y foto para Nuestro bloc o descarte.
+- Inclinación Android y cruce de extremos en Ascenso; gesto vertical fuerte desde arriba para cambiar menú.
 
 ## Requisitos
 
@@ -55,7 +59,7 @@ cd App_Aniversario\app
 flutter pub get
 ```
 
-La aplicación funciona sin Supabase: en ese caso los datos se guardan solamente en el dispositivo.
+La aplicación funciona sin internet. Los cambios se guardan localmente; con una cuenta Google se sincronizan después con Firebase.
 
 ### Ejecutar en web
 
@@ -88,7 +92,9 @@ flutter build apk --debug
 
 El archivo queda en `app/build/app/outputs/flutter-apk/app-debug.apk`.
 
-## Configuración opcional de Supabase
+## Configuración histórica de Supabase (no usada por la app actual)
+
+La configuración activa está en [app/FIREBASE.md](app/FIREBASE.md). Lo siguiente describe el prototipo anterior, conservado como referencia; no se necesita para ejecutar Anivermaru.
 
 Copia `app/config.example.json` como `app/config.local.json` y reemplaza los valores de ejemplo:
 
@@ -109,7 +115,7 @@ Las migraciones están en `supabase/migrations/`. Los códigos de activación, a
 
 ## Memes y cartas
 
-Las 244 imágenes listas para usar están en `app/assets/memes/`. El orden estable de las cartas se guarda en `app/tool/meme_catalog.json` y el código generado en `app/lib/meme_cards.dart`.
+Las 334 imágenes listas para usar están en `app/assets/memes/`. El orden estable de las cartas se guarda en `app/tool/meme_catalog.json` y el código generado en `app/lib/meme_cards.dart`.
 
 Para añadir imágenes nuevas:
 
@@ -148,4 +154,4 @@ flutter test
 
 ## Datos y seguridad
 
-Las monedas, sobres y cartas son locales. Supabase es opcional y usa RLS para proteger el espacio compartido. Una sesión anónima no se recupera automáticamente si se borran los datos de la aplicación o se cambia de dispositivo. Antes de distribuir una APK definitiva, utiliza una firma de publicación estable.
+Firebase protege datos por UID y membresía del mural; los rankings son comunes a usuarios autenticados. Monedas, cartas, partidas y notas tienen guardado local y sincronización posterior. Los conflictos entre dispositivos conservan ambas versiones para elegir. Antes de distribuir: firma release estable, validación física de cámara/inclinación, App Check y validación de puntuaciones/recompensas en servidor. No subir credenciales privadas ni claves de firma. Supabase/Drive son material histórico, no backend activo.

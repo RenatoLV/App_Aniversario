@@ -5,14 +5,77 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import android.content.Intent
 import android.net.Uri
+import android.media.AudioManager
+import android.media.ToneGenerator
 import java.io.File
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
+import io.flutter.plugin.common.EventChannel
+import android.view.Surface
 
 class MainActivity : FlutterActivity() {
+    private var tiltSink: EventChannel.EventSink? = null
+    private val sensors by lazy { getSystemService(SENSOR_SERVICE) as SensorManager }
+    private val tiltListener = object : SensorEventListener {
+        override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+        override fun onSensorChanged(event: SensorEvent) {
+            @Suppress("DEPRECATION")
+            val rotation = windowManager.defaultDisplay.rotation
+            val x = when (rotation) {
+                Surface.ROTATION_90 -> -event.values[1]
+                Surface.ROTATION_180 -> -event.values[0]
+                Surface.ROTATION_270 -> event.values[1]
+                else -> event.values[0]
+            }
+            tiltSink?.success(x.toDouble())
+        }
+    }
+    private fun startTilt() {
+        val sensor = sensors.getDefaultSensor(Sensor.TYPE_GRAVITY)
+            ?: sensors.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
+        if (sensor == null || !sensors.registerListener(tiltListener, sensor, SensorManager.SENSOR_DELAY_GAME)) {
+            tiltSink?.error("unavailable", "Sensor no disponible", null)
+        }
+    }
+    override fun onPause() {
+        sensors.unregisterListener(tiltListener)
+        super.onPause()
+    }
+    override fun onResume() {
+        super.onResume()
+        if (tiltSink != null) startTilt()
+    }
+    private var tones: ToneGenerator? = null
     private var pendingAr: MethodChannel.Result? = null
     private var textureFile: File? = null
+    private var backTextureFile: File? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        EventChannel(flutterEngine.dartExecutor.binaryMessenger, "anivermaru/tilt")
+            .setStreamHandler(object : EventChannel.StreamHandler {
+                override fun onListen(arguments: Any?, events: EventChannel.EventSink) {
+                    tiltSink = events
+                    startTilt()
+                }
+                override fun onCancel(arguments: Any?) {
+                    sensors.unregisterListener(tiltListener)
+                    tiltSink = null
+                }
+            })
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "anivermaru/sfx")
+            .setMethodCallHandler { call, result ->
+                if (call.method != "play") { result.notImplemented(); return@setMethodCallHandler }
+                try {
+                    val player = tones ?: ToneGenerator(AudioManager.STREAM_MUSIC, 55).also { tones = it }
+                    val clear = call.argument<Boolean>("clear") == true
+                    player.startTone(if (clear) ToneGenerator.TONE_PROP_ACK else ToneGenerator.TONE_PROP_BEEP,
+                        if (clear) 220 else 65)
+                    result.success(null)
+                } catch (_: Exception) { result.success(null) }
+            }
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "rincon/card_ar")
             .setMethodCallHandler { call, result ->
                 if (call.method == "privacy") {
@@ -25,18 +88,24 @@ class MainActivity : FlutterActivity() {
                 if (call.method != "open") { result.notImplemented(); return@setMethodCallHandler }
                 if (pendingAr != null) { result.error("busy", "Ya hay una sesión AR abierta.", null); return@setMethodCallHandler }
                 val bytes = call.argument<ByteArray>("texture")
-                if (bytes == null || bytes.size > 6_000_000) {
+                val backBytes = call.argument<ByteArray>("backTexture")
+                if (bytes == null || bytes.size > 6_000_000 || (backBytes?.size ?: 0) > 6_000_000) {
                     result.error("texture", "No pudimos preparar la carta.", null)
                     return@setMethodCallHandler
                 }
                 try {
                     textureFile = File.createTempFile("ar-card-", ".png", cacheDir).apply { writeBytes(bytes) }
+                    backTextureFile = backBytes?.let { content ->
+                        File.createTempFile("ar-back-", ".png", cacheDir).apply { writeBytes(content) }
+                    }
                     pendingAr = result
-                    startActivityForResult(Intent(this, CardArActivity::class.java)
-                        .putExtra("texturePath", textureFile!!.absolutePath), 8421)
+                    startActivityForResult(Intent(this, CameraCardActivity::class.java)
+                        .putExtra("texturePath", textureFile!!.absolutePath)
+                        .putExtra("backTexturePath", backTextureFile?.absolutePath), 8421)
                 } catch (e: Exception) {
                     pendingAr = null
                     textureFile?.delete()
+                    backTextureFile?.delete()
                     result.error("ar", "No se pudo abrir la cámara AR.", null)
                 }
             }
@@ -50,6 +119,8 @@ class MainActivity : FlutterActivity() {
         pendingAr = null
         textureFile?.delete()
         textureFile = null
+        backTextureFile?.delete()
+        backTextureFile = null
         val error = data?.getStringExtra("error")
         val path = data?.getStringExtra("photoPath")
         if (error != null) result?.error("ar", error, null)
@@ -59,5 +130,11 @@ class MainActivity : FlutterActivity() {
             catch (_: Exception) { result?.error("capture", "No pudimos leer la foto.", null) }
             finally { photo.delete() }
         } else result?.success(null)
+    }
+
+    override fun onDestroy() {
+        tones?.release()
+        tones = null
+        super.onDestroy()
     }
 }

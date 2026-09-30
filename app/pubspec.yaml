@@ -67,6 +67,7 @@ flutter:
   assets:
     - assets/cuadro.jpg
     - assets/gato_cohete.png
+    - assets/anivermaru_logo.png
     - assets/memes/
     - assets/wordle_es.dic
     - assets/wordle_cl.dic

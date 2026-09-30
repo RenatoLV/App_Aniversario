@@ -59,11 +59,15 @@ async function main(){
   await doc(b,prefix+'/notes/one',null,false);
   await doc(b,prefix+'/members/'+a.id,{nickname:'forged'},false);
   await storage(a,prefix+'/notes/one/image',true);
+  await storage(a,prefix+'/notes/photo/jpeg',true,true,'image/jpeg');
+  await doc(a,prefix+'/notes/photo',{...note,body:'foto creada antes de iniciar sesión',mediaKind:'photo',mediaPath:prefix+'/notes/photo/jpeg'});
   await storage(b,prefix+'/notes/one/image',false,false);
   await storage(a,prefix+'/notes/one/bad',true,false,'text/html');
   await doc(b,prefix+'/members/'+b.id,{nickname:'B'});
   await doc(b,prefix+'/notes/one');
   await storage(b,prefix+'/notes/one/image',false);
+  await storage(b,prefix+'/notes/photo/jpeg',false);
+  await doc(b,prefix+'/notes/photo');
   await doc(b,prefix+'/notes/one',{...note,body:'editado',editor:b.id});
   await doc(b,prefix+'/notes/one',{...note,editor:b.id,mediaPath:'spaces/other/secret'},false);
   const score={user_id:a.id,nickname:'A',game:'blocks-v1',score:100,updated_at:'now'};
@@ -71,6 +75,19 @@ async function main(){
   await doc(b,prefix+'/scores/'+a.id+'_blocks-v1',{...score,user_id:b.id},false);
   await doc(a,prefix+'/scores/'+a.id+'_blocks-v1',{...score,score:50},false);
   await doc(a,prefix+'/scores/'+a.id+'_blocks-v1',{...score,score:150});
+  // Rankings are shared across users, independently of mural membership.
+  await doc(a,'game_scores/'+a.id+'_blocks-v1',score);
+  await doc(c,'game_scores/'+a.id+'_blocks-v1');
+  await doc(null,'game_scores/'+a.id+'_blocks-v1',null,false);
+  await doc(b,'game_scores/'+a.id+'_blocks-v1',{...score,user_id:b.id},false);
+  await doc(a,'game_scores/'+a.id+'_blocks-v1',{...score,score:50},false);
+  await doc(a,'game_scores/'+a.id+'_blocks-v1',{...score,score:200});
+  await doc(a,'game_scores/'+a.id+'_blocks-v1',{...score,score:200,nickname:'Nuevo nombre'});
+  for (const game of ['wordlady','candy-churu-cat','ascenso-maruzon']) {
+    await doc(c,'game_scores/'+c.id+'_'+game,{...score,user_id:c.id,nickname:'C',game});
+    await doc(b,'game_scores/'+c.id+'_'+game);
+  }
+  await doc(a,'game_scores/'+a.id+'_invalid',{...score,game:'invalid'},false);
   await realtime(a,prefix+'/members/'+a.id,true);
   await realtime(b,prefix+'/presence',undefined,false);
   await realtime(a,prefix+'/presence/'+a.id+'/device',{name:'A',since:1});

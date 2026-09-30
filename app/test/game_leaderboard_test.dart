@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -6,6 +7,73 @@ import 'package:nuestro_rincon/home.dart';
 import 'package:nuestro_rincon/store.dart';
 
 void main() {
+  testWidgets('Two users from different devices share a live game ranking', (
+    tester,
+  ) async {
+    final scores = StreamController<List<Map<String, dynamic>>>();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: GameLeaderboardDialog(
+          gameId: 'blocks-v1',
+          title: 'Block Blaster',
+          spaceId: null,
+          scoresStream: scores.stream,
+        ),
+      ),
+    );
+    scores.add([
+      {
+        'user_id': 'pc',
+        'game': 'blocks-v1',
+        'nickname': 'RenatoLV',
+        'score': 2930,
+      },
+      {
+        'user_id': 'phone',
+        'game': 'blocks-v1',
+        'nickname': 'renatiu',
+        'score': 400,
+      },
+      {
+        'user_id': 'other',
+        'game': 'wordlady',
+        'nickname': 'Otro juego',
+        'score': 99,
+      },
+    ]);
+    await tester.pump();
+    await tester.pump();
+    expect(find.text('RenatoLV'), findsOneWidget);
+    expect(find.text('renatiu'), findsOneWidget);
+    expect(find.text('2930 puntos'), findsOneWidget);
+    expect(find.text('Otro juego'), findsNothing);
+    expect(find.text('Todos los jugadores · En vivo'), findsOneWidget);
+    scores.add([
+      {
+        'user_id': 'pc',
+        'game': 'blocks-v1',
+        'nickname': 'RenatoLV',
+        'score': 2930,
+      },
+      {
+        'user_id': 'phone',
+        'game': 'blocks-v1',
+        'nickname': 'renatiu',
+        'score': 3500,
+      },
+    ]);
+    await tester.pump();
+    await tester.pump();
+    expect(find.text('3500 puntos'), findsOneWidget);
+    expect(
+      tester.getTopLeft(find.text('renatiu')).dy,
+      lessThan(tester.getTopLeft(find.text('RenatoLV')).dy),
+    );
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+    unawaited(scores.close());
+    await tester.pump();
+  });
   test('Each leaderboard includes only its game, ranked highest first', () {
     final source = [
       {'game': 'wordlady', 'nickname': 'Maru', 'score': 3},
