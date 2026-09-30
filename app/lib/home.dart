@@ -8,6 +8,10 @@ import 'game.dart';
 import 'store.dart';
 import 'cat_character.dart';
 import 'backend.dart';
+import 'wordle.dart';
+import 'sweet_screen.dart';
+import 'cat_room.dart';
+import 'leap_screen.dart';
 
 const ink = Color(0xff293f39),
     cream = Color(0xfffaf6ee),
@@ -173,7 +177,8 @@ class _RinconHomeState extends State<RinconHome>
     } catch (_) {
       if (mounted) {
         setState(
-          () => _cloudError = 'No se pudo activar. Revisa el código y que Supabase permita acceso anónimo.',
+          () => _cloudError =
+              'No se pudo activar. Revisa el código y que Supabase permita acceso anónimo.',
         );
       }
     } finally {
@@ -266,7 +271,7 @@ class _RinconHomeState extends State<RinconHome>
         ),
       ),
       const SizedBox(height: 12),
-      const _CatPlayScene(),
+      const CatRoom(),
       if (Backend.configured) ...[
         const SizedBox(height: 18),
         Card(
@@ -364,7 +369,8 @@ class _RinconHomeState extends State<RinconHome>
                   } catch (_) {
                     if (mounted) {
                       setState(
-                        () => _cloudError = 'El récord está guardado aquí; falta sincronizarlo.',
+                        () => _cloudError =
+                            'El récord está guardado aquí; falta sincronizarlo.',
                       );
                     }
                   }
@@ -376,6 +382,69 @@ class _RinconHomeState extends State<RinconHome>
               ),
             ),
           ],
+        ),
+      ),
+      const SizedBox(height: 24),
+      Card(
+        child: ListTile(
+          contentPadding: const EdgeInsets.all(20),
+          leading: const Icon(Icons.grid_on_rounded, color: green, size: 36),
+          title: const Text(
+            'Palabras & bigotes',
+            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+          ),
+          subtitle: const Text(
+            'Nuestro Wordle en español.\nCinco letras, seis intentos y dos compañeros.',
+          ),
+          trailing: const Icon(Icons.play_arrow_rounded, color: green),
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute<void>(builder: (_) => WordleScreen(store: s)),
+          ),
+        ),
+      ),
+      const SizedBox(height: 24),
+      Card(
+        color: const Color(0xffffe8ed),
+        child: ListTile(
+          contentPadding: const EdgeInsets.all(20),
+          leading: const Icon(Icons.pets, color: Color(0xff936278), size: 36),
+          title: const Text(
+            'Dulces & bigotes',
+            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+          ),
+          subtitle: const Text(
+            'Combina premios, crea especiales y limpia gelatinas.\n¡Maru y Lady celebran cada combinación!',
+          ),
+          trailing: const Icon(Icons.play_arrow_rounded),
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute<void>(builder: (_) => SweetScreen(store: s)),
+          ),
+        ),
+      ),
+      const SizedBox(height: 24),
+      Card(
+        color: const Color(0xffe4edf8),
+        child: ListTile(
+          contentPadding: const EdgeInsets.all(20),
+          leading: const Icon(
+            Icons.rocket_launch,
+            color: Color(0xff355579),
+            size: 36,
+          ),
+          title: const Text(
+            'Maru & Lady: Galactic Leap',
+            style: TextStyle(fontSize: 21, fontWeight: FontWeight.bold),
+          ),
+          subtitle: const Text(
+            'Salta del cielo al espacio.\nRecoge monedas y despega con cohetes.',
+          ),
+          trailing: const Icon(Icons.play_arrow_rounded),
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute<void>(builder: (_) => LeapScreen(store: s)),
+          ),
         ),
       ),
       const SizedBox(height: 24),
@@ -501,12 +570,14 @@ class _RinconHomeState extends State<RinconHome>
                         height: 216 + flare * 70,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: const Color(0xff41d9ff)
-                              .withValues(alpha: .32 * (1 - flare)),
+                          color: const Color(
+                            0xff41d9ff,
+                          ).withValues(alpha: .32 * (1 - flare)),
                           boxShadow: [
                             BoxShadow(
-                              color: const Color(0xffa842ff)
-                                  .withValues(alpha: .6 * (1 - flare)),
+                              color: const Color(
+                                0xffa842ff,
+                              ).withValues(alpha: .6 * (1 - flare)),
                               blurRadius: 56 + t * 30,
                               spreadRadius: 8 + t * 12,
                             ),
@@ -577,13 +648,13 @@ class _RinconHomeState extends State<RinconHome>
                                     ),
                                     const SizedBox(height: 15),
                                     const Text(
-                                      'COSITAS\nNUESTRAS',
+                                      'MOMAZOS VOL. 1\nEDICIÓN\nANIVERSARIO',
                                       textAlign: TextAlign.center,
                                       style: TextStyle(
-                                        fontSize: 23,
+                                        fontSize: 18,
                                         height: 1,
                                         fontWeight: FontWeight.w900,
-                                        letterSpacing: 2.5,
+                                        letterSpacing: 1.2,
                                         color: Colors.white,
                                         shadows: [
                                           Shadow(
@@ -678,7 +749,7 @@ class _RinconHomeState extends State<RinconHome>
                                           ),
                                           child: const Center(
                                             child: Text(
-                                              '✦  COSITAS NUESTRAS  ✦',
+                                              '✦  SOBRE SORPRESA  ✦',
                                               style: TextStyle(
                                                 fontSize: 10,
                                                 fontWeight: FontWeight.w900,
@@ -1273,6 +1344,7 @@ class _BlockScreenState extends State<BlockScreen>
   bool _showCombo = false;
   bool _gameOverShown = false;
   CatKind _clearCat = CatKind.lady;
+  int _clearVariation = 0;
   int? _hover;
   GameStore get store => widget.store;
 
@@ -1303,6 +1375,11 @@ class _BlockScreenState extends State<BlockScreen>
     _juice.forward(from: 0);
     if (store.game.lastClearedCount > 0) {
       _clearCat = _clearCat == CatKind.lady ? CatKind.maru : CatKind.lady;
+      _clearVariation = (_clearVariation + 1) % 3;
+      _juice.duration = Duration(
+        milliseconds: store.game.lastClearedCount >= 3 ? 1900 : 1300,
+      );
+      _juice.forward(from: 0);
       HapticFeedback.heavyImpact();
       _comboTimer?.cancel();
       setState(() => _showCombo = true);
@@ -1315,12 +1392,125 @@ class _BlockScreenState extends State<BlockScreen>
     }
     if (store.game.over) {
       Future.delayed(
-        Duration(milliseconds: store.game.lastClearedCount > 0 ? 1180 : 350),
+        Duration(
+          milliseconds: store.game.lastClearedCount > 0
+              ? _juice.duration!.inMilliseconds + 80
+              : 350,
+        ),
         () {
           if (mounted && store.game.over) _showGameOver();
         },
       );
     }
+  }
+
+  List<Widget> _catClearParty(
+    Size board,
+    double size,
+    double t,
+    double opacity,
+    List<int> rows,
+    List<int> columns,
+  ) {
+    final lines = [
+      for (final row in rows) (horizontal: true, index: row),
+      for (final col in columns) (horizontal: false, index: col),
+    ];
+    final special = lines.length >= 3;
+    final sweepEnd = special ? .62 : .84;
+    final children = <Widget>[];
+    for (var i = 0; i < lines.length; i++) {
+      final line = lines[i];
+      final reverse = (i + _clearVariation).isOdd;
+      final sweep = ((t - .08 - i * .025) / (sweepEnd - .12)).clamp(0.0, 1.0);
+      final travel = reverse ? 1 - sweep : sweep;
+      var x = line.horizontal
+          ? travel * (board.width + size) - size
+          : (line.index + .5) * board.width / 8 - size / 2;
+      var y = line.horizontal
+          ? (line.index + .5) * board.height / 8 - size * .55
+          : travel * (board.height + size) - size;
+      var angle = reverse ? -.15 : .15;
+      // Every cleared line gets its own helper; both cats share double clears.
+      final cat = i.isEven
+          ? _clearCat
+          : (_clearCat == CatKind.maru ? CatKind.lady : CatKind.maru);
+      if (special && t > .62) {
+        if (i > 1) continue;
+        final finale = ((t - .62) / .38).clamp(0.0, 1.0);
+        final side = i == 0 ? -1.0 : 1.0;
+        final center = Offset(board.width / 2, board.height / 2);
+        final radius = board.width * .22;
+        switch (_clearVariation) {
+          case 0: // A shared leap with a somersault.
+            x = center.dx + side * radius - size / 2;
+            y = center.dy - size / 2 - math.sin(finale * math.pi) * radius;
+            angle = side * finale * math.pi * 2;
+          case 1: // Chase each other around a sparkling circle.
+            final orbit = finale * math.pi * 2 + i * math.pi;
+            x = center.dx + math.cos(orbit) * radius - size / 2;
+            y = center.dy + math.sin(orbit) * radius * .65 - size / 2;
+            angle = math.sin(orbit) * .3;
+          default: // Meet in the middle and bounce paws together.
+            x = center.dx + side * radius * (1 - finale * .6) - size / 2;
+            y =
+                center.dy -
+                size / 2 -
+                math.sin(finale * math.pi * 3).abs() * size * .4;
+            angle = side * math.sin(finale * math.pi * 3) * .35;
+        }
+      } else if (_clearVariation == 1) {
+        y += math.sin(sweep * math.pi * 4) * size * .12;
+      } else if (_clearVariation == 2) {
+        angle += math.sin(sweep * math.pi * 6) * .18;
+      }
+      children.add(
+        Positioned(
+          left: x,
+          top: y,
+          child: Opacity(
+            opacity: opacity,
+            child: Transform.rotate(
+              angle: angle,
+              child: CatActor(
+                cat: cat,
+                size: size,
+                action: CatAction.blocks,
+                active: true,
+                showLabel: false,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+    if (special && t > .62) {
+      children.add(
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: board.height * .15,
+          child: Opacity(
+            opacity: opacity,
+            child: Text(
+              [
+                '¡Salto de bigotes! ✨',
+                '¡Persecución estelar! 🐾',
+                '¡Choca esas patitas! 💛',
+              ][_clearVariation],
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.w900,
+                shadows: [Shadow(color: Colors.purple, blurRadius: 8)],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+    return children;
   }
 
   Future<void> _showGameOver() async {
@@ -1761,23 +1951,33 @@ class _BlockScreenState extends State<BlockScreen>
                                                     catSize;
                                           return Stack(
                                             children: [
-                                              Positioned(
-                                                left: left,
-                                                top: top,
-                                                child: Opacity(
-                                                  opacity: opacity.clamp(
-                                                    0.0,
-                                                    1.0,
-                                                  ),
-                                                  child: CatActor(
-                                                    cat: _clearCat,
-                                                    size: catSize,
-                                                    action: CatAction.blocks,
-                                                    active: true,
-                                                    showLabel: false,
+                                              if (g.lastClearedCount == 1)
+                                                Positioned(
+                                                  left: left,
+                                                  top: top,
+                                                  child: Opacity(
+                                                    opacity: opacity.clamp(
+                                                      0.0,
+                                                      1.0,
+                                                    ),
+                                                    child: CatActor(
+                                                      cat: _clearCat,
+                                                      size: catSize,
+                                                      action: CatAction.blocks,
+                                                      active: true,
+                                                      showLabel: false,
+                                                    ),
                                                   ),
                                                 ),
-                                              ),
+                                              if (g.lastClearedCount >= 2)
+                                                ..._catClearParty(
+                                                  c.biggest,
+                                                  catSize,
+                                                  t,
+                                                  opacity.clamp(0.0, 1.0),
+                                                  g.lastClearedRows,
+                                                  g.lastClearedColumns,
+                                                ),
                                             ],
                                           );
                                         },
@@ -2828,7 +3028,7 @@ class _InspectCardDialogState extends State<_InspectCardDialog>
                 ),
                 const SizedBox(height: 16),
                 const Text(
-                  'COSITAS NUESTRAS · VOL. 01',
+                  'SOBRE SORPRESA · VOL. 01',
                   style: TextStyle(
                     color: Color(0xfffff0bf),
                     fontSize: 10,
@@ -3197,7 +3397,7 @@ class _CardRevealDialogState extends State<CardRevealDialog>
                                   ),
                                   const SizedBox(height: 10),
                                   const Text(
-                                    'COSITAS NUESTRAS · VOL. 01',
+                                    'SOBRE SORPRESA · VOL. 01',
                                     style: TextStyle(
                                       color: Color(0xfffff0bf),
                                       fontSize: 8,
@@ -3336,359 +3536,6 @@ class _MaruversarioTitleState extends State<_MaruversarioTitle>
         ],
       );
     },
-  );
-}
-
-enum _CatMoment { together, churu, litter, thoughts }
-
-class _CatPlayScene extends StatefulWidget {
-  const _CatPlayScene();
-
-  @override
-  State<_CatPlayScene> createState() => _CatPlaySceneState();
-}
-
-class _CatPlaySceneState extends State<_CatPlayScene> {
-  Timer? _sceneTimer;
-  Timer? _detailTimer;
-  _CatMoment _moment = _CatMoment.together;
-  int _turn = 0;
-  bool _maruEats = true;
-  bool _maruDigs = true;
-  int _thoughtTurn = 0;
-
-  @override
-  void initState() {
-    super.initState();
-    _sceneTimer = Timer.periodic(const Duration(seconds: 8), (_) {
-      if (!mounted) return;
-      setState(() {
-        _turn++;
-        _moment = _CatMoment.values[_turn % _CatMoment.values.length];
-      });
-    });
-    _detailTimer = Timer.periodic(const Duration(seconds: 2), (_) {
-      if (mounted &&
-          (_moment == _CatMoment.churu ||
-              _moment == _CatMoment.thoughts ||
-              _moment == _CatMoment.litter)) {
-        setState(() {
-          _maruEats = !_maruEats;
-          _maruDigs = !_maruDigs;
-          _thoughtTurn++;
-        });
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _sceneTimer?.cancel();
-    _detailTimer?.cancel();
-    super.dispose();
-  }
-
-  void _show(_CatMoment moment) => setState(() => _moment = moment);
-
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.fromLTRB(12, 18, 12, 16),
-    decoration: BoxDecoration(
-      color: const Color(0xfffffdf8),
-      borderRadius: BorderRadius.circular(22),
-      border: Border.all(color: const Color(0xffe7dfcf)),
-    ),
-    child: LayoutBuilder(
-      builder: (context, constraints) {
-        final actorSize = math.min(205.0, (constraints.maxWidth - 16) / 2);
-        final sceneHeight = (MediaQuery.sizeOf(context).height * .47).clamp(
-          340.0,
-          480.0,
-        );
-        final churu = _moment == _CatMoment.churu;
-        final litter = _moment == _CatMoment.litter;
-        final thoughts = _moment == _CatMoment.thoughts;
-        return Column(
-          children: [
-            Container(
-              height: 32,
-              alignment: Alignment.center,
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 300),
-                child: Text(
-                  switch (_moment) {
-                    _CatMoment.together => '🐾 Maru y Lady se hacen compañía',
-                    _CatMoment.churu => '🥰 ¡Churu para compartir!',
-                    _CatMoment.litter =>
-                      _maruDigs
-                          ? '🧹 Maru escarba, Lady espera su turno'
-                          : '🧹 Lady escarba, Maru vigila',
-                    _CatMoment.thoughts => '💭 ¿Qué estarán pensando?',
-                  },
-                  key: ValueKey(_moment),
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w800,
-                    color: green,
-                  ),
-                ),
-              ),
-            ),
-            Stack(
-              alignment: Alignment.bottomCenter,
-              children: [
-                SizedBox(width: double.infinity, height: sceneHeight),
-                Positioned.fill(
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: const Color(0xfff3ecde),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                  ),
-                ),
-                Positioned(
-                  top: 12,
-                  left: 18,
-                  child: Text(
-                    '🪴',
-                    style: TextStyle(fontSize: actorSize * .24),
-                  ),
-                ),
-                Positioned(
-                  top: 10,
-                  right: 16,
-                  child: Text(
-                    '🖼️',
-                    style: TextStyle(fontSize: actorSize * .23),
-                  ),
-                ),
-                Positioned(
-                  bottom: 0,
-                  left: 0,
-                  right: 0,
-                  child: Container(
-                    height: 28,
-                    decoration: const BoxDecoration(
-                      color: Color(0xffe4d4bd),
-                      borderRadius: BorderRadius.vertical(
-                        bottom: Radius.circular(20),
-                      ),
-                    ),
-                  ),
-                ),
-                if (thoughts)
-                  Positioned(
-                    top: 54,
-                    left: 14,
-                    child: AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 450),
-                      child: _ThoughtBubble(
-                        key: ValueKey('maru-$_thoughtTurn'),
-                        thought: _thoughtTurn.isEven
-                            ? '🐟  ¡un pescadito!'
-                            : '💛  Lady y yo',
-                        color: const Color(0xffe9f3ff),
-                      ),
-                    ),
-                  ),
-                if (thoughts)
-                  Positioned(
-                    top: 88,
-                    right: 14,
-                    child: AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 450),
-                      child: _ThoughtBubble(
-                        key: ValueKey('lady-$_thoughtTurn'),
-                        thought: _thoughtTurn.isEven
-                            ? '🧶  ¡a jugar!'
-                            : '🐾  ¿Dónde está Maru?',
-                        color: const Color(0xffffe9f0),
-                      ),
-                    ),
-                  ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(4, 42, 4, 18),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      AnimatedSlide(
-                        offset: Offset(litter && _maruDigs ? .16 : 0, 0),
-                        duration: const Duration(milliseconds: 550),
-                        curve: Curves.easeInOut,
-                        child: CatActor(
-                          cat: CatKind.maru,
-                          size: actorSize,
-                          active:
-                              churu ||
-                              litter ||
-                              (_moment == _CatMoment.together),
-                          feeding: churu && _maruEats,
-                          digging: litter && _maruDigs,
-                          focus: 1,
-                          movable: true,
-                          onPet: () => _show(_CatMoment.together),
-                        ),
-                      ),
-                      AnimatedSlide(
-                        offset: Offset(litter && !_maruDigs ? -.16 : 0, 0),
-                        duration: const Duration(milliseconds: 550),
-                        curve: Curves.easeInOut,
-                        child: CatActor(
-                          cat: CatKind.lady,
-                          size: actorSize,
-                          active:
-                              churu ||
-                              litter ||
-                              (_moment == _CatMoment.together),
-                          feeding: churu && !_maruEats,
-                          digging: litter && !_maruDigs,
-                          focus: -1,
-                          movable: true,
-                          onPet: () => _show(_CatMoment.together),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                if (litter)
-                  Positioned(
-                    bottom: 7,
-                    child: Column(
-                      children: [
-                        AnimatedSlide(
-                          offset: Offset(_maruDigs ? -.25 : .25, 0),
-                          duration: const Duration(milliseconds: 500),
-                          child: const Text(
-                            '✦  ·  ✦',
-                            style: TextStyle(
-                              color: Color(0xffa28266),
-                              fontSize: 22,
-                            ),
-                          ),
-                        ),
-                        Container(
-                          width: 118,
-                          height: 40,
-                          alignment: Alignment.center,
-                          decoration: BoxDecoration(
-                            color: const Color(0xffb49bca),
-                            borderRadius: const BorderRadius.vertical(
-                              top: Radius.circular(9),
-                              bottom: Radius.circular(17),
-                            ),
-                            border: Border.all(
-                              color: const Color(0xff806898),
-                              width: 3,
-                            ),
-                            boxShadow: const [
-                              BoxShadow(
-                                color: Color(0x44000000),
-                                blurRadius: 6,
-                                offset: Offset(0, 3),
-                              ),
-                            ],
-                          ),
-                          child: Container(
-                            width: 99,
-                            height: 16,
-                            decoration: BoxDecoration(
-                              color: const Color(0xffd6c1a2),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: const Center(
-                              child: Text(
-                                '·  ·  ·  ·',
-                                style: TextStyle(
-                                  color: Color(0xff8d7257),
-                                  fontWeight: FontWeight.w900,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Wrap(
-              alignment: WrapAlignment.center,
-              spacing: 6,
-              runSpacing: 4,
-              children: [
-                for (final (moment, icon, label) in [
-                  (_CatMoment.together, '🐾', 'Juntos'),
-                  (_CatMoment.churu, '🥢', 'Churu'),
-                  (_CatMoment.litter, '🧹', 'Baño'),
-                  (_CatMoment.thoughts, '💭', 'Pensamientos'),
-                ])
-                  ActionChip(
-                    avatar: Text(icon),
-                    label: Text(label),
-                    onPressed: () => _show(moment),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 3),
-            const Text(
-              'Acarícialos · arrástralos · dos toques para dormir (despiertan solos)',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 11, color: Color(0xff69776d)),
-            ),
-          ],
-        );
-      },
-    ),
-  );
-}
-
-class _ThoughtBubble extends StatelessWidget {
-  final String thought;
-  final Color color;
-  const _ThoughtBubble({super.key, required this.thought, required this.color});
-
-  @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-        decoration: BoxDecoration(
-          color: color,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: const Color(0xffd8d2cf)),
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x19000000),
-              blurRadius: 6,
-              offset: Offset(0, 3),
-            ),
-          ],
-        ),
-        child: Text(
-          thought,
-          style: const TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-            color: ink,
-          ),
-        ),
-      ),
-      const Padding(
-        padding: EdgeInsets.only(left: 20, top: 3),
-        child: Text(
-          '◦',
-          style: TextStyle(fontSize: 20, height: .7, color: green),
-        ),
-      ),
-      const Padding(
-        padding: EdgeInsets.only(left: 11),
-        child: Text(
-          '·',
-          style: TextStyle(fontSize: 22, height: .6, color: green),
-        ),
-      ),
-    ],
   );
 }
 

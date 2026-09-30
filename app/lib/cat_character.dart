@@ -16,8 +16,10 @@ class CatActor extends StatefulWidget {
   final bool active;
   final double focus;
   final bool showLabel;
+  final bool showShadow;
   final bool movable;
   final bool feeding;
+  final bool munching;
   final bool digging;
   final bool crying;
   final double packProgress;
@@ -31,8 +33,10 @@ class CatActor extends StatefulWidget {
     this.active = false,
     this.focus = 0,
     this.showLabel = true,
+    this.showShadow = true,
     this.movable = false,
     this.feeding = false,
+    this.munching = false,
     this.digging = false,
     this.crying = false,
     this.packProgress = 0,
@@ -197,9 +201,11 @@ class _CatActorState extends State<CatActor> with TickerProviderStateMixin {
                       sleeping: _sleeping,
                       reaction: _reaction,
                       feeding: widget.feeding,
+                      munching: widget.munching,
                       digging: widget.digging,
                       crying: widget.crying,
                       packProgress: widget.packProgress,
+                      showShadow: widget.showShadow,
                     ),
                   ),
                 ),
@@ -223,6 +229,49 @@ class _CatActorState extends State<CatActor> with TickerProviderStateMixin {
   }
 }
 
+/// Shared anatomy for games: preserves Maru's stripes and Lady's patches.
+abstract class CatPainter extends CustomPainter {
+  final double phase, blink, joy;
+  const CatPainter({this.phase = 0, this.blink = 0, this.joy = 0});
+  CatKind get kind;
+  @override
+  void paint(Canvas canvas, Size size) => _CatPainter(
+    cat: kind,
+    action: CatAction.blocks,
+    active: true,
+    phase: phase,
+    pet: joy,
+    focus: 0,
+    sleeping: false,
+    reaction: 1,
+    feeding: false,
+    munching: false,
+    digging: false,
+    crying: false,
+    packProgress: 0,
+    showShadow: false,
+    forcedBlink: blink > .35,
+  ).paint(canvas, size);
+  @override
+  bool shouldRepaint(covariant CatPainter old) =>
+      old.kind != kind ||
+      old.phase != phase ||
+      old.blink != blink ||
+      old.joy != joy;
+}
+
+class MaruPainter extends CatPainter {
+  const MaruPainter({super.phase, super.blink, super.joy});
+  @override
+  CatKind get kind => CatKind.maru;
+}
+
+class LadyPainter extends CatPainter {
+  const LadyPainter({super.phase, super.blink, super.joy});
+  @override
+  CatKind get kind => CatKind.lady;
+}
+
 class _CatPainter extends CustomPainter {
   final CatKind cat;
   final CatAction action;
@@ -231,9 +280,12 @@ class _CatPainter extends CustomPainter {
   final bool sleeping;
   final int reaction;
   final bool feeding;
+  final bool munching;
   final bool digging;
   final bool crying;
   final double packProgress;
+  final bool showShadow;
+  final bool forcedBlink;
   const _CatPainter({
     required this.cat,
     required this.action,
@@ -244,9 +296,12 @@ class _CatPainter extends CustomPainter {
     required this.sleeping,
     required this.reaction,
     required this.feeding,
+    required this.munching,
     required this.digging,
     required this.crying,
     required this.packProgress,
+    required this.showShadow,
+    this.forcedBlink = false,
   });
 
   bool get maru => cat == CatKind.maru;
@@ -313,16 +368,25 @@ class _CatPainter extends CustomPainter {
         ? math.sin((packProgress - .2) * math.pi * 10).abs() * .8
         : 0.0;
     final dig = digging ? (math.sin(phase * math.pi * 8) + 1) * .42 : 0.0;
-    final reach = sleeping
+    final reach = feeding || munching
+        ? .18 + .08 * math.sin(phase * math.pi * 8)
+        : sleeping
         ? 0.0
         : (active ? .55 + pulse * .45 : 0.0) +
               math.sin(pet * math.pi) * .8 +
               packSwipe +
               dig;
-    final blink = sleeping || (phase > .93 && phase < .965);
+    final blink =
+        sleeping ||
+        forcedBlink ||
+        (munching && math.sin(phase * math.pi * 8) > .65) ||
+        (phase > .93 && phase < .965);
     final gaze = focus.clamp(-1.0, 1.0);
 
-    ellipse(canvas, 50, 92, 38, 5, const Color(0x33413039));
+    if (showShadow) {
+      ellipse(canvas, 50, 95, 34, 3, const Color(0x33413039));
+      ellipse(canvas, 37, 94, 11, 1.5, const Color(0x33413039));
+    }
 
     // Tail pivots behind the body, so wagging does not slide its markings.
     canvas.save();
@@ -353,7 +417,10 @@ class _CatPainter extends CustomPainter {
     canvas.restore();
 
     canvas.save();
-    canvas.translate(0, breathe);
+    // Breathing expands the torso around the planted foot instead of lifting it.
+    canvas.translate(50, 94);
+    canvas.scale(1 + breathe * .0015, 1 + breathe * .006);
+    canvas.translate(-50, -94);
     ellipse(
       canvas,
       50,
@@ -407,6 +474,7 @@ class _CatPainter extends CustomPainter {
     // Independent head tilt follows a target or a petting tap.
     canvas.save();
     if (sleeping) canvas.translate(0, 8);
+    if (munching) canvas.translate(0, 10 + math.sin(phase * math.pi * 8) * 2);
     canvas.translate(50, sleeping ? 51 : 45);
     canvas.rotate(
       gaze * .08 + math.sin(pet * math.pi) * .13 + (active ? wave * .035 : 0),
@@ -537,7 +605,7 @@ class _CatPainter extends CustomPainter {
       line(canvas, 50, 60, 45, 62, maru ? dark : const Color(0xff8b8588), 1.3);
       line(canvas, 50, 60, 55, 62, maru ? dark : const Color(0xff8b8588), 1.3);
     }
-    if (feeding && !sleeping) {
+    if ((feeding || munching) && !sleeping) {
       final lick = (math.sin(phase * math.pi * 8) + 1) / 2;
       ellipse(
         canvas,
@@ -572,18 +640,24 @@ class _CatPainter extends CustomPainter {
     canvas.restore();
 
     if (feeding && !sleeping) {
-      // A little treat held right by the mouth, with a moving tip.
-      final sway = math.sin(phase * math.pi * 4) * 1.5;
+      // The treat tip meets the mouth; a paw holds the diagonal packet.
+      final sway = math.sin(phase * math.pi * 8) * .5;
+      canvas.save();
+      canvas.translate(50, 63);
+      canvas.rotate(maru ? -.24 : .24);
+      canvas.translate(-50, -63);
       final tube = Path()
-        ..moveTo(47, 65 + sway)
-        ..lineTo(53, 65 + sway)
-        ..lineTo(56, 88 + sway)
-        ..lineTo(44, 88 + sway)
+        ..moveTo(48, 65 + sway)
+        ..lineTo(52, 65 + sway)
+        ..lineTo(54, 84 + sway)
+        ..lineTo(46, 84 + sway)
         ..close();
       path(canvas, tube, const Color(0xffff82aa));
-      line(canvas, 45, 67 + sway, 55, 67 + sway, const Color(0xffb84d75), 2);
-      ellipse(canvas, 50, 64 + sway, 3, 2, const Color(0xffead8a7));
-      line(canvas, 47, 78 + sway, 53, 78 + sway, Colors.white, 2);
+      line(canvas, 48, 69 + sway, 52, 69 + sway, const Color(0xffb84d75), 1.3);
+      ellipse(canvas, 50, 64 + sway, 1.6, 1, const Color(0xffead8a7));
+      line(canvas, 48, 76 + sway, 52, 76 + sway, Colors.white, 1.5);
+      ellipse(canvas, 46, 79, 4, 5, maru ? dark : const Color(0xfffffdf5));
+      canvas.restore();
     }
 
     if (sleeping) {
@@ -654,8 +728,10 @@ class _CatPainter extends CustomPainter {
       old.focus != focus ||
       old.action != action ||
       old.feeding != feeding ||
+      old.munching != munching ||
       old.digging != digging ||
       old.crying != crying ||
       old.packProgress != packProgress ||
+      old.showShadow != showShadow ||
       old.cat != cat;
 }

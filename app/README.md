@@ -2,7 +2,9 @@
 
 Ver ../README.md para el alcance, ejecución y estado de Supabase/Drive.
 
-Interfaz actual: tablero arcade violeta con bloques facetados, arrastre y proyección de encaje, chispas, zarandeo y combo; sobres holo con una secuencia protagonizada por Maru o Lady y carta revelada inclinable; colección de 237 memes. En el menú principal Maru y Lady interactúan, comen churu, usan su caja de arena, muestran pensamientos, duermen y despiertan solos. `flutter analyze` y las cinco pruebas automatizadas pasan correctamente.
+Interfaz actual: tablero arcade violeta con bloques facetados, arrastre y proyección de encaje, chispas, zarandeo y combo; sobres holo con una secuencia protagonizada por Maru o Lady y carta revelada inclinable; colección de 244 memes. Incluye Wordle, Dulces & bigotes y Galactic Leap. En el menú principal Maru y Lady interactúan, comen churu y comida, usan su caja de arena, muestran pensamientos, duermen y despiertan solos.
+
+Revisión visual y mejoras pendientes: [REVISION_UX.md](REVISION_UX.md).
 
 La configuración local de Supabase está en config.local.json (no se sube a Git). Ejecuta desde app/: ..\\.tools\\flutter\\bin\\flutter.bat run --dart-define-from-file=config.local.json
 

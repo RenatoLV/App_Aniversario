@@ -946,5 +946,33 @@
   {
     "name": "signo de duda",
     "asset": "assets/memes/meme_236.webp"
+  },
+  {
+    "name": "art",
+    "asset": "assets/memes/meme_237.webp"
+  },
+  {
+    "name": "astronomicdown",
+    "asset": "assets/memes/meme_238.webp"
+  },
+  {
+    "name": "cuadro",
+    "asset": "assets/memes/meme_239.webp"
+  },
+  {
+    "name": "mevoialcielo",
+    "asset": "assets/memes/meme_240.webp"
+  },
+  {
+    "name": "rayos y centellas",
+    "asset": "assets/memes/meme_241.webp"
+  },
+  {
+    "name": "selomerese",
+    "asset": "assets/memes/meme_242.webp"
+  },
+  {
+    "name": "wapush",
+    "asset": "assets/memes/meme_243.webp"
   }
 ]

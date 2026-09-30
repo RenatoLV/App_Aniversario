@@ -237,6 +237,13 @@ const memeNames = [
   'mueble si capitanazo',
   'perro wueon',
   'signo de duda',
+  'art',
+  'astronomicdown',
+  'cuadro',
+  'mevoialcielo',
+  'rayos y centellas',
+  'selomerese',
+  'wapush',
 ];
 
 const memeAssets = [
@@ -477,4 +484,11 @@ const memeAssets = [
   'assets/memes/meme_234.webp',
   'assets/memes/meme_235.webp',
   'assets/memes/meme_236.webp',
+  'assets/memes/meme_237.webp',
+  'assets/memes/meme_238.webp',
+  'assets/memes/meme_239.webp',
+  'assets/memes/meme_240.webp',
+  'assets/memes/meme_241.webp',
+  'assets/memes/meme_242.webp',
+  'assets/memes/meme_243.webp',
 ];

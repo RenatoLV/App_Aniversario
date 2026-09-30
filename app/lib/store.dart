@@ -50,6 +50,7 @@ class GameStore extends ChangeNotifier {
   final SharedPreferences prefs;
   BlockGame game = BlockGame();
   int coins = 30, best = 0;
+  final Set<String> _wordleRewards = {};
   int get totalCards => cards.values.fold(0, (sum, copies) => sum + copies);
   Map<int, int> cards = {};
   Map<int, CardRarity> rarities = {};
@@ -67,6 +68,7 @@ class GameStore extends ChangeNotifier {
     try {
       final j = jsonDecode(raw) as Map<String, dynamic>;
       coins = j['coins'] as int;
+      _wordleRewards.addAll(List<String>.from(j['wordleRewards'] ?? []));
       best = j['best'] as int;
       cards = (j['cards'] as Map<String, dynamic>).map(
         (k, v) => MapEntry(int.parse(k), v as int),
@@ -93,7 +95,8 @@ class GameStore extends ChangeNotifier {
       rarities = {};
       notes = [];
       game = BlockGame();
-      saveError = 'No pudimos leer el guardado anterior. Se conserva una copia de recuperación.';
+      saveError =
+          'No pudimos leer el guardado anterior. Se conserva una copia de recuperación.';
       prefs.setString('rincon.recovery', raw);
     }
   }
@@ -117,7 +120,8 @@ class GameStore extends ChangeNotifier {
         _mergeCloudNotes();
       },
       onError: (_) {
-        saveError = 'Las notas siguen guardadas aquí, pero se interrumpió la sincronización.';
+        saveError =
+            'Las notas siguen guardadas aquí, pero se interrumpió la sincronización.';
         notifyListeners();
       },
     );
@@ -189,6 +193,7 @@ class GameStore extends ChangeNotifier {
   Future<void> save() {
     final snapshot = jsonEncode({
       'coins': coins,
+      'wordleRewards': _wordleRewards.toList(),
       'best': best,
       'cards': cards.map((k, v) => MapEntry('$k', v)),
       'rarities': rarities.map((k, v) => MapEntry('$k', v.index)),
@@ -209,6 +214,18 @@ class GameStore extends ChangeNotifier {
     });
     notifyListeners();
     return _pending;
+  }
+
+  Future<void> rewardWordle(String roundId) async {
+    if (!_wordleRewards.add(roundId)) return;
+    coins += 100;
+    await save();
+  }
+
+  Future<void> collectLeapCoins(int amount) async {
+    if (amount <= 0) return;
+    coins += amount;
+    await save();
   }
 
   bool place(int x, int y) {

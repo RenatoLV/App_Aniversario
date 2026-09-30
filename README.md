@@ -2,14 +2,34 @@
 
 Aplicación Flutter de aniversario con juegos, Maru y Lady animados, sobres holográficos y una colección local de memes convertidos en cartas. El mismo proyecto funciona en web y Android.
 
-El repositorio incluye **237 cartas** y sus imágenes WebP. No hace falta descargar los memes por separado para ejecutar la aplicación.
+El repositorio incluye **244 memes** y sus imágenes WebP, además de seis cartas de ejemplo dibujadas con código (250 entradas en el álbum). No hace falta descargar los memes por separado para ejecutar la aplicación.
 
 ## Qué incluye
+
+- Maru & Lady: Galactic Leap: saltos verticales infinitos con selección de mascota,
+  nubes, rocas, plataformas móviles, tormentas, monedas y cohetes. El cielo
+  cambia al espacio al ascender; Lady deja una estela arcoíris. Controles táctiles
+  y de teclado, pausa, captura con vista previa y récord local.
+  Funcionamiento: [app/GALACTIC_LEAP.md](app/GALACTIC_LEAP.md).
+
+- Dulces & bigotes: combina premios en un tablero 9×9, crea especiales,
+  encadena cascadas y limpia gelatinas junto a Maru y Lady. Incluye niveles
+  progresivos, glaseado, chocolate, lazos, huecos, potenciadores y guardado local.
+  Arquitectura y reglas: [app/MATCH3.md](app/MATCH3.md).
+
+- Palabras & bigotes: Wordle de cinco letras con vocabulario español y chileno,
+  100 monedas por victoria y dos pistas al día por dispositivo (fecha local).
+  La partida, las victorias y las pistas se conservan localmente.
+  Los diccionarios Hunspell incluidos provienen de
+  https://github.com/wooorm/dictionaries (es y es-CL, proyecto RLA-ES de Santiago Bosio).
+  Se utilizan sus entradas de cinco letras, sin expandir los afijos de Hunspell.
+  Se distribuyen bajo MPL 1.1 o posterior; la licencia y los créditos originales
+  están en `app/assets/wordle_dictionary_license.txt`.
 
 - Escena interactiva de Maru y Lady: caricias, movimiento, siestas, pensamientos, churu y caja de arena.
 - Juego de bloques 8×8 con puntuación, combos, récord y monedas.
 - Sobres con animación de apertura, rarezas y carta holográfica inclinable.
-- Colección de 237 cartas; conserva copias repetidas y la mejor rareza obtenida.
+- Colección con 244 memes y seis cartas de ejemplo; conserva copias repetidas y la mejor rareza obtenida.
 - Bloc de notas local.
 - Persistencia local del tablero, monedas, colección y notas.
 - Integración opcional con Supabase para el espacio privado, récords y notas compartidas.
@@ -89,7 +109,7 @@ Las migraciones están en `supabase/migrations/`. Los códigos de activación, a
 
 ## Memes y cartas
 
-Las 237 imágenes listas para usar están en `app/assets/memes/`. El orden estable de las cartas se guarda en `app/tool/meme_catalog.json` y el código generado en `app/lib/meme_cards.dart`.
+Las 244 imágenes listas para usar están en `app/assets/memes/`. El orden estable de las cartas se guarda en `app/tool/meme_catalog.json` y el código generado en `app/lib/meme_cards.dart`.
 
 Para añadir imágenes nuevas:
 
