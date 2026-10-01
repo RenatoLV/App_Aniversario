@@ -6,6 +6,50 @@ import 'package:nuestro_rincon/store.dart';
 import 'package:nuestro_rincon/wordle.dart';
 
 void main() {
+  test(
+    'Answers use common five-letter words instead of all Hunspell entries',
+    () {
+      expect(wordleAnswers.length, greaterThan(150));
+      expect(
+        wordleAnswers.every((word) => RegExp(r'^[A-ZÑ]{5}$').hasMatch(word)),
+        isTrue,
+      );
+      expect(wordleAnswers, containsAll(['GATOS', 'QUESO', 'PALTA', 'SUEÑO']));
+      expect(wordleAnswers, isNot(contains('LEZDA')));
+    },
+  );
+  testWidgets('An old rare answer is replaced without losing wins', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'wordle.v1': jsonEncode({
+        'answer': 'LEZDA',
+        'guesses': ['AUDIO'],
+        'wins': 7,
+        'roundId': 'old-round',
+        'hints': [2],
+      }),
+      'wordle.hintDay': '2026-09-30',
+      'wordle.hintsUsed': 1,
+    });
+    final prefs = await SharedPreferences.getInstance();
+    final store = GameStore(prefs);
+    await tester.runAsync(() async {
+      await tester.pumpWidget(MaterialApp(home: WordleScreen(store: store)));
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+    });
+    await tester.pump();
+    final saved =
+        jsonDecode(prefs.getString('wordle.v1')!) as Map<String, dynamic>;
+    expect(wordleAnswers, contains(saved['answer']));
+    expect(saved['wins'], 7);
+    expect(saved['guesses'], isEmpty);
+    expect(saved['hints'], isEmpty);
+    expect(saved['roundId'], isNot('old-round'));
+    expect(prefs.getInt('wordle.hintsUsed'), 1);
+    expect(store.coins, 30);
+    expect(tester.takeException(), isNull);
+  });
   test('Exact letters reserve their copies before yellow hints', () {
     expect(wordleMarks('CASAS', 'GATOS'), [0, 2, 0, 0, 2]);
     expect(wordleMarks('SALSA', 'CASAS'), [1, 2, 0, 1, 1]);

@@ -4,6 +4,72 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:nuestro_rincon/leap.dart';
 
 void main() {
+  test(
+    'Powers appear early, regularly and above safe stationary platforms',
+    () {
+      for (var seed = 0; seed < 30; seed++) {
+        final game = LeapGame(random: math.Random(seed));
+        game.generate(30000);
+        for (final kind in [LeapPickupKind.rocket, LeapPickupKind.ufo]) {
+          final powers = game.pickups.where((p) => p.kind == kind).toList();
+          expect(
+            powers.first.y,
+            lessThan(kind == LeapPickupKind.rocket ? 700 : 2400),
+          );
+          for (var i = 1; i < powers.length; i++) {
+            expect(
+              powers[i].y - powers[i - 1].y,
+              lessThan(kind == LeapPickupKind.rocket ? 1400 : 2600),
+            );
+          }
+          for (final power in powers) {
+            final base = game.platforms.singleWhere(
+              (p) => (p.y - (power.y - 42)).abs() < .0001,
+            );
+            expect(base.kind, isNot(LeapPlatformKind.storm));
+            expect(base.motion, 0);
+            expect(power.x, base.x);
+            expect(
+              game.pickups.where(
+                (p) => p != power && (p.y - power.y).abs() < 20,
+              ),
+              isEmpty,
+            );
+          }
+        }
+      }
+    },
+  );
+  test('Collecting a rocket activates and then expires its impulse', () {
+    final game = LeapGame(random: math.Random(2));
+    game.pickups
+      ..clear()
+      ..add(LeapPickup(180, 106, LeapPickupKind.rocket));
+    game.step(.01, 0, 640);
+    expect(game.rockets, 1);
+    expect(game.boosting, isTrue);
+    expect(game.vy, 760);
+    game.pickups.clear();
+    game.platforms.removeWhere((p) => p.kind == LeapPlatformKind.storm);
+    game.rocketTime = .01;
+    game.step(.02, 0, 640);
+    expect(game.boosting, isFalse);
+  });
+  test('Every finite landscape is extended by sixty percent', () {
+    final boundaries = [
+      LeapGame.meadowHeight,
+      LeapGame.neighborhoodHeight,
+      LeapGame.cityHeight,
+      LeapGame.skyscraperHeight,
+      LeapGame.upperSkyHeight,
+      LeapGame.spaceHeight,
+      LeapGame.heavenHeight,
+    ];
+    const previous = [1600, 3200, 5200, 7600, 10000, 13200, 18000];
+    for (var i = 0; i < boundaries.length; i++) {
+      expect(boundaries[i], previous[i] * 1.6);
+    }
+  });
   test('Crossing either side wraps without losing horizontal speed', () {
     final game = LeapGame()
       ..x = LeapGame.width - 1

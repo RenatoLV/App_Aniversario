@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// Observes a deliberate header swipe without stealing scroll/drag gestures.
+/// Header gestures leave game boards, carousels and scrolling untouched.
 class MenuSwipe extends StatefulWidget {
   final Widget child;
   final ValueChanged<int> onStep;
@@ -37,6 +37,14 @@ class _MenuSwipeState extends State<MenuSwipe> {
       if (start == null || _time == null) return;
       final delta = event.position - start;
       final seconds = (event.timeStamp - _time!).inMicroseconds / 1000000;
+      if (seconds > 0 &&
+          seconds < .7 &&
+          delta.dx.abs() >= 72 &&
+          delta.dx.abs() > delta.dy.abs() * 2 &&
+          ModalRoute.of(context)?.isCurrent == true) {
+        widget.onStep(delta.dx < 0 ? 1 : -1);
+        return;
+      }
       if (seconds > 0 &&
           seconds < .45 &&
           delta.dy.abs() >= 150 &&

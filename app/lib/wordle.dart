@@ -16,7 +16,6 @@ const _words = <String>[
   'AMIGA',
   'AMIGO',
   'BESOS',
-  'ABRAZO',
   'FELIZ',
   'DULCE',
   'NUBES',
@@ -34,7 +33,6 @@ const _words = <String>[
   'LIMON',
   'MELON',
   'PERAS',
-  'UVITA',
   'QUESO',
   'CREMA',
   'LECHE',
@@ -44,7 +42,6 @@ const _words = <String>[
   'FUEGO',
   'AGUAS',
   'NIEVE',
-  'VIENTO',
   'BRISA',
   'CALOR',
   'RELOJ',
@@ -104,7 +101,6 @@ const _words = <String>[
   'BAÑOS',
   'CIELO',
   'MUNDO',
-  'TIERRA',
   'HOGAR',
   'NOCHE',
   'TARDE',
@@ -120,7 +116,6 @@ const _words = <String>[
   'RISAS',
   'IDEAS',
   'UNION',
-  'JUNTOS',
   'CERCA',
   'LEJOS',
   'NUEVO',
@@ -176,7 +171,6 @@ const _words = <String>[
   'POLLO',
   'CARNE',
   'SALSA',
-  'MIEL',
   'ROCAS',
   'ARENA',
   'OLIVA',
@@ -184,7 +178,6 @@ const _words = <String>[
   'RAMAS',
   'HOJAS',
   'BROTE',
-  'RAIZ',
 ];
 const _chileanWords = [
   'POLOLO',
@@ -226,6 +219,29 @@ final _dictionary = {
   ..._words,
   ..._chileanWords,
 }.where((w) => w.length == 5).toSet();
+
+// Hunspell validates guesses, but includes rare words unsuitable as answers.
+// Keep the answer pool curated independently of the loaded dictionaries.
+final wordleAnswers = Set<String>.unmodifiable({
+  ..._words,
+  'PALTA',
+  'FOMES',
+  'BACAN',
+  'GUATA',
+  'LUCAS',
+  'PISCO',
+  'CHATO',
+  'PIOLA',
+  'PEGAS',
+  'CABRO',
+  'CHALA',
+  'CUECA',
+});
+
+String _pickAnswer([String? previous]) {
+  final choices = wordleAnswers.where((word) => word != previous).toList();
+  return choices[Random().nextInt(choices.length)];
+}
 
 /// First reserve exact matches, then consume remaining copies of each letter.
 List<int> wordleMarks(String guess, String answer) {
@@ -303,19 +319,19 @@ class _WordleScreenState extends State<WordleScreen>
       _dictionaryError = 'No se pudo cargar el diccionario ampliado.';
     }
     if (!mounted) return;
-    _answer = _dictionary.elementAt(Random().nextInt(_dictionary.length));
+    _answer = _pickAnswer();
     try {
       final raw = widget.store.prefs.getString('wordle.v1');
       if (raw != null) {
         final saved = jsonDecode(raw) as Map<String, dynamic>;
+        _wins = saved['wins'] as int? ?? 0;
         final answer = saved['answer'] as String;
         final guesses = List<String>.from(saved['guesses'] as List);
-        if (_dictionary.contains(answer) &&
+        if (wordleAnswers.contains(answer) &&
             guesses.length <= 6 &&
             guesses.every(_dictionary.contains)) {
           _answer = answer;
           _guesses = guesses;
-          _wins = saved['wins'] as int? ?? 0;
           _roundId = saved['roundId'] as String? ?? _roundId;
           _hints = List<int>.from(
             saved['hints'] ?? [],
@@ -331,6 +347,8 @@ class _WordleScreenState extends State<WordleScreen>
       0,
       2,
     );
+    await _save();
+    if (!mounted) return;
     setState(() => _loading = false);
   }
 
@@ -395,8 +413,7 @@ class _WordleScreenState extends State<WordleScreen>
 
   void _newGame() {
     setState(() {
-      final choices = _dictionary.where((w) => w != _answer).toList();
-      _answer = choices[Random().nextInt(choices.length)];
+      _answer = _pickAnswer(_answer);
       _guesses = [];
       _roundId = DateTime.now().microsecondsSinceEpoch.toString();
       _hints = [];

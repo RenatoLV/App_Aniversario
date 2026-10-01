@@ -32,6 +32,7 @@ class _LeapScreenState extends State<LeapScreen>
   Timer? _blinkTimer;
   final _focus = FocusNode(), _captureKey = GlobalKey();
   final Map<int, double> _touches = {};
+  final Map<int, Offset> _dragOrigins = {};
   StreamSubscription<dynamic>? _tiltSubscription;
   bool _tiltEnabled = false;
   double _tiltDirection = 0;
@@ -199,6 +200,7 @@ class _LeapScreenState extends State<LeapScreen>
       _fall.forward(from: 0);
       _record();
       _touches.clear();
+      _dragOrigins.clear();
       _left = false;
       _right = false;
     }
@@ -237,6 +239,7 @@ class _LeapScreenState extends State<LeapScreen>
       _fall.reset();
       _rocketFlash.reset();
       _touches.clear();
+      _dragOrigins.clear();
       _left = false;
       _right = false;
     });
@@ -249,6 +252,7 @@ class _LeapScreenState extends State<LeapScreen>
     if (!_started || _game.over) return;
     setState(() => _paused = pause);
     _touches.clear();
+    _dragOrigins.clear();
     _left = false;
     _right = false;
     if (pause) {
@@ -278,6 +282,7 @@ class _LeapScreenState extends State<LeapScreen>
     });
     _physics.stop();
     _touches.clear();
+    _dragOrigins.clear();
     _left = false;
     _right = false;
     try {
@@ -489,529 +494,323 @@ class _LeapScreenState extends State<LeapScreen>
                   final catSize = 60 * scale;
                   return RepaintBoundary(
                     key: _captureKey,
-                    child: Stack(
-                      children: [
-                        Positioned.fill(
-                          child: Listener(
-                            behavior: HitTestBehavior.opaque,
-                            onPointerDown: (e) {
-                              if (_running) {
-                                setState(
-                                  () => _touches[e.pointer] =
-                                      e.localPosition.dx < c.maxWidth / 2
-                                      ? -1
-                                      : 1,
-                                );
-                              }
-                            },
-                            onPointerMove: (e) {
-                              if (_touches.containsKey(e.pointer)) {
-                                _touches[e.pointer] =
-                                    e.localPosition.dx < c.maxWidth / 2
-                                    ? -1
-                                    : 1;
-                              }
-                            },
-                            onPointerUp: (e) =>
-                                setState(() => _touches.remove(e.pointer)),
-                            onPointerCancel: (e) =>
-                                setState(() => _touches.remove(e.pointer)),
-                            child: CustomPaint(
-                              painter: _LeapWorldPainter(_game, _cat),
-                            ),
-                          ),
-                        ),
-                        Positioned(
-                          left: _game.x * scale - catSize / 2,
-                          top: foot - catSize * .94,
-                          child: IgnorePointer(
-                            child: AnimatedBuilder(
-                              animation: Listenable.merge([
-                                _breath,
-                                _tail,
-                                _blink,
-                                _bounce,
-                                _joy,
-                              ]),
-                              builder: (context, _) {
-                                final squash = _bounce.isAnimating
-                                    ? TweenSequence<double>([
-                                        TweenSequenceItem(
-                                          tween: Tween(begin: .8, end: 1.16)
-                                              .chain(
-                                                CurveTween(
-                                                  curve: Curves.easeOut,
-                                                ),
-                                              ),
-                                          weight: 45,
-                                        ),
-                                        TweenSequenceItem(
-                                          tween: Tween(begin: 1.16, end: 1.0)
-                                              .chain(
-                                                CurveTween(
-                                                  curve: Curves.easeInOut,
-                                                ),
-                                              ),
-                                          weight: 55,
-                                        ),
-                                      ]).transform(_bounce.value)
-                                    : 1.0;
-                                return Transform.rotate(
-                                  angle: _game.vx / 230 * .12,
-                                  child: Transform(
-                                    alignment: Alignment.bottomCenter,
-                                    transform: Matrix4.diagonal3Values(
-                                      1 / squash,
-                                      squash *
-                                          (1 +
-                                              math.sin(
-                                                    _breath.value * math.pi * 2,
-                                                  ) *
-                                                  .008),
-                                      1,
-                                    ),
-                                    child: SizedBox.square(
-                                      dimension: catSize,
-                                      child: Stack(
-                                        children: [
-                                          ColorFiltered(
-                                            colorFilter: _game.alien
-                                                ? const ColorFilter.mode(
-                                                    Color(0xff63e257),
-                                                    BlendMode.color,
-                                                  )
-                                                : const ColorFilter.mode(
-                                                    Colors.transparent,
-                                                    BlendMode.dst,
-                                                  ),
-                                            child: CustomPaint(
-                                              size: Size.square(catSize),
-                                              painter: _cat == CatKind.maru
-                                                  ? MaruPainter(
-                                                      phase: _tail.value,
-                                                      blink: _blink.value,
-                                                      joy: _joy.value,
-                                                    )
-                                                  : LadyPainter(
-                                                      phase: _tail.value,
-                                                      blink: _blink.value,
-                                                      joy: _joy.value,
-                                                    ),
-                                            ),
-                                          ),
-                                          if (_game.alien)
-                                            CustomPaint(
-                                              size: Size.square(catSize),
-                                              painter:
-                                                  const _AlienEyesPainter(),
-                                            ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                        ),
-                        Positioned(
-                          top: 105,
-                          left: 0,
-                          right: 0,
-                          child: IgnorePointer(
-                            child: AnimatedBuilder(
-                              animation: _rocketFlash,
-                              builder: (context, _) {
-                                final opacity = math
-                                    .sin(_rocketFlash.value * math.pi)
-                                    .clamp(0.0, 1.0);
-                                return Opacity(
-                                  opacity: opacity,
-                                  child: Center(
-                                    child: Transform.scale(
-                                      scale: .82 + _rocketFlash.value * .18,
-                                      child: Container(
-                                        width: 132,
-                                        height: 132,
-                                        clipBehavior: Clip.antiAlias,
-                                        decoration: BoxDecoration(
-                                          borderRadius: BorderRadius.circular(
-                                            24,
-                                          ),
-                                          border: Border.all(
-                                            color: Colors.white.withValues(
-                                              alpha: .82,
-                                            ),
-                                            width: 3,
-                                          ),
-                                          boxShadow: const [
-                                            BoxShadow(
-                                              color: Color(0x88000000),
-                                              blurRadius: 18,
-                                              offset: Offset(0, 7),
-                                            ),
-                                          ],
-                                        ),
-                                        child: Image.asset(
-                                          'assets/gato_cohete.png',
-                                          fit: BoxFit.cover,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                        ),
-                        Positioned(
-                          top: 8,
-                          left: 8,
-                          right: 8,
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              IconButton(
-                                onPressed: () => Navigator.pop(context),
-                                icon: const Icon(
-                                  Icons.arrow_back,
-                                  color: Colors.white,
-                                ),
-                                tooltip: 'Volver',
-                              ),
-                              Expanded(
-                                child: Padding(
-                                  padding: const EdgeInsets.only(top: 6),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'Puntos: ${_game.points}',
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.w900,
-                                          fontSize: 21,
-                                          color: Colors.white,
-                                          shadows: [
-                                            Shadow(
-                                              color: Color(0xff184e75),
-                                              blurRadius: 3,
-                                              offset: Offset(0, 2),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      Text(
-                                        '${_game.coins} monedas · récord $_best',
-                                        style: const TextStyle(
-                                          fontSize: 12,
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                              IconButton(
-                                onPressed: _started && !_capturing
-                                    ? _camera
-                                    : null,
-                                tooltip: 'Capturar salto',
-                                icon: const Icon(
-                                  Icons.photo_camera_outlined,
-                                  color: Colors.white,
-                                ),
-                              ),
-                              IconButton(
-                                onPressed: _started
-                                    ? _game.over
-                                          ? null
-                                          : () => _pause(!_paused)
-                                    : null,
-                                tooltip: _paused ? 'Continuar' : 'Pausa',
-                                icon: Icon(
-                                  _paused
-                                      ? Icons.play_arrow_rounded
-                                      : Icons.pause_rounded,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Positioned(
-                          top: 84,
-                          left: 34,
-                          right: 34,
-                          child: IgnorePointer(
-                            child: AnimatedOpacity(
-                              opacity:
-                                  _running && _game.clock < _zoneMessageUntil
-                                  ? 1
-                                  : 0,
-                              duration: const Duration(milliseconds: 350),
-                              child: DecoratedBox(
-                                decoration: BoxDecoration(
-                                  color: const Color(
-                                    0xff17234d,
-                                  ).withValues(alpha: .88),
-                                  borderRadius: BorderRadius.circular(22),
-                                  border: Border.all(
-                                    color: Colors.white.withValues(alpha: .45),
-                                  ),
-                                  boxShadow: const [
-                                    BoxShadow(
-                                      color: Color(0x55000000),
-                                      blurRadius: 12,
-                                      offset: Offset(0, 5),
-                                    ),
-                                  ],
-                                ),
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 18,
-                                    vertical: 10,
-                                  ),
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      const Text(
-                                        'NUEVA ZONA',
-                                        style: TextStyle(
-                                          color: Color(0xffffd776),
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.w900,
-                                          letterSpacing: 2.1,
-                                        ),
-                                      ),
-                                      Text(
-                                        _zoneName(_lastZone),
-                                        textAlign: TextAlign.center,
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 19,
-                                          fontWeight: FontWeight.w900,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                        Positioned(
-                          bottom: 12,
-                          left: 16,
-                          right: 16,
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              _control(-1),
-                              Flexible(
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                  ),
-                                  child: TextButton.icon(
-                                    onPressed: _toggleTilt,
-                                    icon: Icon(
-                                      Icons.screen_rotation,
-                                      color: _tiltEnabled
-                                          ? Colors.lightGreenAccent
-                                          : Colors.white,
-                                    ),
-                                    label: Text(
-                                      _tiltEnabled
-                                          ? 'Inclinación ON'
-                                          : 'Inclinación OFF',
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 11,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              _control(1),
-                            ],
-                          ),
-                        ),
-                        if (!_started || _paused && !_capturing || _game.over)
+                    child: ClipRect(
+                      child: Stack(
+                        children: [
                           Positioned.fill(
-                            child: ColoredBox(
-                              color: const Color(0x60101a3a),
-                              child: Center(
-                                child: SingleChildScrollView(
-                                  padding: const EdgeInsets.all(20),
-                                  child: Container(
-                                    padding: const EdgeInsets.all(22),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xfffaf5ec),
-                                      borderRadius: BorderRadius.circular(28),
-                                      border: Border.all(
-                                        color: Colors.white,
-                                        width: 2,
+                            child: Listener(
+                              behavior: HitTestBehavior.opaque,
+                              onPointerDown: (e) {
+                                if (_running) {
+                                  _dragOrigins[e.pointer] = e.localPosition;
+                                  setState(
+                                    () => _touches[e.pointer] =
+                                        e.localPosition.dx < c.maxWidth / 2
+                                        ? -1
+                                        : 1,
+                                  );
+                                }
+                              },
+                              onPointerMove: (e) {
+                                final origin = _dragOrigins[e.pointer];
+                                if (_running && origin != null) {
+                                  final dx = e.localPosition.dx - origin.dx;
+                                  if (dx.abs() > 8) {
+                                    _touches[e.pointer] = (dx / (60 * scale))
+                                        .clamp(-1.0, 1.0);
+                                  }
+                                }
+                              },
+                              onPointerUp: (e) => setState(() {
+                                _touches.remove(e.pointer);
+                                _dragOrigins.remove(e.pointer);
+                              }),
+                              onPointerCancel: (e) => setState(() {
+                                _touches.remove(e.pointer);
+                                _dragOrigins.remove(e.pointer);
+                              }),
+                              child: CustomPaint(
+                                painter: _LeapWorldPainter(_game, _cat),
+                              ),
+                            ),
+                          ),
+                          Positioned(
+                            left: _game.x * scale - catSize / 2,
+                            top: foot - catSize * .94,
+                            child: IgnorePointer(
+                              child: AnimatedBuilder(
+                                animation: Listenable.merge([
+                                  _breath,
+                                  _tail,
+                                  _blink,
+                                  _bounce,
+                                  _joy,
+                                ]),
+                                builder: (context, _) {
+                                  final squash = _bounce.isAnimating
+                                      ? TweenSequence<double>([
+                                          TweenSequenceItem(
+                                            tween: Tween(begin: .8, end: 1.16)
+                                                .chain(
+                                                  CurveTween(
+                                                    curve: Curves.easeOut,
+                                                  ),
+                                                ),
+                                            weight: 45,
+                                          ),
+                                          TweenSequenceItem(
+                                            tween: Tween(begin: 1.16, end: 1.0)
+                                                .chain(
+                                                  CurveTween(
+                                                    curve: Curves.easeInOut,
+                                                  ),
+                                                ),
+                                            weight: 55,
+                                          ),
+                                        ]).transform(_bounce.value)
+                                      : 1.0;
+                                  return Transform.rotate(
+                                    angle: _game.vx / 230 * .12,
+                                    child: Transform(
+                                      alignment: Alignment.bottomCenter,
+                                      transform: Matrix4.diagonal3Values(
+                                        1 / squash,
+                                        squash *
+                                            (1 +
+                                                math.sin(
+                                                      _breath.value *
+                                                          math.pi *
+                                                          2,
+                                                    ) *
+                                                    .008),
+                                        1,
                                       ),
+                                      child: SizedBox.square(
+                                        dimension: catSize,
+                                        child: Stack(
+                                          children: [
+                                            ColorFiltered(
+                                              colorFilter: _game.alien
+                                                  ? const ColorFilter.mode(
+                                                      Color(0xff63e257),
+                                                      BlendMode.color,
+                                                    )
+                                                  : const ColorFilter.mode(
+                                                      Colors.transparent,
+                                                      BlendMode.dst,
+                                                    ),
+                                              child: CustomPaint(
+                                                size: Size.square(catSize),
+                                                painter: _cat == CatKind.maru
+                                                    ? MaruPainter(
+                                                        phase: _tail.value,
+                                                        blink: _blink.value,
+                                                        joy: _joy.value,
+                                                      )
+                                                    : LadyPainter(
+                                                        phase: _tail.value,
+                                                        blink: _blink.value,
+                                                        joy: _joy.value,
+                                                      ),
+                                              ),
+                                            ),
+                                            if (_game.alien)
+                                              CustomPaint(
+                                                size: Size.square(catSize),
+                                                painter:
+                                                    const _AlienEyesPainter(),
+                                              ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                          ),
+                          Positioned(
+                            top: 105,
+                            left: 0,
+                            right: 0,
+                            child: IgnorePointer(
+                              child: AnimatedBuilder(
+                                animation: _rocketFlash,
+                                builder: (context, _) {
+                                  final opacity = math
+                                      .sin(_rocketFlash.value * math.pi)
+                                      .clamp(0.0, 1.0);
+                                  return Opacity(
+                                    opacity: opacity,
+                                    child: Center(
+                                      child: Transform.scale(
+                                        scale: .82 + _rocketFlash.value * .18,
+                                        child: Container(
+                                          width: 132,
+                                          height: 132,
+                                          clipBehavior: Clip.antiAlias,
+                                          decoration: BoxDecoration(
+                                            borderRadius: BorderRadius.circular(
+                                              24,
+                                            ),
+                                            border: Border.all(
+                                              color: Colors.white.withValues(
+                                                alpha: .82,
+                                              ),
+                                              width: 3,
+                                            ),
+                                            boxShadow: const [
+                                              BoxShadow(
+                                                color: Color(0x88000000),
+                                                blurRadius: 18,
+                                                offset: Offset(0, 7),
+                                              ),
+                                            ],
+                                          ),
+                                          child: Image.asset(
+                                            'assets/gato_cohete.png',
+                                            fit: BoxFit.cover,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                          ),
+                          Positioned(
+                            top: 8,
+                            left: 8,
+                            right: 8,
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                IconButton(
+                                  onPressed: () => Navigator.pop(context),
+                                  icon: const Icon(
+                                    Icons.arrow_back,
+                                    color: Colors.white,
+                                  ),
+                                  tooltip: 'Volver',
+                                ),
+                                Expanded(
+                                  child: Padding(
+                                    padding: const EdgeInsets.only(top: 6),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'Puntos: ${_game.points}',
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w900,
+                                            fontSize: 21,
+                                            color: Colors.white,
+                                            shadows: [
+                                              Shadow(
+                                                color: Color(0xff184e75),
+                                                blurRadius: 3,
+                                                offset: Offset(0, 2),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        Text(
+                                          '${_game.coins} monedas · récord $_best',
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                IconButton(
+                                  onPressed: _started && !_capturing
+                                      ? _camera
+                                      : null,
+                                  tooltip: 'Capturar salto',
+                                  icon: const Icon(
+                                    Icons.photo_camera_outlined,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                IconButton(
+                                  onPressed: _started
+                                      ? _game.over
+                                            ? null
+                                            : () => _pause(!_paused)
+                                      : null,
+                                  tooltip: _paused ? 'Continuar' : 'Pausa',
+                                  icon: Icon(
+                                    _paused
+                                        ? Icons.play_arrow_rounded
+                                        : Icons.pause_rounded,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Positioned(
+                            top: 84,
+                            left: 34,
+                            right: 34,
+                            child: IgnorePointer(
+                              child: AnimatedOpacity(
+                                opacity:
+                                    _running && _game.clock < _zoneMessageUntil
+                                    ? 1
+                                    : 0,
+                                duration: const Duration(milliseconds: 350),
+                                child: DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    color: const Color(
+                                      0xff17234d,
+                                    ).withValues(alpha: .88),
+                                    borderRadius: BorderRadius.circular(22),
+                                    border: Border.all(
+                                      color: Colors.white.withValues(
+                                        alpha: .45,
+                                      ),
+                                    ),
+                                    boxShadow: const [
+                                      BoxShadow(
+                                        color: Color(0x55000000),
+                                        blurRadius: 12,
+                                        offset: Offset(0, 5),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 18,
+                                      vertical: 10,
                                     ),
                                     child: Column(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
+                                        const Text(
+                                          'NUEVA ZONA',
+                                          style: TextStyle(
+                                            color: Color(0xffffd776),
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w900,
+                                            letterSpacing: 2.1,
+                                          ),
+                                        ),
                                         Text(
-                                          !_started
-                                              ? 'ASCENSO MARUZON'
-                                              : _game.over
-                                              ? '¡Un salto más!'
-                                              : 'Un descansito',
+                                          _zoneName(_lastZone),
                                           textAlign: TextAlign.center,
                                           style: const TextStyle(
-                                            fontSize: 24,
+                                            color: Colors.white,
+                                            fontSize: 19,
                                             fontWeight: FontWeight.w900,
-                                            color: Color(0xff253c61),
                                           ),
                                         ),
-                                        const Text(
-                                          'AVENTURA VERTICAL',
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            letterSpacing: 2,
-                                            color: Color(0xff896787),
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 16),
-                                        if (!_started) ...[
-                                          Row(
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.spaceEvenly,
-                                            children: [
-                                              for (final cat in CatKind.values)
-                                                InkWell(
-                                                  onTap: () => setState(
-                                                    () => _cat = cat,
-                                                  ),
-                                                  borderRadius:
-                                                      BorderRadius.circular(16),
-                                                  child: Container(
-                                                    padding:
-                                                        const EdgeInsets.all(8),
-                                                    decoration: BoxDecoration(
-                                                      color: _cat == cat
-                                                          ? const Color(
-                                                              0xffe6d9f5,
-                                                            )
-                                                          : Colors.transparent,
-                                                      borderRadius:
-                                                          BorderRadius.circular(
-                                                            16,
-                                                          ),
-                                                    ),
-                                                    child: Column(
-                                                      children: [
-                                                        CustomPaint(
-                                                          size: const Size(
-                                                            76,
-                                                            76,
-                                                          ),
-                                                          painter:
-                                                              cat ==
-                                                                  CatKind.maru
-                                                              ? const MaruPainter()
-                                                              : const LadyPainter(),
-                                                        ),
-                                                        Text(
-                                                          cat == CatKind.maru
-                                                              ? 'Maru'
-                                                              : 'Lady',
-                                                          style:
-                                                              const TextStyle(
-                                                                fontWeight:
-                                                                    FontWeight
-                                                                        .bold,
-                                                              ),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                  ),
-                                                ),
-                                            ],
-                                          ),
-                                          const SizedBox(height: 12),
-                                          const Text(
-                                            'Salta del cielo al espacio. Mantén un lado de la pantalla o las flechas para dirigirte.\n\nRecoge monedas y cohetes; evita las nubes eléctricas.',
-                                            textAlign: TextAlign.center,
-                                            style: TextStyle(
-                                              fontSize: 13,
-                                              height: 1.4,
-                                              color: Color(0xff59657a),
-                                            ),
-                                          ),
-                                        ] else if (_game.over) ...[
-                                          _fallingCat(),
-                                          Text(
-                                            _game.endReason,
-                                            textAlign: TextAlign.center,
-                                          ),
-                                          Text(
-                                            '${_game.points} puntos · ${_game.coins} monedas',
-                                            style: const TextStyle(
-                                              fontSize: 18,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                          const Text(
-                                            'Las monedas ya están guardadas para tus sobres.',
-                                            textAlign: TextAlign.center,
-                                            style: TextStyle(fontSize: 12),
-                                          ),
-                                        ] else
-                                          const Text(
-                                            'Maru y Lady te esperan.\nEl juego también se pausa al salir de la app.',
-                                            textAlign: TextAlign.center,
-                                          ),
-                                        const SizedBox(height: 18),
-                                        if (_game.over)
-                                          Wrap(
-                                            alignment: WrapAlignment.center,
-                                            spacing: 10,
-                                            runSpacing: 8,
-                                            children: [
-                                              OutlinedButton.icon(
-                                                onPressed: () {
-                                                  _record();
-                                                  Navigator.pop(context);
-                                                },
-                                                icon: const Icon(
-                                                  Icons.arrow_back_rounded,
-                                                ),
-                                                label: const Text('Volver'),
-                                              ),
-                                              FilledButton.icon(
-                                                onPressed: _start,
-                                                icon: const Icon(
-                                                  Icons.rocket_launch,
-                                                ),
-                                                label: const Text(
-                                                  'Otra subida',
-                                                ),
-                                              ),
-                                            ],
-                                          )
-                                        else
-                                          FilledButton.icon(
-                                            onPressed: !_started
-                                                ? _start
-                                                : () => _pause(false),
-                                            icon: const Icon(
-                                              Icons.rocket_launch,
-                                            ),
-                                            label: Text(
-                                              !_started
-                                                  ? '¡A saltar!'
-                                                  : 'Continuar',
-                                            ),
-                                          ),
                                       ],
                                     ),
                                   ),
@@ -1019,7 +818,291 @@ class _LeapScreenState extends State<LeapScreen>
                               ),
                             ),
                           ),
-                      ],
+                          Positioned(
+                            bottom: 12,
+                            left: 16,
+                            right: 16,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                _control(-1),
+                                Flexible(
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                    ),
+                                    child: TextButton.icon(
+                                      onPressed: _toggleTilt,
+                                      icon: Icon(
+                                        Icons.screen_rotation,
+                                        color: _tiltEnabled
+                                            ? Colors.lightGreenAccent
+                                            : Colors.white,
+                                      ),
+                                      label: Text(
+                                        _tiltEnabled
+                                            ? 'Inclinación ON'
+                                            : 'Inclinación OFF',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 11,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                _control(1),
+                              ],
+                            ),
+                          ),
+                          if (_running)
+                            Positioned(
+                              bottom: 86,
+                              left: 24,
+                              right: 24,
+                              child: IgnorePointer(
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 8,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xdd142844),
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(
+                                      color: _game.boosting
+                                          ? const Color(0xffffcf70)
+                                          : const Color(0xff8cded7),
+                                    ),
+                                  ),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        _game.boosting
+                                            ? '🚀 Cohete · ${_game.rocketTime.toStringAsFixed(1)} s'
+                                            : _game.alien
+                                            ? '🛸 ¡Salto espacial!'
+                                            : 'Busca los poderes: 🚀 impulso · 🛸 salto',
+                                        textAlign: TextAlign.center,
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                      if (_game.boosting || _game.alien) ...[
+                                        const SizedBox(height: 5),
+                                        LinearProgressIndicator(
+                                          value: _game.boosting
+                                              ? (_game.rocketTime / 2.4).clamp(
+                                                  0.0,
+                                                  1.0,
+                                                )
+                                              : (_game.alienTime / 2.2).clamp(
+                                                  0.0,
+                                                  1.0,
+                                                ),
+                                          color: _game.boosting
+                                              ? const Color(0xffffcf70)
+                                              : const Color(0xff8cded7),
+                                          backgroundColor: Colors.white12,
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          if (!_started || _paused && !_capturing || _game.over)
+                            Positioned.fill(
+                              child: ColoredBox(
+                                color: const Color(0x60101a3a),
+                                child: Center(
+                                  child: SingleChildScrollView(
+                                    padding: const EdgeInsets.all(20),
+                                    child: Container(
+                                      padding: const EdgeInsets.all(22),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xfffaf5ec),
+                                        borderRadius: BorderRadius.circular(28),
+                                        border: Border.all(
+                                          color: Colors.white,
+                                          width: 2,
+                                        ),
+                                      ),
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            !_started
+                                                ? 'ASCENSO MARUZON'
+                                                : _game.over
+                                                ? '¡Un salto más!'
+                                                : 'Un descansito',
+                                            textAlign: TextAlign.center,
+                                            style: const TextStyle(
+                                              fontSize: 24,
+                                              fontWeight: FontWeight.w900,
+                                              color: Color(0xff253c61),
+                                            ),
+                                          ),
+                                          const Text(
+                                            'AVENTURA VERTICAL',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              letterSpacing: 2,
+                                              color: Color(0xff896787),
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 16),
+                                          if (!_started) ...[
+                                            Row(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.spaceEvenly,
+                                              children: [
+                                                for (final cat
+                                                    in CatKind.values)
+                                                  InkWell(
+                                                    onTap: () => setState(
+                                                      () => _cat = cat,
+                                                    ),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          16,
+                                                        ),
+                                                    child: Container(
+                                                      padding:
+                                                          const EdgeInsets.all(
+                                                            8,
+                                                          ),
+                                                      decoration: BoxDecoration(
+                                                        color: _cat == cat
+                                                            ? const Color(
+                                                                0xffe6d9f5,
+                                                              )
+                                                            : Colors
+                                                                  .transparent,
+                                                        borderRadius:
+                                                            BorderRadius.circular(
+                                                              16,
+                                                            ),
+                                                      ),
+                                                      child: Column(
+                                                        children: [
+                                                          CustomPaint(
+                                                            size: const Size(
+                                                              76,
+                                                              76,
+                                                            ),
+                                                            painter:
+                                                                cat ==
+                                                                    CatKind.maru
+                                                                ? const MaruPainter()
+                                                                : const LadyPainter(),
+                                                          ),
+                                                          Text(
+                                                            cat == CatKind.maru
+                                                                ? 'Maru'
+                                                                : 'Lady',
+                                                            style:
+                                                                const TextStyle(
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .bold,
+                                                                ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                  ),
+                                              ],
+                                            ),
+                                            const SizedBox(height: 12),
+                                            const Text(
+                                              'Arrastra el dedo a izquierda o derecha para dirigir el salto. También puedes mantener un lado o usar las flechas.\n\n🚀 Cohete: impulso de 2,4 s.\n🛸 OVNI: salto a una plataforma superior.\nEvita las nubes eléctricas.',
+                                              textAlign: TextAlign.center,
+                                              style: TextStyle(
+                                                fontSize: 13,
+                                                height: 1.4,
+                                                color: Color(0xff59657a),
+                                              ),
+                                            ),
+                                          ] else if (_game.over) ...[
+                                            _fallingCat(),
+                                            Text(
+                                              _game.endReason,
+                                              textAlign: TextAlign.center,
+                                            ),
+                                            Text(
+                                              '${_game.points} puntos · ${_game.coins} monedas',
+                                              style: const TextStyle(
+                                                fontSize: 18,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                            const Text(
+                                              'Las monedas ya están guardadas para tus sobres.',
+                                              textAlign: TextAlign.center,
+                                              style: TextStyle(fontSize: 12),
+                                            ),
+                                          ] else
+                                            const Text(
+                                              'Maru y Lady te esperan.\nEl juego también se pausa al salir de la app.',
+                                              textAlign: TextAlign.center,
+                                            ),
+                                          const SizedBox(height: 18),
+                                          if (_game.over)
+                                            Wrap(
+                                              alignment: WrapAlignment.center,
+                                              spacing: 10,
+                                              runSpacing: 8,
+                                              children: [
+                                                OutlinedButton.icon(
+                                                  onPressed: () {
+                                                    _record();
+                                                    Navigator.pop(context);
+                                                  },
+                                                  icon: const Icon(
+                                                    Icons.arrow_back_rounded,
+                                                  ),
+                                                  label: const Text('Volver'),
+                                                ),
+                                                FilledButton.icon(
+                                                  onPressed: _start,
+                                                  icon: const Icon(
+                                                    Icons.rocket_launch,
+                                                  ),
+                                                  label: const Text(
+                                                    'Otra subida',
+                                                  ),
+                                                ),
+                                              ],
+                                            )
+                                          else
+                                            FilledButton.icon(
+                                              onPressed: !_started
+                                                  ? _start
+                                                  : () => _pause(false),
+                                              icon: const Icon(
+                                                Icons.rocket_launch,
+                                              ),
+                                              label: Text(
+                                                !_started
+                                                    ? '¡A saltar!'
+                                                    : 'Continuar',
+                                              ),
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
                     ),
                   );
                 },
@@ -1038,11 +1121,14 @@ class _LeapWorldPainter extends CustomPainter {
   _LeapWorldPainter(this.game, this.cat);
   @override
   void paint(Canvas canvas, Size size) {
+    canvas.save();
+    canvas.clipRect(Offset.zero & size);
     final scale = size.width / 360;
     final height = size.height / scale;
     final altitude = game.camera + height * .42;
-    final dusk = ((altitude - 6400) / 4000).clamp(0.0, 1.0);
-    final space = ((altitude - 11200) / 2000).clamp(0.0, 1.0);
+    final scenicAltitude = altitude / LeapGame.stageStretch;
+    final dusk = ((scenicAltitude - 6400) / 4000).clamp(0.0, 1.0);
+    final space = ((scenicAltitude - 11200) / 2000).clamp(0.0, 1.0);
     final heaven = ((altitude - LeapGame.heavenHeight + 300) / 900).clamp(
       0.0,
       1.0,
@@ -1089,7 +1175,8 @@ class _LeapWorldPainter extends CustomPainter {
       _heavenBackdrop(canvas, height, heaven);
     }
     final p = Paint();
-    _journeyBackdrop(canvas, height, altitude);
+    _journeyBackdrop(canvas, height, scenicAltitude);
+    _landscapeDetails(canvas, height, altitude);
     for (var n = 0; n < 65; n++) {
       final x = (n * 71.37) % 360,
           y =
@@ -1382,6 +1469,20 @@ class _LeapWorldPainter extends CustomPainter {
       if (pickup.taken) continue;
       final at = Offset(pickup.x, height - (pickup.y - game.camera));
       if (at.dy < -30 || at.dy > height + 30) continue;
+      if (pickup.kind != LeapPickupKind.coin) {
+        final color = pickup.kind == LeapPickupKind.rocket
+            ? const Color(0xffffd478)
+            : const Color(0xff98ffe0);
+        canvas.drawCircle(at, 25, Paint()..color = const Color(0xaa173450));
+        canvas.drawCircle(
+          at,
+          27 + math.sin(game.clock * 3) * 2,
+          Paint()
+            ..color = color
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 2,
+        );
+      }
       switch (pickup.kind) {
         case LeapPickupKind.rocket:
           _rocket(canvas, at, game.clock);
@@ -1402,6 +1503,7 @@ class _LeapWorldPainter extends CustomPainter {
           );
       }
     }
+    canvas.restore();
     canvas.restore();
   }
 
@@ -1513,8 +1615,8 @@ class _LeapWorldPainter extends CustomPainter {
 
     final city = _bandAlpha(
       altitude,
-      LeapGame.cityHeight - 750,
-      LeapGame.skyscraperHeight,
+      (LeapGame.cityHeight / LeapGame.stageStretch) - 750,
+      (LeapGame.skyscraperHeight / LeapGame.stageStretch),
     );
     if (city > 0) {
       final base = height + ((altitude - 4450) / 3150).clamp(0.0, 1.0) * 120;
@@ -1547,8 +1649,8 @@ class _LeapWorldPainter extends CustomPainter {
 
     final towers = _bandAlpha(
       altitude,
-      LeapGame.skyscraperHeight - 850,
-      LeapGame.upperSkyHeight,
+      (LeapGame.skyscraperHeight / LeapGame.stageStretch) - 850,
+      (LeapGame.upperSkyHeight / LeapGame.stageStretch),
     );
     if (towers > 0) {
       final base = height + ((altitude - 6750) / 3250).clamp(0.0, 1.0) * 155;
@@ -1581,8 +1683,8 @@ class _LeapWorldPainter extends CustomPainter {
 
     final highSky = _bandAlpha(
       altitude,
-      LeapGame.upperSkyHeight - 800,
-      LeapGame.spaceHeight + 700,
+      (LeapGame.upperSkyHeight / LeapGame.stageStretch) - 800,
+      (LeapGame.spaceHeight / LeapGame.stageStretch) + 700,
     );
     if (highSky > 0) {
       for (var i = 0; i < 9; i++) {
@@ -1592,6 +1694,97 @@ class _LeapWorldPainter extends CustomPainter {
           Rect.fromCenter(center: Offset(x, y), width: 70, height: 18),
           Paint()..color = Colors.white.withValues(alpha: highSky * .22),
         );
+      }
+    }
+  }
+
+  // A bounded set of vector details: no image loading or random work per frame.
+  void _landscapeDetails(Canvas canvas, double height, double altitude) {
+    final zone = game.zoneAt(altitude);
+    final paint = Paint()..strokeWidth = 1.5;
+    for (var i = 0; i < 12; i++) {
+      final x = 18.0 + (i * 83.0) % 324;
+      final y = (i * 137.0 - game.camera * .12) % (height + 80) - 40;
+      final at = Offset(x, y);
+      switch (zone) {
+        case LeapWorldZone.underground:
+          paint.color = const Color(0xffc596bd).withValues(alpha: .22);
+          canvas.drawOval(
+            Rect.fromCenter(center: at, width: 23, height: 10),
+            paint,
+          );
+          canvas.drawLine(
+            at + const Offset(-9, 8),
+            at + const Offset(5, 13),
+            paint,
+          );
+        case LeapWorldZone.meadow:
+          paint.color = const Color(0xff488e69).withValues(alpha: .25);
+          canvas.drawLine(at, at + const Offset(0, 15), paint);
+          for (var petal = 0; petal < 5; petal++) {
+            final angle = petal * math.pi * 2 / 5;
+            paint.color = const Color(0xffffdaa1).withValues(alpha: .45);
+            canvas.drawCircle(
+              at + Offset(math.cos(angle) * 4, math.sin(angle) * 4),
+              3,
+              paint,
+            );
+          }
+        case LeapWorldZone.neighborhood:
+        case LeapWorldZone.city:
+          paint.color = const Color(0xffe9f5ee).withValues(alpha: .35);
+          final bird = Path()
+            ..moveTo(x - 8, y + 3)
+            ..quadraticBezierTo(x - 4, y - 3, x, y)
+            ..quadraticBezierTo(x + 4, y - 3, x + 8, y + 3);
+          paint.style = PaintingStyle.stroke;
+          canvas.drawPath(bird, paint);
+          paint.style = PaintingStyle.fill;
+        case LeapWorldZone.skyscrapers:
+        case LeapWorldZone.upperSky:
+          paint.color = const Color(0xffeef8ff).withValues(alpha: .18);
+          canvas.drawOval(
+            Rect.fromCenter(center: at, width: 46, height: 9),
+            paint,
+          );
+          canvas.drawOval(
+            Rect.fromCenter(
+              center: at + const Offset(13, -5),
+              width: 30,
+              height: 11,
+            ),
+            paint,
+          );
+        case LeapWorldZone.space:
+          paint.color = const Color(0xffcbb0ed).withValues(alpha: .13);
+          canvas.drawOval(
+            Rect.fromCenter(center: at, width: 64, height: 23),
+            paint,
+          );
+          paint.color = const Color(0xffffe4a8).withValues(alpha: .55);
+          canvas.drawLine(
+            at - const Offset(3, 0),
+            at + const Offset(3, 0),
+            paint,
+          );
+          canvas.drawLine(
+            at - const Offset(0, 3),
+            at + const Offset(0, 3),
+            paint,
+          );
+        case LeapWorldZone.heaven:
+          paint.color = const Color(0xffcfab54).withValues(alpha: .3);
+          canvas.drawCircle(at, 4, paint);
+          canvas.drawLine(
+            at + const Offset(-8, 0),
+            at + const Offset(8, 0),
+            paint,
+          );
+          canvas.drawLine(
+            at + const Offset(0, -8),
+            at + const Offset(0, 8),
+            paint,
+          );
       }
     }
   }

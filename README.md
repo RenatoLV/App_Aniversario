@@ -21,6 +21,8 @@ El repositorio incluye **334 memes** de Momazos vol. 1 y vol. 2 y sus imágenes 
 
 - Wordlady: Wordle de cinco letras con vocabulario español y chileno,
   100 monedas por victoria y dos pistas al día por dispositivo (fecha local).
+  Las respuestas se eligen de una lista de palabras cotidianas y chilenismos
+  conocidos; el diccionario amplio se usa solamente para validar los intentos.
   La partida, las victorias y las pistas se conservan localmente.
   Los diccionarios Hunspell incluidos provienen de
   https://github.com/wooorm/dictionaries (es y es-CL, proyecto RLA-ES de Santiago Bosio).

@@ -44,19 +44,21 @@ class LeapPickup {
 class LeapGame {
   static const width = 360.0, catWidth = 46.0, catHeight = 52.0;
   static const gravity = 950.0, jumpSpeed = 480.0;
-  static const meadowHeight = 1600.0;
-  static const neighborhoodHeight = 3200.0;
-  static const cityHeight = 5200.0;
-  static const skyscraperHeight = 7600.0;
-  static const upperSkyHeight = 10000.0;
-  static const spaceHeight = 13200.0;
-  static const heavenHeight = 18000.0;
+  static const stageStretch = 1.6;
+  static const meadowHeight = 1600.0 * stageStretch;
+  static const neighborhoodHeight = 3200.0 * stageStretch;
+  static const cityHeight = 5200.0 * stageStretch;
+  static const skyscraperHeight = 7600.0 * stageStretch;
+  static const upperSkyHeight = 10000.0 * stageStretch;
+  static const spaceHeight = 13200.0 * stageStretch;
+  static const heavenHeight = 18000.0 * stageStretch;
   final math.Random random;
   final List<LeapPlatform> platforms = [];
   final List<LeapPickup> pickups = [];
   double x = 180, y = 80, vx = 0, vy = jumpSpeed;
   double camera = 0, maxHeight = 80, clock = 0, rocketTime = 0, alienTime = 0;
   double _top = 80, _pathX = 180;
+  double _nextRocketHeight = 520, _nextUfoHeight = 2200;
   double _routeDirection = 1;
   int _sameDirectionSteps = 0;
   int _nextId = 1, coins = 0, rockets = 0, ufos = 0, landings = 0;
@@ -85,7 +87,7 @@ class LeapGame {
 
   void generate(double ceiling) {
     while (_top < ceiling) {
-      final difficulty = (_top / 9000).clamp(0.0, 1.0);
+      final difficulty = (_top / (9000 * stageStretch)).clamp(0.0, 1.0);
       // A full jump rises about 121 units. These gaps demand more steering while
       // keeping every platform on the generated route physically reachable.
       _top += 75 + random.nextDouble() * (20 + difficulty * 20);
@@ -112,7 +114,14 @@ class LeapGame {
         nextX = _pathX + _routeDirection * horizontalTravel;
       }
       _pathX = nextX.clamp(42.0, 318.0);
-      final moving = _top > 850 && random.nextDouble() < .22;
+      final powerup = _top >= _nextUfoHeight
+          ? LeapPickupKind.ufo
+          : _top >= _nextRocketHeight
+          ? LeapPickupKind.rocket
+          : null;
+      // Powers sit above a stationary, reachable platform. Their spacing is
+      // bounded, independent of the longer scenery stages.
+      final moving = powerup == null && _top > 850 && random.nextDouble() < .22;
       final zone = zoneAt(_top);
       final cloudChance = switch (zone) {
         LeapWorldZone.underground => 0,
@@ -145,14 +154,16 @@ class LeapGame {
         motion: moving ? 12 + difficulty * 10 : 0,
       );
       platforms.add(platform);
-      if (random.nextDouble() < .55) {
+      if (powerup == null && random.nextDouble() < .55) {
         pickups.add(LeapPickup(_pathX, _top + 30, LeapPickupKind.coin));
       }
-      if (_top > 500 && random.nextDouble() < .05) {
-        pickups.add(LeapPickup(_pathX, _top + 52, LeapPickupKind.rocket));
-      }
-      if (_top > cityHeight && random.nextDouble() < .018) {
-        pickups.add(LeapPickup(_pathX, _top + 48, LeapPickupKind.ufo));
+      if (powerup != null) {
+        pickups.add(LeapPickup(_pathX, _top + 42, powerup));
+        if (powerup == LeapPickupKind.rocket) {
+          _nextRocketHeight = _top + 850 + random.nextDouble() * 250;
+        } else {
+          _nextUfoHeight = _top + 1900 + random.nextDouble() * 500;
+        }
       }
       // Storms are optional hazards beside, never in place of the reachable route.
       if (!skyTraffic && _top > 700 && random.nextDouble() < .18) {

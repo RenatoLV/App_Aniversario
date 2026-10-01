@@ -10,13 +10,18 @@ código; se incluye además el recurso `assets/gato_cohete.png` para el efecto d
 ## Jugar
 
 - Selecciona a Maru o Lady y pulsa **¡A saltar!**.
-- El gato salta automáticamente. Mantén pulsada una mitad de la pantalla o una
-  flecha inferior para moverte. Arrastrar entre mitades cambia la dirección.
+- El gato salta automáticamente. Arrastra a izquierda/derecha para modular
+  el movimiento desde donde apoyaste el dedo. También puedes mantener una
+  mitad de la pantalla o una flecha inferior para moverte.
 - En ordenador, mantén las flechas izquierda/derecha o A/D. Espacio o Escape
   alternan la pausa.
 - Recoge monedas para el monedero de los sobres. Se guardan al recogerlas,
   incluso si la partida termina después.
 - Los cohetes desactivan la gravedad y dan impulso durante 2,4 segundos.
+  Aparecen desde las 520 unidades y vuelven cada 850–1.100 unidades, más
+  el salto hasta la siguiente plataforma; los OVNIs aparecen desde las 2.200.
+  Ambos se distinguen con un halo, sobre plataformas quietas y sin monedas
+  superpuestas. El indicador inferior muestra el poder activo y su duración.
 - Las nubes eléctricas terminan la partida al tocarlas desde cualquier dirección, incluso usando un cohete.
 - El botón de cámara congela la partida y muestra una captura en un diálogo.
   Al cerrar la vista previa, la partida continúa si estaba en marcha.
@@ -31,7 +36,7 @@ código; se incluye además el recurso `assets/gato_cohete.png` para el efecto d
   campo visible y se descartan objetos que quedan muy abajo.
 - El viaje visual es extenso y está dividido en ocho zonas: subsuelo, pradera,
   barrio, ciudad, rascacielos, cielo alto, espacio y Cielo. Cada cambio muestra el
-  nombre de la zona. Los planetas comienzan recién alrededor de los 13.200
+  nombre de la zona. Cada etapa dura un 60% más; el espacio comienza a 21.120
   puntos, después de atravesar todos los paisajes.
 - La separación vertical máxima permanece por debajo de la altura de salto.
   La ruta principal contiene nubes o rocas; los peligros aparecen a un lado.
@@ -42,12 +47,15 @@ código; se incluye además el recurso `assets/gato_cohete.png` para el efecto d
 - El subsuelo usa plataformas de roca gris y contiene fósiles. Desde la zona
   de rascacielos la ruta utiliza únicamente nubes y aviones móviles; ya no
   aparecen bloques de tierra flotando en el cielo.
-- El OVNI es un poder raro disponible desde la ciudad. Teletransporta al gato
+- El OVNI reaparece cada 1.900–2.400 unidades de subida. Teletransporta al gato
   más de 500 unidades hacia una plataforma segura y, durante unos segundos,
   lo transforma en alienígena verde con ojos negros y un haz luminoso.
 - `lib/leap_screen.dart`: controles, interfaz, captura y pintor del mundo.
   El escenario se adapta al ancho disponible y respeta `SafeArea`, con un
   ancho máximo de 480 px en pantallas grandes.
+  El dibujo y las mascotas se recortan al rectángulo de juego. Los fondos
+  incluyen flores, aves, minerales, nubes y destellos con paralaje; se dibujan
+  con una cantidad fija de figuras para mantener acotado el trabajo por cuadro.
 - `lib/cat_character.dart`: base pública `CatPainter` y clases `MaruPainter` y
   `LadyPainter`, que reutilizan la anatomía vectorial de las mascotas existentes.
   Los controladores animan respiración, cola, parpadeo aleatorio, reacción al

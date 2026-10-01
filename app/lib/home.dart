@@ -97,7 +97,6 @@ class _RinconHomeState extends State<RinconHome>
   String? _selectedCollection;
   late final AnimationController _packAnimation;
   late final PageController _packCarousel;
-  Timer? _packCarouselTimer;
   int _selectedPackVolume = 0;
   bool _openingPack = false;
   Map<String, dynamic>? _cloudMember;
@@ -128,12 +127,6 @@ class _RinconHomeState extends State<RinconHome>
       duration: const Duration(milliseconds: 3100),
     );
     _packCarousel = PageController(viewportFraction: .82);
-    _packCarouselTimer = Timer.periodic(const Duration(seconds: 9), (_) {
-      if (!mounted || page != 1 || _openingPack || !_packCarousel.hasClients) {
-        return;
-      }
-      _selectPackVolume(1 - _selectedPackVolume);
-    });
     _refreshCloud();
     _collectionPlayTimer = Timer.periodic(const Duration(seconds: 28), (_) {
       if (mounted && page == 2) {
@@ -392,7 +385,6 @@ class _RinconHomeState extends State<RinconHome>
     _collectionPlayTimer?.cancel();
     _packAnimation.dispose();
     _packCarousel.dispose();
-    _packCarouselTimer?.cancel();
     _collectionSearch.dispose();
     super.dispose();
   }
@@ -404,7 +396,10 @@ class _RinconHomeState extends State<RinconHome>
       onStep: (step) => setState(() => page = (page + step).clamp(0, 3)),
       child: Scaffold(
         appBar: AppBar(
-          title: const _MaruversarioTitle(),
+          title: const Tooltip(
+            message: 'Desliza la cabecera a los lados para cambiar de menú',
+            child: _MaruversarioTitle(),
+          ),
           actions: [
             Chip(
               avatar: const Icon(Icons.toll, size: 18),
@@ -430,7 +425,12 @@ class _RinconHomeState extends State<RinconHome>
                 child: Center(
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 650),
-                    child: [home(), packs(), collection(), notes()][page],
+                    child: switch (page) {
+                      0 => home(),
+                      1 => packs(),
+                      2 => collection(),
+                      _ => notes(),
+                    },
                   ),
                 ),
               ),
@@ -894,7 +894,7 @@ class _RinconHomeState extends State<RinconHome>
   );
 
   void _selectPackVolume(int index) {
-    if (!mounted || index < 0 || index > 1) return;
+    if (!mounted || _openingPack || index < 0 || index > 1) return;
     setState(() => _selectedPackVolume = index);
     if (_packCarousel.hasClients) {
       _packCarousel.animateToPage(
@@ -908,10 +908,11 @@ class _RinconHomeState extends State<RinconHome>
   Future<void> _openPack() async {
     if (_openingPack || s.coins < 20) return;
     final opener = _packCat;
+    final selectedVolume = _selectedPackVolume;
     setState(() => _openingPack = true);
     HapticFeedback.mediumImpact();
     await _packAnimation.forward(from: 0);
-    final collectionId = _selectedPackVolume == 0
+    final collectionId = selectedVolume == 0
         ? anniversaryCollectionId
         : anniversaryCollectionV2Id;
     final id = s.openPack(opener: opener, collectionId: collectionId);
@@ -936,6 +937,7 @@ class _RinconHomeState extends State<RinconHome>
   }
 
   Widget packs() => ListView(
+    key: const PageStorageKey("packs-scroll"),
     padding: const EdgeInsets.all(24),
     children: [
       const Text(
@@ -952,15 +954,20 @@ class _RinconHomeState extends State<RinconHome>
       ),
       const SizedBox(height: 22),
       SizedBox(
-        height: 160,
+        height: 176,
         child: Stack(
           alignment: Alignment.center,
           children: [
             PageView.builder(
+              key: const PageStorageKey("pack-volumes"),
+              physics: _openingPack
+                  ? const NeverScrollableScrollPhysics()
+                  : null,
               controller: _packCarousel,
               itemCount: 2,
-              onPageChanged: (index) =>
-                  setState(() => _selectedPackVolume = index),
+              onPageChanged: (index) {
+                if (!_openingPack) setState(() => _selectedPackVolume = index);
+              },
               itemBuilder: (context, index) {
                 final selected = index == _selectedPackVolume;
                 final colors = index == 0
@@ -1010,8 +1017,8 @@ class _RinconHomeState extends State<RinconHome>
                           child: Row(
                             children: [
                               Container(
-                                width: 58,
-                                height: 76,
+                                width: 32,
+                                height: 52,
                                 decoration: BoxDecoration(
                                   color: Colors.white.withValues(alpha: .16),
                                   borderRadius: BorderRadius.circular(14),
@@ -1028,17 +1035,23 @@ class _RinconHomeState extends State<RinconHome>
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(
-                                      'MOMAZOS VOL. ${index + 1}',
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 17,
-                                        fontWeight: FontWeight.w900,
+                                    FittedBox(
+                                      fit: BoxFit.scaleDown,
+                                      alignment: Alignment.centerLeft,
+                                      child: Text(
+                                        'MOMAZOS VOL. ${index + 1}',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 17,
+                                          fontWeight: FontWeight.w900,
+                                        ),
                                       ),
                                     ),
                                     const SizedBox(height: 5),
-                                    const Text(
-                                      'EDICIÓN ANIVERSARIO',
+                                    Text(
+                                      index == 0
+                                          ? 'EDICIÓN ANIVERSARIO'
+                                          : 'EDICIÓN PAPU',
                                       style: TextStyle(
                                         color: Color(0xffffefae),
                                         fontSize: 9,
@@ -1112,300 +1125,320 @@ class _RinconHomeState extends State<RinconHome>
       ),
       const SizedBox(height: 24),
       Center(
-        child: AnimatedBuilder(
-          animation: _packAnimation,
-          builder: (context, _) {
-            final t = _packAnimation.value;
-            final flare = Curves.easeOut.transform((t * 1.4).clamp(0.0, 1.0));
-            final tear = ((t - .42) / .38).clamp(0.0, 1.0);
-            return Transform.translate(
-              offset: Offset(math.sin(t * math.pi * 12) * 8 * (1 - t), 0),
-              child: Transform.scale(
-                scale: 1 + math.sin(t * math.pi) * .09,
-                child: SizedBox(
-                  width: 310,
-                  height: 286,
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      Container(
-                        width: 216 + flare * 70,
-                        height: 216 + flare * 70,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: const Color(
-                            0xff41d9ff,
-                          ).withValues(alpha: .32 * (1 - flare)),
-                          boxShadow: [
-                            BoxShadow(
-                              color: const Color(
-                                0xffa842ff,
-                              ).withValues(alpha: .6 * (1 - flare)),
-                              blurRadius: 56 + t * 30,
-                              spreadRadius: 8 + t * 12,
-                            ),
-                          ],
-                        ),
-                      ),
-                      Positioned(
-                        left: 9,
-                        top: 23,
-                        child: Transform.rotate(
-                          angle: -.105 - math.sin(t * math.pi * 2) * .02,
-                          child: Container(
-                            width: 164,
-                            height: 226,
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: SizedBox(
+            width: 340,
+            child: AnimatedBuilder(
+              animation: _packAnimation,
+              builder: (context, _) {
+                final t = _packAnimation.value;
+                final flare = Curves.easeOut.transform(
+                  (t * 1.4).clamp(0.0, 1.0),
+                );
+                final tear = ((t - .42) / .38).clamp(0.0, 1.0);
+                return Transform.translate(
+                  offset: Offset(math.sin(t * math.pi * 12) * 8 * (1 - t), 0),
+                  child: Transform.scale(
+                    scale: 1 + math.sin(t * math.pi) * .09,
+                    child: SizedBox(
+                      width: 310,
+                      height: 286,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          Container(
+                            width: 216 + flare * 70,
+                            height: 216 + flare * 70,
                             decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                                colors: _selectedPackVolume == 1
-                                    ? const [
-                                        Color(0xff8dffcf),
-                                        Color(0xff29c8bb),
-                                        Color(0xff365bc4),
-                                        Color(0xff28256f),
-                                      ]
-                                    : const [
-                                        Color(0xffffe37c),
-                                        Color(0xffff83c4),
-                                        Color(0xff9564ef),
-                                        Color(0xff432884),
-                                      ],
-                              ),
-                              borderRadius: BorderRadius.circular(22),
-                              border: Border.all(
-                                color: const Color(0xffd8fff0),
-                                width: 2.2,
-                              ),
-                              boxShadow: const [
+                              shape: BoxShape.circle,
+                              color: const Color(
+                                0xff41d9ff,
+                              ).withValues(alpha: .32 * (1 - flare)),
+                              boxShadow: [
                                 BoxShadow(
-                                  color: Color(0x7736aee2),
-                                  blurRadius: 24,
-                                  offset: Offset(-7, 13),
-                                ),
-                              ],
-                            ),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Icon(
-                                  Icons.pets,
-                                  color: Colors.white70,
-                                  size: 42,
-                                ),
-                                const SizedBox(height: 12),
-                                Text(
-                                  'MOMAZOS\nVOL. ${_selectedPackVolume + 1}',
-                                  textAlign: TextAlign.center,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w900,
-                                    letterSpacing: 1,
-                                  ),
-                                ),
-                                const SizedBox(height: 12),
-                                Text(
-                                  _selectedPackVolume == 1
-                                      ? 'EDICIÓN PAPU'
-                                      : 'BRILLIBRILLI',
-                                  style: const TextStyle(
-                                    color: Color(0xfffff09e),
-                                    fontSize: 8,
-                                    fontWeight: FontWeight.w900,
-                                    letterSpacing: 1,
-                                  ),
+                                  color: const Color(
+                                    0xffa842ff,
+                                  ).withValues(alpha: .6 * (1 - flare)),
+                                  blurRadius: 56 + t * 30,
+                                  spreadRadius: 8 + t * 12,
                                 ),
                               ],
                             ),
                           ),
-                        ),
-                      ),
-                      Transform.translate(
-                        offset: Offset(48, 5),
-                        child: Transform(
-                          alignment: Alignment.center,
-                          transform: Matrix4.identity()
-                            ..setEntry(3, 2, .0015)
-                            ..rotateY(
-                              t > .55
-                                  ? (t - .55) * math.pi * .72
-                                  : math.sin(t * math.pi * 2) * .12,
-                            )
-                            ..rotateZ(math.sin(t * math.pi * 4) * .035),
-                          child: Container(
-                            width: 202,
-                            height: 258,
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                                colors: _selectedPackVolume == 1
-                                    ? const [
-                                        Color(0xffffef77),
-                                        Color(0xff46dbc1),
-                                        Color(0xff3880dd),
-                                        Color(0xff382777),
-                                      ]
-                                    : const [
-                                        Color(0xffffd46b),
-                                        Color(0xffff6bb6),
-                                        Color(0xff8152ff),
-                                        Color(0xff372780),
-                                      ],
-                              ),
-                              borderRadius: BorderRadius.circular(24),
-                              border: Border.all(
-                                color: const Color(0xfffff0bb),
-                                width: 2.4,
-                              ),
-                              boxShadow: const [
-                                BoxShadow(
-                                  color: Color(0x995b23bd),
-                                  blurRadius: 28,
-                                  offset: Offset(0, 15),
-                                ),
-                                BoxShadow(
-                                  color: Color(0x88fff7d5),
-                                  blurRadius: 12,
-                                  spreadRadius: -4,
-                                ),
-                              ],
-                            ),
-                            child: Stack(
-                              clipBehavior: Clip.none,
-                              children: [
-                                Positioned.fill(
-                                  child: ClipRRect(
-                                    borderRadius: BorderRadius.circular(22),
-                                    child: CustomPaint(
-                                      painter: HoloPatternPainter(progress: t),
-                                    ),
+                          Positioned(
+                            left: 9,
+                            top: 23,
+                            child: Transform.rotate(
+                              angle: -.105 - math.sin(t * math.pi * 2) * .02,
+                              child: Container(
+                                width: 164,
+                                height: 226,
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                    colors: _selectedPackVolume == 1
+                                        ? const [
+                                            Color(0xff8dffcf),
+                                            Color(0xff29c8bb),
+                                            Color(0xff365bc4),
+                                            Color(0xff28256f),
+                                          ]
+                                        : const [
+                                            Color(0xffffe37c),
+                                            Color(0xffff83c4),
+                                            Color(0xff9564ef),
+                                            Color(0xff432884),
+                                          ],
                                   ),
+                                  borderRadius: BorderRadius.circular(22),
+                                  border: Border.all(
+                                    color: const Color(0xffd8fff0),
+                                    width: 2.2,
+                                  ),
+                                  boxShadow: const [
+                                    BoxShadow(
+                                      color: Color(0x7736aee2),
+                                      blurRadius: 24,
+                                      offset: Offset(-7, 13),
+                                    ),
+                                  ],
                                 ),
-                                Center(
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      const Icon(
-                                        Icons.pets,
-                                        size: 61,
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    const Icon(
+                                      Icons.pets,
+                                      color: Colors.white70,
+                                      size: 42,
+                                    ),
+                                    const SizedBox(height: 12),
+                                    Text(
+                                      'MOMAZOS\nVOL. ${_selectedPackVolume + 1}',
+                                      textAlign: TextAlign.center,
+                                      style: const TextStyle(
                                         color: Colors.white,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w900,
+                                        letterSpacing: 1,
                                       ),
-                                      const SizedBox(height: 15),
-                                      Text(
-                                        'MOMAZOS VOL. ${_selectedPackVolume + 1}\nEDICIÓN\n${_selectedPackVolume == 1 ? 'PAPU' : 'ANIVERSARIO'}',
-                                        textAlign: TextAlign.center,
-                                        style: TextStyle(
-                                          fontSize: 18,
-                                          height: 1,
-                                          fontWeight: FontWeight.w900,
-                                          letterSpacing: 1.2,
-                                          color: Colors.white,
-                                          shadows: [
-                                            Shadow(
-                                              color: Color(0xff48217b),
-                                              blurRadius: 8,
-                                              offset: Offset(0, 3),
+                                    ),
+                                    const SizedBox(height: 12),
+                                    Text(
+                                      _selectedPackVolume == 1
+                                          ? 'EDICIÓN PAPU'
+                                          : 'BRILLIBRILLI',
+                                      style: const TextStyle(
+                                        color: Color(0xfffff09e),
+                                        fontSize: 8,
+                                        fontWeight: FontWeight.w900,
+                                        letterSpacing: 1,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                          Transform.translate(
+                            offset: Offset(48, 5),
+                            child: Transform(
+                              alignment: Alignment.center,
+                              transform: Matrix4.identity()
+                                ..setEntry(3, 2, .0015)
+                                ..rotateY(
+                                  t > .55
+                                      ? (t - .55) * math.pi * .72
+                                      : math.sin(t * math.pi * 2) * .12,
+                                )
+                                ..rotateZ(math.sin(t * math.pi * 4) * .035),
+                              child: Container(
+                                width: 202,
+                                height: 258,
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                    colors: _selectedPackVolume == 1
+                                        ? const [
+                                            Color(0xffffef77),
+                                            Color(0xff46dbc1),
+                                            Color(0xff3880dd),
+                                            Color(0xff382777),
+                                          ]
+                                        : const [
+                                            Color(0xffffd46b),
+                                            Color(0xffff6bb6),
+                                            Color(0xff8152ff),
+                                            Color(0xff372780),
+                                          ],
+                                  ),
+                                  borderRadius: BorderRadius.circular(24),
+                                  border: Border.all(
+                                    color: const Color(0xfffff0bb),
+                                    width: 2.4,
+                                  ),
+                                  boxShadow: const [
+                                    BoxShadow(
+                                      color: Color(0x995b23bd),
+                                      blurRadius: 28,
+                                      offset: Offset(0, 15),
+                                    ),
+                                    BoxShadow(
+                                      color: Color(0x88fff7d5),
+                                      blurRadius: 12,
+                                      spreadRadius: -4,
+                                    ),
+                                  ],
+                                ),
+                                child: Stack(
+                                  clipBehavior: Clip.none,
+                                  children: [
+                                    Positioned.fill(
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(22),
+                                        child: CustomPaint(
+                                          painter: HoloPatternPainter(
+                                            progress: t,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    Center(
+                                      child: Column(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          const Icon(
+                                            Icons.pets,
+                                            size: 61,
+                                            color: Colors.white,
+                                          ),
+                                          const SizedBox(height: 15),
+                                          Text(
+                                            'MOMAZOS\nVOL. ${_selectedPackVolume + 1} · EDICIÓN\n${_selectedPackVolume == 1 ? 'PAPU' : 'ANIVERSARIO'}',
+                                            textAlign: TextAlign.center,
+                                            maxLines: 4,
+                                            style: TextStyle(
+                                              fontSize: 16,
+                                              height: 1,
+                                              fontWeight: FontWeight.w900,
+                                              letterSpacing: 1.2,
+                                              color: Colors.white,
+                                              shadows: [
+                                                Shadow(
+                                                  color: Color(0xff48217b),
+                                                  blurRadius: 8,
+                                                  offset: Offset(0, 3),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          const SizedBox(height: 16),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 12,
+                                              vertical: 5,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xfffff3c7),
+                                              borderRadius:
+                                                  BorderRadius.circular(30),
+                                            ),
+                                            child: Text(
+                                              _selectedPackVolume == 1
+                                                  ? '😎  EDICIÓN PAPU  😎'
+                                                  : '✨  EDICIÓN BRILLIBRILLI  ✨',
+                                              style: const TextStyle(
+                                                fontSize: 8,
+                                                fontWeight: FontWeight.w900,
+                                                color: Color(0xff57278d),
+                                                letterSpacing: 1,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    Positioned(
+                                      left: 7,
+                                      right: 7,
+                                      top: 43,
+                                      child: Container(
+                                        height: 4 + tear * 5,
+                                        decoration: BoxDecoration(
+                                          gradient: const LinearGradient(
+                                            colors: [
+                                              Color(0xff56f8ff),
+                                              Colors.white,
+                                              Color(0xff5689ff),
+                                            ],
+                                          ),
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
+                                          boxShadow: const [
+                                            BoxShadow(
+                                              color: Color(0xff53d9ff),
+                                              blurRadius: 15,
+                                              spreadRadius: 3,
                                             ),
                                           ],
                                         ),
                                       ),
-                                      const SizedBox(height: 16),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 12,
-                                          vertical: 5,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xfffff3c7),
-                                          borderRadius: BorderRadius.circular(
-                                            30,
-                                          ),
-                                        ),
-                                        child: Text(
-                                          _selectedPackVolume == 1
-                                              ? '😎  EDICIÓN PAPU  😎'
-                                              : '✨  EDICIÓN BRILLIBRILLI  ✨',
-                                          style: const TextStyle(
-                                            fontSize: 8,
-                                            fontWeight: FontWeight.w900,
-                                            color: Color(0xff57278d),
-                                            letterSpacing: 1,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                Positioned(
-                                  left: 7,
-                                  right: 7,
-                                  top: 43,
-                                  child: Container(
-                                    height: 4 + tear * 5,
-                                    decoration: BoxDecoration(
-                                      gradient: const LinearGradient(
-                                        colors: [
-                                          Color(0xff56f8ff),
-                                          Colors.white,
-                                          Color(0xff5689ff),
-                                        ],
-                                      ),
-                                      borderRadius: BorderRadius.circular(8),
-                                      boxShadow: const [
-                                        BoxShadow(
-                                          color: Color(0xff53d9ff),
-                                          blurRadius: 15,
-                                          spreadRadius: 3,
-                                        ),
-                                      ],
                                     ),
-                                  ),
-                                ),
-                                Positioned(
-                                  top: 0,
-                                  left: 0,
-                                  right: 0,
-                                  child: Opacity(
-                                    opacity:
-                                        (1 - ((t - .83) / .17).clamp(0.0, 1.0))
-                                            .clamp(0.0, 1.0),
-                                    child: Transform.translate(
-                                      offset: Offset(
-                                        (_packCat == CatKind.lady ? -1 : 1) *
-                                            tear *
-                                            25,
-                                        -tear * 78,
-                                      ),
-                                      child: Transform.rotate(
-                                        angle:
+                                    Positioned(
+                                      top: 0,
+                                      left: 0,
+                                      right: 0,
+                                      child: Opacity(
+                                        opacity:
+                                            (1 -
+                                                    ((t - .83) / .17).clamp(
+                                                      0.0,
+                                                      1.0,
+                                                    ))
+                                                .clamp(0.0, 1.0),
+                                        child: Transform.translate(
+                                          offset: Offset(
                                             (_packCat == CatKind.lady
-                                                ? -.28
-                                                : .28) *
-                                            tear,
-                                        child: ClipPath(
-                                          clipper: _TornSealClipper(),
-                                          child: Container(
-                                            height: 52,
-                                            decoration: const BoxDecoration(
-                                              gradient: LinearGradient(
-                                                colors: [
-                                                  Color(0xff3a2daf),
-                                                  Color(0xff3ea9f5),
-                                                  Color(0xffa954df),
-                                                ],
-                                              ),
-                                            ),
-                                            child: const Center(
-                                              child: Text(
-                                                '✦  SOBRE SORPRESA  ✦',
-                                                style: TextStyle(
-                                                  fontSize: 10,
-                                                  fontWeight: FontWeight.w900,
-                                                  color: Colors.white,
-                                                  letterSpacing: 1,
+                                                    ? -1
+                                                    : 1) *
+                                                tear *
+                                                25,
+                                            -tear * 78,
+                                          ),
+                                          child: Transform.rotate(
+                                            angle:
+                                                (_packCat == CatKind.lady
+                                                    ? -.28
+                                                    : .28) *
+                                                tear,
+                                            child: ClipPath(
+                                              clipper: _TornSealClipper(),
+                                              child: Container(
+                                                height: 52,
+                                                decoration: const BoxDecoration(
+                                                  gradient: LinearGradient(
+                                                    colors: [
+                                                      Color(0xff3a2daf),
+                                                      Color(0xff3ea9f5),
+                                                      Color(0xffa954df),
+                                                    ],
+                                                  ),
+                                                ),
+                                                child: const Center(
+                                                  child: Text(
+                                                    '✦  SOBRE SORPRESA  ✦',
+                                                    style: TextStyle(
+                                                      fontSize: 10,
+                                                      fontWeight:
+                                                          FontWeight.w900,
+                                                      color: Colors.white,
+                                                      letterSpacing: 1,
+                                                    ),
+                                                  ),
                                                 ),
                                               ),
                                             ),
@@ -1413,143 +1446,146 @@ class _RinconHomeState extends State<RinconHome>
                                         ),
                                       ),
                                     ),
-                                  ),
-                                ),
-                                if (_openingPack)
-                                  Positioned.fill(
-                                    child: IgnorePointer(
-                                      child: CustomPaint(
-                                        painter: PackSparklePainter(
-                                          progress: t,
+                                    if (_openingPack)
+                                      Positioned.fill(
+                                        child: IgnorePointer(
+                                          child: CustomPaint(
+                                            painter: PackSparklePainter(
+                                              progress: t,
+                                            ),
+                                          ),
                                         ),
                                       ),
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                      if (_openingPack)
-                        Positioned(
-                          bottom: 0,
-                          child: Opacity(
-                            opacity: (1 - t).clamp(0.0, 1.0),
-                            child: const Text(
-                              '¡ABRIENDO!',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 19,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: 2,
-                                shadows: [
-                                  Shadow(
-                                    color: Color(0xffca4cff),
-                                    blurRadius: 18,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      if (_openingPack)
-                        Positioned(
-                          right: _packCat == CatKind.lady
-                              ? -5 + tear * 12
-                              : null,
-                          left: _packCat == CatKind.maru
-                              ? -12 + tear * 12
-                              : null,
-                          top:
-                              -46 +
-                              Curves.easeInOut.transform(
-                                    (t / .35).clamp(0.0, 1.0),
-                                  ) *
-                                  55,
-                          child: Opacity(
-                            opacity:
-                                ((t / .12).clamp(0.0, 1.0) *
-                                (1 - ((t - .8) / .2).clamp(0.0, 1.0))),
-                            child: CatActor(
-                              cat: _packCat,
-                              size: 118,
-                              action: CatAction.pack,
-                              active: true,
-                              packProgress: t,
-                              showLabel: false,
-                            ),
-                          ),
-                        ),
-                      if (_openingPack && t > .25 && t < .78)
-                        Positioned(
-                          top: 37,
-                          right: _packCat == CatKind.maru ? 18 : null,
-                          left: _packCat == CatKind.lady ? 18 : null,
-                          child: Opacity(
-                            opacity: math
-                                .sin((t - .25) / .53 * math.pi)
-                                .clamp(0.0, 1.0),
-                            child: Transform.rotate(
-                              angle: _packCat == CatKind.maru ? -.3 : .3,
-                              child: const Text(
-                                '✦  ╱╱  ✦',
-                                style: TextStyle(
-                                  color: Color(0xffffe88b),
-                                  fontSize: 25,
-                                  fontWeight: FontWeight.w900,
-                                  shadows: [
-                                    Shadow(color: Colors.white, blurRadius: 12),
                                   ],
                                 ),
                               ),
                             ),
                           ),
-                        ),
-                      if (_openingPack && t > .72)
-                        Positioned(
-                          top: 58 - ((t - .72) / .28) * 92,
-                          child: Opacity(
-                            opacity: ((t - .72) / .12).clamp(0.0, 1.0),
-                            child: Transform.rotate(
-                              angle: (1 - t) * .45,
-                              child: Container(
-                                width: 96,
-                                height: 126,
-                                decoration: BoxDecoration(
-                                  gradient: const LinearGradient(
-                                    colors: [
-                                      Color(0xffffe577),
-                                      Color(0xffff88d1),
-                                      Color(0xff8e66ff),
+                          if (_openingPack)
+                            Positioned(
+                              bottom: 0,
+                              child: Opacity(
+                                opacity: (1 - t).clamp(0.0, 1.0),
+                                child: const Text(
+                                  '¡ABRIENDO!',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 19,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: 2,
+                                    shadows: [
+                                      Shadow(
+                                        color: Color(0xffca4cff),
+                                        blurRadius: 18,
+                                      ),
                                     ],
                                   ),
-                                  borderRadius: BorderRadius.circular(13),
-                                  border: Border.all(
-                                    color: Colors.white,
-                                    width: 3,
-                                  ),
-                                  boxShadow: const [
-                                    BoxShadow(
-                                      color: Color(0xffffe577),
-                                      blurRadius: 24,
-                                    ),
-                                  ],
-                                ),
-                                child: const Icon(
-                                  Icons.pets,
-                                  color: Colors.white,
-                                  size: 42,
                                 ),
                               ),
                             ),
-                          ),
-                        ),
-                    ],
+                          if (_openingPack)
+                            Positioned(
+                              right: _packCat == CatKind.lady
+                                  ? -5 + tear * 12
+                                  : null,
+                              left: _packCat == CatKind.maru
+                                  ? -12 + tear * 12
+                                  : null,
+                              top:
+                                  -46 +
+                                  Curves.easeInOut.transform(
+                                        (t / .35).clamp(0.0, 1.0),
+                                      ) *
+                                      55,
+                              child: Opacity(
+                                opacity:
+                                    ((t / .12).clamp(0.0, 1.0) *
+                                    (1 - ((t - .8) / .2).clamp(0.0, 1.0))),
+                                child: CatActor(
+                                  cat: _packCat,
+                                  size: 118,
+                                  action: CatAction.pack,
+                                  active: true,
+                                  packProgress: t,
+                                  showLabel: false,
+                                ),
+                              ),
+                            ),
+                          if (_openingPack && t > .25 && t < .78)
+                            Positioned(
+                              top: 37,
+                              right: _packCat == CatKind.maru ? 18 : null,
+                              left: _packCat == CatKind.lady ? 18 : null,
+                              child: Opacity(
+                                opacity: math
+                                    .sin((t - .25) / .53 * math.pi)
+                                    .clamp(0.0, 1.0),
+                                child: Transform.rotate(
+                                  angle: _packCat == CatKind.maru ? -.3 : .3,
+                                  child: const Text(
+                                    '✦  ╱╱  ✦',
+                                    style: TextStyle(
+                                      color: Color(0xffffe88b),
+                                      fontSize: 25,
+                                      fontWeight: FontWeight.w900,
+                                      shadows: [
+                                        Shadow(
+                                          color: Colors.white,
+                                          blurRadius: 12,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          if (_openingPack && t > .72)
+                            Positioned(
+                              top: 58 - ((t - .72) / .28) * 92,
+                              child: Opacity(
+                                opacity: ((t - .72) / .12).clamp(0.0, 1.0),
+                                child: Transform.rotate(
+                                  angle: (1 - t) * .45,
+                                  child: Container(
+                                    width: 96,
+                                    height: 126,
+                                    decoration: BoxDecoration(
+                                      gradient: const LinearGradient(
+                                        colors: [
+                                          Color(0xffffe577),
+                                          Color(0xffff88d1),
+                                          Color(0xff8e66ff),
+                                        ],
+                                      ),
+                                      borderRadius: BorderRadius.circular(13),
+                                      border: Border.all(
+                                        color: Colors.white,
+                                        width: 3,
+                                      ),
+                                      boxShadow: const [
+                                        BoxShadow(
+                                          color: Color(0xffffe577),
+                                          blurRadius: 24,
+                                        ),
+                                      ],
+                                    ),
+                                    child: const Icon(
+                                      Icons.pets,
+                                      color: Colors.white,
+                                      size: 42,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
                   ),
-                ),
-              ),
-            );
-          },
+                );
+              },
+            ),
+          ),
         ),
       ),
       const SizedBox(height: 28),
@@ -1711,418 +1747,459 @@ class _RinconHomeState extends State<RinconHome>
       order[positionA] = playfulOwned[b];
       order[positionB] = playfulOwned[a];
     }
-    return ListView(
-      padding: const EdgeInsets.all(24),
-      children: [
-        const Text(
-          'Nuestros tesoros',
-          style: TextStyle(
-            fontSize: 30,
-            fontWeight: FontWeight.w800,
-            color: ink,
-          ),
-        ),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            Text(
-              '${s.cards.length} de ${cardNames.length} recuerdos descubiertos',
-            ),
-            _CollectionBadge(label: '+1', unlocked: s.totalCards >= 1),
-            _CollectionBadge(label: '+6', unlocked: s.totalCards >= 6),
-            _CollectionBadge(label: '+9', unlocked: s.totalCards >= 9),
-          ],
-        ),
-        const SizedBox(height: 12),
-        for (final volumeId in [
-          anniversaryCollectionId,
-          anniversaryCollectionV2Id,
-        ])
-          Builder(
-            builder: (context) {
-              final volumeCards = cardsForCollection(volumeId);
-              final volumeOwned = volumeCards.where(s.cards.containsKey).length;
-              final volumeSelected = _selectedCollection == volumeId;
-              final isV2 = volumeId == anniversaryCollectionV2Id;
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: InkWell(
-                  onTap: () => setState(() {
-                    _selectedCollection = volumeSelected ? null : volumeId;
-                    if (!volumeSelected) {
-                      _collectionOwnedOnly = false;
-                      _collectionRarity = null;
-                      _collectionQuery = '';
-                      _collectionSearch.clear();
-                    }
-                  }),
-                  borderRadius: BorderRadius.circular(22),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 250),
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: volumeSelected
-                            ? const [Color(0xff3b8eea), Color(0xffcb61ed)]
-                            : isV2
-                            ? const [Color(0xff147d78), Color(0xff274b9e)]
-                            : const [Color(0xff39236d), Color(0xff7040aa)],
-                      ),
-                      borderRadius: BorderRadius.circular(22),
-                      border: Border.all(
-                        color: volumeSelected
-                            ? const Color(0xffffdf78)
-                            : const Color(0xffb9e8f5),
-                        width: volumeSelected ? 2.5 : 1.5,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(
-                            0xff8f4ddb,
-                          ).withValues(alpha: volumeSelected ? .35 : .16),
-                          blurRadius: 18,
-                          offset: const Offset(0, 7),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 66,
-                          height: 82,
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                              colors: [Color(0xff3c91ee), Color(0xffdf6de2)],
-                            ),
-                            borderRadius: BorderRadius.circular(13),
-                            border: Border.all(color: const Color(0xffffe17d)),
-                          ),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.pets, color: Colors.white, size: 30),
-                              SizedBox(height: 5),
-                              Text(
-                                isV2 ? 'VOL. 2' : 'VOL. 1',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w900,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'SOBRE SORPRESA',
-                                style: TextStyle(
-                                  color: Color(0xffbdefff),
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.w900,
-                                  letterSpacing: 1.4,
-                                ),
-                              ),
-                              const SizedBox(height: 3),
-                              Text(
-                                isV2 ? 'Momazos Vol. 2' : 'Momazos Vol. 1',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w900,
-                                ),
-                              ),
-                              Text(
-                                isV2
-                                    ? 'Edición Papu · Aniversario'
-                                    : 'Edición Aniversario',
-                                style: TextStyle(
-                                  color: Color(0xffffe49a),
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                              const SizedBox(height: 9),
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(9),
-                                child: LinearProgressIndicator(
-                                  value: volumeCards.isEmpty
-                                      ? 0
-                                      : volumeOwned / volumeCards.length,
-                                  minHeight: 7,
-                                  backgroundColor: Colors.white.withValues(
-                                    alpha: .18,
-                                  ),
-                                  valueColor: const AlwaysStoppedAnimation(
-                                    Color(0xffffdf78),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 5),
-                              Text(
-                                '$volumeOwned / ${volumeCards.length} descubiertas',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Icon(
-                          volumeSelected
-                              ? Icons.grid_view_rounded
-                              : Icons.arrow_forward_ios_rounded,
-                          color: Colors.white,
-                          size: 21,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
-        if (volumeSelected) ...[
-          const SizedBox(height: 9),
-          Row(
+    return CustomScrollView(
+      key: const PageStorageKey("collection-scroll"),
+      slivers: [
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+          sliver: SliverList.list(
             children: [
-              const Icon(Icons.visibility_off_outlined, size: 17, color: ink),
-              const SizedBox(width: 6),
-              const Expanded(
-                child: Text(
-                  'Las cartas no descubiertas permanecen ocultas para evitar spoilers.',
-                  style: TextStyle(fontSize: 11, color: Color(0xff69776d)),
+              const Text(
+                'Nuestros tesoros',
+                style: TextStyle(
+                  fontSize: 30,
+                  fontWeight: FontWeight.w800,
+                  color: ink,
                 ),
               ),
-              TextButton(
-                onPressed: () => setState(() => _selectedCollection = null),
-                child: const Text('Ver todas'),
-              ),
-            ],
-          ),
-        ],
-        const SizedBox(height: 12),
-        TextField(
-          controller: _collectionSearch,
-          decoration: InputDecoration(
-            hintText: 'Buscar entre tus cartas',
-            prefixIcon: const Icon(Icons.search),
-            suffixIcon: _collectionQuery.isEmpty
-                ? null
-                : IconButton(
-                    tooltip: 'Limpiar búsqueda',
-                    onPressed: () {
-                      _collectionSearch.clear();
-                      setState(() => _collectionQuery = '');
-                    },
-                    icon: const Icon(Icons.close),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Text(
+                    '${s.cards.length} de ${cardNames.length} recuerdos descubiertos',
                   ),
-            filled: true,
-            fillColor: Colors.white,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: const BorderSide(color: Color(0xffded5c6)),
-            ),
-          ),
-          onChanged: (value) => setState(() => _collectionQuery = value),
-        ),
-        const SizedBox(height: 10),
-        Wrap(
-          spacing: 7,
-          runSpacing: 7,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            ChoiceChip(
-              label: const Text('Todas'),
-              selected: _collectionRarity == null,
-              onSelected: (_) => setState(() => _collectionRarity = null),
-            ),
-            for (final rarity in CardRarity.values)
-              ChoiceChip(
-                avatar: Icon(
-                  Icons.auto_awesome,
-                  size: 16,
-                  color: rarityColor(rarity),
-                ),
-                label: Text('${rarity.label} ${rarityCounts[rarity]}'),
-                selected: _collectionRarity == rarity,
-                onSelected: (_) => setState(() => _collectionRarity = rarity),
+                  _CollectionBadge(label: '+1', unlocked: s.totalCards >= 1),
+                  _CollectionBadge(label: '+6', unlocked: s.totalCards >= 6),
+                  _CollectionBadge(label: '+9', unlocked: s.totalCards >= 9),
+                ],
               ),
-            FilterChip(
-              label: const Text('Descubiertas'),
-              selected: _collectionOwnedOnly,
-              onSelected: (value) =>
-                  setState(() => _collectionOwnedOnly = value),
-            ),
-            DropdownButton<_CollectionSort>(
-              value: _collectionSort,
-              borderRadius: BorderRadius.circular(14),
-              onChanged: (value) {
-                if (value != null) setState(() => _collectionSort = value);
-              },
-              items: const [
-                DropdownMenuItem(
-                  value: _CollectionSort.rarity,
-                  child: Text('Orden: calidad'),
+              const SizedBox(height: 12),
+              for (final volumeId in [
+                anniversaryCollectionId,
+                anniversaryCollectionV2Id,
+              ])
+                Builder(
+                  builder: (context) {
+                    final volumeCards = cardsForCollection(volumeId);
+                    final volumeOwned = volumeCards
+                        .where(s.cards.containsKey)
+                        .length;
+                    final volumeSelected = _selectedCollection == volumeId;
+                    final isV2 = volumeId == anniversaryCollectionV2Id;
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: InkWell(
+                        onTap: () => setState(() {
+                          _selectedCollection = volumeSelected
+                              ? null
+                              : volumeId;
+                          if (!volumeSelected) {
+                            _collectionOwnedOnly = false;
+                            _collectionRarity = null;
+                            _collectionQuery = '';
+                            _collectionSearch.clear();
+                          }
+                        }),
+                        borderRadius: BorderRadius.circular(22),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 250),
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: volumeSelected
+                                  ? const [Color(0xff3b8eea), Color(0xffcb61ed)]
+                                  : isV2
+                                  ? const [Color(0xff147d78), Color(0xff274b9e)]
+                                  : const [
+                                      Color(0xff39236d),
+                                      Color(0xff7040aa),
+                                    ],
+                            ),
+                            borderRadius: BorderRadius.circular(22),
+                            border: Border.all(
+                              color: volumeSelected
+                                  ? const Color(0xffffdf78)
+                                  : const Color(0xffb9e8f5),
+                              width: volumeSelected ? 2.5 : 1.5,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(
+                                  0xff8f4ddb,
+                                ).withValues(alpha: volumeSelected ? .35 : .16),
+                                blurRadius: 18,
+                                offset: const Offset(0, 7),
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 66,
+                                height: 82,
+                                decoration: BoxDecoration(
+                                  gradient: const LinearGradient(
+                                    begin: Alignment.topCenter,
+                                    end: Alignment.bottomCenter,
+                                    colors: [
+                                      Color(0xff3c91ee),
+                                      Color(0xffdf6de2),
+                                    ],
+                                  ),
+                                  borderRadius: BorderRadius.circular(13),
+                                  border: Border.all(
+                                    color: const Color(0xffffe17d),
+                                  ),
+                                ),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.pets,
+                                      color: Colors.white,
+                                      size: 30,
+                                    ),
+                                    SizedBox(height: 5),
+                                    Text(
+                                      isV2 ? 'VOL. 2' : 'VOL. 1',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w900,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'SOBRE SORPRESA',
+                                      style: TextStyle(
+                                        color: Color(0xffbdefff),
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.w900,
+                                        letterSpacing: 1.4,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 3),
+                                    Text(
+                                      isV2
+                                          ? 'Momazos Vol. 2'
+                                          : 'Momazos Vol. 1',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w900,
+                                      ),
+                                    ),
+                                    Text(
+                                      isV2
+                                          ? 'Edición Papu · Aniversario'
+                                          : 'Edición Aniversario',
+                                      style: TextStyle(
+                                        color: Color(0xffffe49a),
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 9),
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(9),
+                                      child: LinearProgressIndicator(
+                                        value: volumeCards.isEmpty
+                                            ? 0
+                                            : volumeOwned / volumeCards.length,
+                                        minHeight: 7,
+                                        backgroundColor: Colors.white
+                                            .withValues(alpha: .18),
+                                        valueColor:
+                                            const AlwaysStoppedAnimation(
+                                              Color(0xffffdf78),
+                                            ),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 5),
+                                    Text(
+                                      '$volumeOwned / ${volumeCards.length} descubiertas',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Icon(
+                                volumeSelected
+                                    ? Icons.grid_view_rounded
+                                    : Icons.arrow_forward_ios_rounded,
+                                color: Colors.white,
+                                size: 21,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
                 ),
-                DropdownMenuItem(
-                  value: _CollectionSort.name,
-                  child: Text('Orden: nombre'),
-                ),
-                DropdownMenuItem(
-                  value: _CollectionSort.copies,
-                  child: Text('Orden: copias'),
+              if (volumeSelected) ...[
+                const SizedBox(height: 9),
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.visibility_off_outlined,
+                      size: 17,
+                      color: ink,
+                    ),
+                    const SizedBox(width: 6),
+                    const Expanded(
+                      child: Text(
+                        'Las cartas no descubiertas permanecen ocultas para evitar spoilers.',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Color(0xff69776d),
+                        ),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () =>
+                          setState(() => _selectedCollection = null),
+                      child: const Text('Ver todas'),
+                    ),
+                  ],
                 ),
               ],
-            ),
-            Text(
-              '${order.length} resultados',
-              style: const TextStyle(fontSize: 12, color: Color(0xff69776d)),
-            ),
-          ],
+              const SizedBox(height: 12),
+              TextField(
+                controller: _collectionSearch,
+                decoration: InputDecoration(
+                  hintText: 'Buscar entre tus cartas',
+                  prefixIcon: const Icon(Icons.search),
+                  suffixIcon: _collectionQuery.isEmpty
+                      ? null
+                      : IconButton(
+                          tooltip: 'Limpiar búsqueda',
+                          onPressed: () {
+                            _collectionSearch.clear();
+                            setState(() => _collectionQuery = '');
+                          },
+                          icon: const Icon(Icons.close),
+                        ),
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: const BorderSide(color: Color(0xffded5c6)),
+                  ),
+                ),
+                onChanged: (value) => setState(() => _collectionQuery = value),
+              ),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 7,
+                runSpacing: 7,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  ChoiceChip(
+                    label: const Text('Todas'),
+                    selected: _collectionRarity == null,
+                    onSelected: (_) => setState(() => _collectionRarity = null),
+                  ),
+                  for (final rarity in CardRarity.values)
+                    ChoiceChip(
+                      avatar: Icon(
+                        Icons.auto_awesome,
+                        size: 16,
+                        color: rarityColor(rarity),
+                      ),
+                      label: Text('${rarity.label} ${rarityCounts[rarity]}'),
+                      selected: _collectionRarity == rarity,
+                      onSelected: (_) =>
+                          setState(() => _collectionRarity = rarity),
+                    ),
+                  FilterChip(
+                    label: const Text('Descubiertas'),
+                    selected: _collectionOwnedOnly,
+                    onSelected: (value) =>
+                        setState(() => _collectionOwnedOnly = value),
+                  ),
+                  DropdownButton<_CollectionSort>(
+                    value: _collectionSort,
+                    borderRadius: BorderRadius.circular(14),
+                    onChanged: (value) {
+                      if (value != null) {
+                        setState(() => _collectionSort = value);
+                      }
+                    },
+                    items: const [
+                      DropdownMenuItem(
+                        value: _CollectionSort.rarity,
+                        child: Text('Orden: calidad'),
+                      ),
+                      DropdownMenuItem(
+                        value: _CollectionSort.name,
+                        child: Text('Orden: nombre'),
+                      ),
+                      DropdownMenuItem(
+                        value: _CollectionSort.copies,
+                        child: Text('Orden: copias'),
+                      ),
+                    ],
+                  ),
+                  Text(
+                    '${order.length} resultados',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Color(0xff69776d),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Tus dos compañeros juegan con las cartas 🐾',
+                style: TextStyle(color: ink, fontSize: 12),
+              ),
+              const SizedBox(height: 24),
+            ],
+          ),
         ),
-        const SizedBox(height: 12),
-        const Text(
-          'Tus dos compañeros juegan con las cartas 🐾',
-          style: TextStyle(color: ink, fontSize: 12),
-        ),
-        const SizedBox(height: 24),
         if (order.isEmpty)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 48),
-            child: Center(
-              child: Text(
-                'No encontramos cartas con esos filtros 🐾',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Color(0xff69776d)),
+          SliverToBoxAdapter(
+            child: const Padding(
+              padding: EdgeInsets.symmetric(vertical: 48),
+              child: Center(
+                child: Text(
+                  'No encontramos cartas con esos filtros 🐾',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Color(0xff69776d)),
+                ),
               ),
             ),
           )
         else
-          LayoutBuilder(
-            builder: (context, constraints) => GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: order.length,
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: constraints.maxWidth >= 1050
-                    ? 5
-                    : constraints.maxWidth >= 740
-                    ? 4
-                    : constraints.maxWidth >= 520
-                    ? 3
-                    : 2,
-                childAspectRatio: .58,
-                crossAxisSpacing: 12,
-                mainAxisSpacing: 12,
-              ),
-              itemBuilder: (context, displayIndex) {
-                final i = order[displayIndex];
-                final unlocked = s.cards.containsKey(i);
-                return _CollectionCatPlay(
-                  key: ValueKey('cat-card-$i'),
-                  cardId: i,
-                  enabled:
-                      !_inspectingCollection &&
-                      playfulOwned.take(2).contains(i),
-                  cat: playfulOwned.isNotEmpty && i == playfulOwned.first
-                      ? CatKind.maru
-                      : CatKind.lady,
-                  routine: (_collectionShuffle + i) % 3,
-                  delay: playfulOwned.isNotEmpty && i == playfulOwned.first
-                      ? 0
-                      : 1,
-                  child: InkWell(
-                    onTap: unlocked ? () => _viewCardVariants(i) : null,
-                    borderRadius: BorderRadius.circular(20),
-                    child: _RarityFrame(
-                      rarity: unlocked
-                          ? s.rarities[i] ?? CardRarity.common
-                          : CardRarity.common,
-                      locked: !unlocked,
-                      child: _PaletteSurface(
-                        cardId: i,
-                        enabled: unlocked,
-                        child: Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Expanded(
-                                child: unlocked
-                                    ? _CardArt(cardId: i)
-                                    : const Center(
-                                        child: Text(
-                                          '?',
-                                          style: TextStyle(
-                                            fontSize: 46,
-                                            color: green,
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+            sliver: SliverLayoutBuilder(
+              builder: (context, constraints) => SliverGrid(
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: constraints.crossAxisExtent >= 1050
+                      ? 5
+                      : constraints.crossAxisExtent >= 740
+                      ? 4
+                      : constraints.crossAxisExtent >= 520
+                      ? 3
+                      : 2,
+                  childAspectRatio: .58,
+                  crossAxisSpacing: 12,
+                  mainAxisSpacing: 12,
+                ),
+                delegate: SliverChildBuilderDelegate((context, displayIndex) {
+                  final i = order[displayIndex];
+                  final unlocked = s.cards.containsKey(i);
+                  return _CollectionCatPlay(
+                    key: ValueKey('cat-card-$i'),
+                    cardId: i,
+                    enabled:
+                        !_inspectingCollection &&
+                        playfulOwned.take(2).contains(i),
+                    cat: playfulOwned.isNotEmpty && i == playfulOwned.first
+                        ? CatKind.maru
+                        : CatKind.lady,
+                    routine: (_collectionShuffle + i) % 3,
+                    delay: playfulOwned.isNotEmpty && i == playfulOwned.first
+                        ? 0
+                        : 1,
+                    child: InkWell(
+                      onTap: unlocked ? () => _viewCardVariants(i) : null,
+                      borderRadius: BorderRadius.circular(20),
+                      child: _RarityFrame(
+                        rarity: unlocked
+                            ? s.rarities[i] ?? CardRarity.common
+                            : CardRarity.common,
+                        locked: !unlocked,
+                        child: _PaletteSurface(
+                          cardId: i,
+                          enabled: unlocked,
+                          child: Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Expanded(
+                                  child: unlocked
+                                      ? _CardArt(cardId: i)
+                                      : const Center(
+                                          child: Text(
+                                            '?',
+                                            style: TextStyle(
+                                              fontSize: 46,
+                                              color: green,
+                                            ),
                                           ),
                                         ),
-                                      ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                unlocked ? cardNames[i] : 'Por descubrir',
-                                textAlign: TextAlign.center,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: unlocked ? Colors.white : ink,
                                 ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                unlocked
-                                    ? '${(s.rarities[i] ?? CardRarity.common).label.toUpperCase()}  ·  ×${s.cards[i]} · ${s.variantsFor(i).length} variantes'
-                                    : 'Abre un sobre',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w900,
-                                  color: unlocked
-                                      ? rarityColor(
-                                          s.rarities[i] ?? CardRarity.common,
-                                        )
-                                      : ink,
-                                ),
-                              ),
-                              if (unlocked) ...[
-                                const SizedBox(height: 4),
+                                const SizedBox(height: 8),
                                 Text(
-                                  s.cardOpeners[i] == null
-                                      ? 'Descubierta por Maru & Lady'
-                                      : 'La abrió ${CatKind.values[s.cardOpeners[i]!] == CatKind.maru ? 'Maru' : 'Lady'}',
-                                  maxLines: 1,
+                                  unlocked ? cardNames[i] : 'Por descubrir',
+                                  textAlign: TextAlign.center,
+                                  maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    color: Color(0xffffedbe),
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.w700,
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: unlocked ? Colors.white : ink,
                                   ),
                                 ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  unlocked
+                                      ? '${(s.rarities[i] ?? CardRarity.common).label.toUpperCase()}  ·  ×${s.cards[i]} · ${s.variantsFor(i).length} variantes'
+                                      : 'Abre un sobre',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w900,
+                                    color: unlocked
+                                        ? rarityColor(
+                                            s.rarities[i] ?? CardRarity.common,
+                                          )
+                                        : ink,
+                                  ),
+                                ),
+                                if (unlocked) ...[
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    s.cardOpeners[i] == null
+                                        ? 'Descubierta por Maru & Lady'
+                                        : 'La abrió ${CatKind.values[s.cardOpeners[i]!] == CatKind.maru ? 'Maru' : 'Lady'}',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      color: Color(0xffffedbe),
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ],
                               ],
-                            ],
+                            ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-                );
-              },
+                  );
+                }, childCount: order.length),
+              ),
             ),
           ),
       ],
