@@ -42,6 +42,7 @@ dependencies:
   firebase_storage: ^13.6.0
   firebase_database: ^12.6.0
   google_sign_in: ^7.2.0
+  audioplayers: 6.5.1
 
 dev_dependencies:
   flutter_test:
@@ -72,6 +73,8 @@ flutter:
     - assets/wordle_es.dic
     - assets/wordle_cl.dic
     - assets/wordle_dictionary_license.txt
+    - assets/audio/
+    - assets/audio/music/
 
   # To add assets to your application, add an assets section, like this:
   # assets:

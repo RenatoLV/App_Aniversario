@@ -4,42 +4,90 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:nuestro_rincon/leap.dart';
 
 void main() {
-  test(
-    'Powers appear early, regularly and above safe stationary platforms',
-    () {
-      for (var seed = 0; seed < 30; seed++) {
-        final game = LeapGame(random: math.Random(seed));
-        game.generate(30000);
-        for (final kind in [LeapPickupKind.rocket, LeapPickupKind.ufo]) {
-          final powers = game.pickups.where((p) => p.kind == kind).toList();
-          expect(
-            powers.first.y,
-            lessThan(kind == LeapPickupKind.rocket ? 700 : 2400),
+  test('Varied platforms leave enough flight time for taller, wider jumps', () {
+    for (var seed = 0; seed < 30; seed++) {
+      final game = LeapGame(random: math.Random(seed))..generate(30000);
+      final route = game.platforms
+          .where((p) => p.kind != LeapPlatformKind.storm)
+          .toList();
+      expect(route.map((p) => p.width.round()).toSet().length, greaterThan(15));
+      expect(
+        route.where((p) => p.motion > 0).length,
+        greaterThan(route.length * .2),
+      );
+      for (var i = 1; i < route.length; i++) {
+        final from = route[i - 1], to = route[i];
+        final gap = to.y - from.y;
+        expect(gap, inInclusiveRange(90, 116));
+        final time =
+            (LeapGame.jumpSpeed +
+                math.sqrt(
+                  LeapGame.jumpSpeed * LeapGame.jumpSpeed -
+                      2 * LeapGame.gravity * gap,
+                )) /
+            LeapGame.gravity;
+        final worstTravel =
+            (to.baseX - from.baseX).abs() + from.motion + to.motion;
+        final travelAfterReversal = 230 * time - 460 / 12;
+        expect(
+          worstTravel,
+          lessThan(
+            travelAfterReversal + to.width / 2 + LeapGame.catWidth * .28,
+          ),
+        );
+        expect(to.baseX - to.width / 2, greaterThanOrEqualTo(0));
+        expect(to.baseX + to.width / 2, lessThanOrEqualTo(LeapGame.width));
+      }
+    }
+  });
+  test('Shared power schedule halves total frequency, including umbrellas', () {
+    for (var seed = 0; seed < 30; seed++) {
+      final game = LeapGame(random: math.Random(seed));
+      game.generate(30000);
+      final allPowers = game.pickups
+          .where((p) => p.kind != LeapPickupKind.coin)
+          .toList();
+      expect(allPowers.length, inInclusiveRange(19, 23));
+      for (var i = 1; i < allPowers.length; i++) {
+        expect(
+          allPowers[i].y - allPowers[i - 1].y,
+          inInclusiveRange(1200, 1670),
+        );
+      }
+      for (final kind in [
+        LeapPickupKind.rocket,
+        LeapPickupKind.umbrella,
+        LeapPickupKind.ufo,
+      ]) {
+        final powers = game.pickups.where((p) => p.kind == kind).toList();
+        expect(
+          powers.first.y,
+          lessThan(
+            kind == LeapPickupKind.rocket
+                ? 1200
+                : kind == LeapPickupKind.umbrella
+                ? 2900
+                : 4600,
+          ),
+        );
+        for (var i = 1; i < powers.length; i++) {
+          expect(powers[i].y - powers[i - 1].y, lessThan(5100));
+        }
+        for (final power in powers) {
+          final base = game.platforms.singleWhere(
+            (p) => (p.y - (power.y - 42)).abs() < .0001,
           );
-          for (var i = 1; i < powers.length; i++) {
-            expect(
-              powers[i].y - powers[i - 1].y,
-              lessThan(kind == LeapPickupKind.rocket ? 1400 : 2600),
-            );
-          }
-          for (final power in powers) {
-            final base = game.platforms.singleWhere(
-              (p) => (p.y - (power.y - 42)).abs() < .0001,
-            );
-            expect(base.kind, isNot(LeapPlatformKind.storm));
-            expect(base.motion, 0);
-            expect(power.x, base.x);
-            expect(
-              game.pickups.where(
-                (p) => p != power && (p.y - power.y).abs() < 20,
-              ),
-              isEmpty,
-            );
-          }
+          expect(base.kind, isNot(LeapPlatformKind.storm));
+          expect(base.motion, 0);
+          expect(power.x, base.x);
+          expect(
+            game.pickups.where((p) => p != power && (p.y - power.y).abs() < 20),
+            isEmpty,
+          );
         }
       }
-    },
-  );
+    }
+  });
   test('Collecting a rocket activates and then expires its impulse', () {
     final game = LeapGame(random: math.Random(2));
     game.pickups
@@ -69,6 +117,59 @@ void main() {
     for (var i = 0; i < boundaries.length; i++) {
       expect(boundaries[i], previous[i] * 1.6);
     }
+  });
+  test('Umbrellas cap descent, preserve ascent and expire', () {
+    final game = LeapGame(random: math.Random(3));
+    game.platforms.clear();
+    game.pickups
+      ..clear()
+      ..add(LeapPickup(180, 526, LeapPickupKind.umbrella));
+    game
+      ..y = 500
+      ..vy = -200;
+    game.step(.05, 0, 640);
+    expect(game.umbrellas, 1);
+    expect(game.umbrellaOpen, isTrue);
+    expect(game.vy, -135);
+    game.vy = 400;
+    game.step(.05, 0, 640);
+    expect(game.umbrellaOpen, isFalse);
+    expect(game.vy, closeTo(400 - LeapGame.gravity * .05, .001));
+    game
+      ..vy = -135
+      ..umbrellaTime = .01;
+    game.step(.04, 0, 640);
+    expect(game.umbrellaTime, 0);
+    expect(game.vy, lessThan(-135));
+  });
+
+  test('A trampoline launches higher and still consumes a cloud normally', () {
+    final game = LeapGame(random: math.Random(3));
+    final spring = LeapPlatform(
+      9000,
+      180,
+      80,
+      100,
+      LeapPlatformKind.cloud,
+      trampoline: true,
+    );
+    game.platforms
+      ..clear()
+      ..add(spring);
+    game.pickups.clear();
+    game
+      ..x = 180
+      ..y = 86
+      ..vy = -100;
+    game.step(.08, 0, 640);
+    expect(game.springJumps, 1);
+    expect(game.vy, greaterThan(LeapGame.jumpSpeed));
+    expect(spring.springAt, isNotNull);
+    expect(spring.vanishingAt, isNotNull);
+    for (var i = 0; i < 5; i++) {
+      game.step(.1, 0, 640);
+    }
+    expect(game.y, greaterThan(80 + 150));
   });
   test('Crossing either side wraps without losing horizontal speed', () {
     final game = LeapGame()
@@ -178,24 +279,85 @@ void main() {
     );
   });
 
-  test('A UFO teleports the cat onto a safe platform far above', () {
-    final game = LeapGame(random: math.Random(8));
-    game.pickups.add(LeapPickup(180, 106, LeapPickupKind.ufo));
+  test(
+    'A UFO visibly carries the cat up and releases it onto a safe platform',
+    () {
+      final game = LeapGame(random: math.Random(8));
+      game.pickups.add(LeapPickup(180, 106, LeapPickupKind.ufo));
 
-    game.step(.01, 0, 640);
+      game.step(.01, 0, 640);
 
-    expect(game.ufos, 1);
-    expect(game.alien, isTrue);
-    expect(game.y, greaterThanOrEqualTo(600));
-    expect(
-      game.platforms.any(
-        (platform) =>
-            (platform.y - game.y).abs() < 10 &&
-            platform.kind != LeapPlatformKind.storm,
-      ),
-      isTrue,
-    );
-  });
+      expect(game.ufos, 1);
+      expect(game.alien, isTrue);
+      expect(game.abducting, isTrue);
+      expect(game.y, lessThan(100));
+      final initialCamera = game.camera;
+      var frames = 0;
+      while (game.abducting && frames < 450) {
+        final previousY = game.y;
+        final previousCamera = game.camera;
+        game.step(1 / 120, 1, 640);
+        expect((game.y - previousY).abs(), lessThan(8));
+        expect((game.camera - previousCamera).abs(), lessThan(8));
+        expect(game.over, isFalse);
+        frames++;
+      }
+      expect(frames, greaterThan(350));
+      expect(game.abducting, isFalse);
+      expect(game.camera, greaterThan(initialCamera));
+      expect(game.y, greaterThanOrEqualTo(600));
+      expect(game.landings, 1);
+      expect(game.vy, greaterThan(0));
+      expect(game.ufoDepartureTime, greaterThan(0));
+      expect(
+        game.platforms.any(
+          (platform) =>
+              (platform.y - game.y).abs() < 10 &&
+              platform.kind != LeapPlatformKind.storm,
+        ),
+        isTrue,
+      );
+    },
+  );
+
+  test(
+    'Abduction follows moving landing platforms and protects the passenger',
+    () {
+      final game = LeapGame(random: math.Random(8));
+      game.generate(1100);
+      final target = LeapPlatform(
+        5000,
+        245,
+        760,
+        90,
+        LeapPlatformKind.cloud,
+        motion: 20,
+      );
+      game.platforms
+        ..clear()
+        ..add(target)
+        ..add(LeapPlatform(5001, 180, 300, 360, LeapPlatformKind.storm));
+      game.pickups
+        ..clear()
+        ..add(LeapPickup(180, 106, LeapPickupKind.ufo));
+      game.step(.01, 0, 640);
+      final startY = game.y;
+      final startTime = game.abductionTime;
+      game.step(0, -1, 640);
+      expect(game.y, startY);
+      expect(game.abductionTime, startTime);
+      for (var frame = 0; frame < 450 && game.abducting; frame++) {
+        game.step(1 / 120, -1, 640);
+      }
+      expect(game.abducting, isFalse);
+      expect(game.over, isFalse);
+      expect(game.x, closeTo(target.x, 1));
+      expect(game.y, closeTo(target.y, 5));
+      expect(target.vanishingAt, isNotNull);
+      game.step(.1, -1, 640);
+      expect(game.vx, lessThan(0));
+    },
+  );
 
   test('The route keeps making meaningful horizontal direction changes', () {
     final game = LeapGame(random: math.Random(14));

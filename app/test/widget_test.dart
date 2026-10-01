@@ -133,21 +133,9 @@ void main() {
     await tester.tap(find.text('Momazos Vol. 1'));
     await tester.pump(const Duration(milliseconds: 400));
 
-    expect(
-      find.text('1 / ${anniversaryCollectionCards.length} descubiertas'),
-      findsOneWidget,
-    );
-    await tester.scrollUntilVisible(
-      find.text('${anniversaryCollectionCards.length} resultados'),
-      150,
-      scrollable: find.byType(Scrollable).first,
-    );
-    expect(
-      find.text('${anniversaryCollectionCards.length} resultados'),
-      findsOneWidget,
-    );
-    await tester.drag(find.byType(ListView).last, const Offset(0, -700));
-    await tester.pump();
+    expect(find.text('1/${anniversaryCollectionCards.length}'), findsOneWidget);
+    expect(find.text('Carta 1'), findsOneWidget);
+    expect(find.text('Carta 2'), findsOneWidget);
     expect(find.text('?'), findsWidgets);
     expect(tester.takeException(), isNull);
   });
@@ -184,7 +172,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400));
 
     expect(find.text('1 resultados'), findsOneWidget);
-    await tester.drag(find.byType(ListView).last, const Offset(0, -700));
+    await tester.drag(find.byType(CustomScrollView), const Offset(0, -700));
     await tester.pump();
     expect(find.text(cardNames[6]), findsOneWidget);
     await tester.tap(find.text(cardNames[6]));

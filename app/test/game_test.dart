@@ -4,6 +4,36 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:nuestro_rincon/game.dart';
 
 void main() {
+  test('New trays never offer the legacy single block', () {
+    final game = BlockGame(random: Random(12));
+    final seen = <int>{};
+    for (var i = 0; i < 200; i++) {
+      for (final shape in game.tray.whereType<int>()) {
+        expect(BlockGame.shapes[shape].length, greaterThan(1));
+        seen.add(shape);
+      }
+      game.refill();
+    }
+    expect(seen, BlockGame.playableShapeIds.toSet());
+  });
+  test(
+    'Old single-block offers upgrade without changing board or progress',
+    () {
+      final original = BlockGame()
+        ..tray = [0, 4, null]
+        ..score = 1230
+        ..combo = 3;
+      original.board[12] = 1;
+      original.board[20] = 7;
+      final restored = BlockGame()..restore(original.toJson());
+      expect(restored.tray, [1, 4, null]);
+      expect(restored.board, original.board);
+      expect(restored.score, 1230);
+      expect(restored.combo, 3);
+      final reloaded = BlockGame()..restore(restored.toJson());
+      expect(reloaded.toJson(), restored.toJson());
+    },
+  );
   test('Crossed row and column clear simultaneously and reward two lines', () {
     final g = BlockGame(random: Random(1));
     for (var x = 1; x < 8; x++) {

@@ -43,6 +43,13 @@ avanzar abre el siguiente nivel. No incluye un sistema de vidas o tienda.
 
 ## Comprobaciones
 
+Los gestos del tablero se miden desde el primer contacto, con un umbral
+táctil local adaptado a las fichas pequeñas. Un arrastre intercambia una sola
+vecina en el eje dominante; también funciona con el cambio libre. Los gestos
+diagonales ambiguos y los que salen del borde no consumen movimientos.
+El aviso de intercambio sin combinación permanece visible; las animaciones
+de vuelta, caída y aparición terminan antes de avanzar al siguiente estado.
+
 `test/match3_test.dart` comprueba patrones, fusiones, bloqueadores, intercambios,
 potenciadores, estabilidad inicial y persistencia. `test/sweet_screen_test.dart`
 comprueba el tablero y los controles en pantallas lógicas 393×852 y 360×740.

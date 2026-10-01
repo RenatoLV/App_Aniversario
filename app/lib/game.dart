@@ -5,6 +5,7 @@ typedef Cell = ({int x, int y});
 class BlockGame {
   static const size = 8;
   static const shapes = <List<Cell>>[
+    // Legacy ID: retain indices/colors in saved boards, never deal this piece.
     [(x: 0, y: 0)],
     [(x: 0, y: 0), (x: 1, y: 0)],
     [(x: 0, y: 0), (x: 1, y: 0), (x: 2, y: 0)],
@@ -13,6 +14,7 @@ class BlockGame {
     [(x: 0, y: 0), (x: 0, y: 1), (x: 1, y: 1)],
     [(x: 0, y: 0), (x: 1, y: 0), (x: 2, y: 0), (x: 1, y: 1)],
   ];
+  static const playableShapeIds = [1, 2, 3, 4, 5, 6];
   final Random random;
   List<int> board = List.filled(size * size, 0);
   List<int?> tray = [];
@@ -28,7 +30,10 @@ class BlockGame {
   }
 
   void refill() {
-    tray = List.generate(3, (_) => random.nextInt(shapes.length));
+    tray = List.generate(
+      3,
+      (_) => playableShapeIds[random.nextInt(playableShapeIds.length)],
+    );
     selected = null;
   }
 
@@ -101,7 +106,10 @@ class BlockGame {
       throw const FormatException('Invalid game');
     }
     board = b;
-    tray = t;
+    // Upgrade an old single-block offer to the two-block piece without moving
+    // any placed tiles or changing the remaining shape IDs.
+    tray = t.map((shape) => shape == 0 ? 1 : shape).toList();
+    selected = null;
     score = json['score'] as int;
     combo = json['combo'] as int? ?? 0;
   }

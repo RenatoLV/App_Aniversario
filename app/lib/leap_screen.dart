@@ -7,8 +7,10 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'cat_character.dart';
+import 'alien_cat.dart';
 import 'leap.dart';
 import 'store.dart';
+import 'game_audio.dart';
 
 class LeapScreen extends StatefulWidget {
   final GameStore store;
@@ -170,23 +172,35 @@ class _LeapScreenState extends State<LeapScreen>
     final coins = _game.coins,
         rockets = _game.rockets,
         ufos = _game.ufos,
-        landings = _game.landings;
+        landings = _game.landings,
+        umbrellas = _game.umbrellas,
+        springs = _game.springJumps;
     _game.step(
       (elapsed - previous).inMicroseconds / 1000000,
       _direction,
       _height,
     );
     if (_game.coins > coins) {
+      GameAudio.instance.play(GameSfx.coin);
       widget.store.collectLeapCoins(_game.coins - coins);
       _joy.forward(from: 0);
       HapticFeedback.selectionClick();
     }
     if (_game.rockets > rockets) {
+      GameAudio.instance.play(GameSfx.rocket);
       _rocketFlash.forward(from: 0);
       HapticFeedback.heavyImpact();
     }
-    if (_game.ufos > ufos) HapticFeedback.heavyImpact();
+    if (_game.ufos > ufos) {
+      GameAudio.instance.stopEffect(GameSfx.rocket);
+      GameAudio.instance.play(GameSfx.abduction);
+      HapticFeedback.heavyImpact();
+    }
+    if (_game.umbrellas > umbrellas) GameAudio.instance.play(GameSfx.paper);
     if (_game.landings > landings) {
+      GameAudio.instance.play(
+        _game.springJumps > springs ? GameSfx.spring : GameSfx.jump,
+      );
       _bounce.forward(from: 0);
       HapticFeedback.lightImpact();
     }
@@ -251,6 +265,7 @@ class _LeapScreenState extends State<LeapScreen>
   void _pause(bool pause) {
     if (!_started || _game.over) return;
     setState(() => _paused = pause);
+    GameAudio.instance.pauseGame(pause);
     _touches.clear();
     _dragOrigins.clear();
     _left = false;
@@ -530,7 +545,7 @@ class _LeapScreenState extends State<LeapScreen>
                                 _dragOrigins.remove(e.pointer);
                               }),
                               child: CustomPaint(
-                                painter: _LeapWorldPainter(_game, _cat),
+                                painter: LeapWorldPainter(_game, _cat),
                               ),
                             ),
                           ),
@@ -570,12 +585,16 @@ class _LeapScreenState extends State<LeapScreen>
                                         ]).transform(_bounce.value)
                                       : 1.0;
                                   return Transform.rotate(
-                                    angle: _game.vx / 230 * .12,
+                                    angle: _game.abducting
+                                        ? math.sin(_game.clock * 3) * .055
+                                        : _game.vx / 230 * .12,
                                     child: Transform(
                                       alignment: Alignment.bottomCenter,
                                       transform: Matrix4.diagonal3Values(
-                                        1 / squash,
+                                        (1 / squash) *
+                                            (_game.abducting ? .85 : 1),
                                         squash *
+                                            (_game.abducting ? .85 : 1) *
                                             (1 +
                                                 math.sin(
                                                       _breath.value *
@@ -587,40 +606,25 @@ class _LeapScreenState extends State<LeapScreen>
                                       ),
                                       child: SizedBox.square(
                                         dimension: catSize,
-                                        child: Stack(
-                                          children: [
-                                            ColorFiltered(
-                                              colorFilter: _game.alien
-                                                  ? const ColorFilter.mode(
-                                                      Color(0xff63e257),
-                                                      BlendMode.color,
-                                                    )
-                                                  : const ColorFilter.mode(
-                                                      Colors.transparent,
-                                                      BlendMode.dst,
-                                                    ),
-                                              child: CustomPaint(
-                                                size: Size.square(catSize),
-                                                painter: _cat == CatKind.maru
-                                                    ? MaruPainter(
-                                                        phase: _tail.value,
-                                                        blink: _blink.value,
-                                                        joy: _joy.value,
-                                                      )
-                                                    : LadyPainter(
-                                                        phase: _tail.value,
-                                                        blink: _blink.value,
-                                                        joy: _joy.value,
-                                                      ),
-                                              ),
-                                            ),
-                                            if (_game.alien)
-                                              CustomPaint(
-                                                size: Size.square(catSize),
-                                                painter:
-                                                    const _AlienEyesPainter(),
-                                              ),
-                                          ],
+                                        child: CustomPaint(
+                                          size: Size.square(catSize),
+                                          painter: _game.alien
+                                              ? AlienCatPainter(
+                                                  cat: _cat,
+                                                  phase: _tail.value,
+                                                  blink: _blink.value,
+                                                )
+                                              : _cat == CatKind.maru
+                                              ? MaruPainter(
+                                                  phase: _tail.value,
+                                                  blink: _blink.value,
+                                                  joy: _joy.value,
+                                                )
+                                              : LadyPainter(
+                                                  phase: _tail.value,
+                                                  blink: _blink.value,
+                                                  joy: _joy.value,
+                                                ),
                                         ),
                                       ),
                                     ),
@@ -727,6 +731,13 @@ class _LeapScreenState extends State<LeapScreen>
                                       ],
                                     ),
                                   ),
+                                ),
+                                AudioSettingsButton(
+                                  color: Colors.white,
+                                  onOpen: _running ? () => _pause(true) : null,
+                                  onClose: _running
+                                      ? () => _pause(false)
+                                      : null,
                                 ),
                                 IconButton(
                                   onPressed: _started && !_capturing
@@ -855,7 +866,10 @@ class _LeapScreenState extends State<LeapScreen>
                               ],
                             ),
                           ),
-                          if (_running)
+                          if (_running &&
+                              (_game.boosting ||
+                                  _game.alien ||
+                                  _game.umbrellaTime > 0))
                             Positioned(
                               bottom: 86,
                               left: 24,
@@ -881,9 +895,15 @@ class _LeapScreenState extends State<LeapScreen>
                                       Text(
                                         _game.boosting
                                             ? '🚀 Cohete · ${_game.rocketTime.toStringAsFixed(1)} s'
-                                            : _game.alien
-                                            ? '🛸 ¡Salto espacial!'
-                                            : 'Busca los poderes: 🚀 impulso · 🛸 salto',
+                                            : _game.abducting
+                                            ? _game.abductionProgress < .2
+                                                  ? '🛸 ¡Nos abducen!'
+                                                  : _game.abductionProgress < .8
+                                                  ? '🛸 Subiendo con la nave'
+                                                  : '🛸 Bajando a la plataforma'
+                                            : _game.umbrellaTime > 0
+                                            ? '☂️ Paraguas · ${_game.umbrellaTime.ceil()} s'
+                                            : '👽 ¡De vuelta en las nubes!',
                                         textAlign: TextAlign.center,
                                         style: const TextStyle(
                                           color: Colors.white,
@@ -891,7 +911,9 @@ class _LeapScreenState extends State<LeapScreen>
                                           fontWeight: FontWeight.w700,
                                         ),
                                       ),
-                                      if (_game.boosting || _game.alien) ...[
+                                      if (_game.boosting ||
+                                          _game.alien ||
+                                          _game.umbrellaTime > 0) ...[
                                         const SizedBox(height: 5),
                                         LinearProgressIndicator(
                                           value: _game.boosting
@@ -899,6 +921,11 @@ class _LeapScreenState extends State<LeapScreen>
                                                   0.0,
                                                   1.0,
                                                 )
+                                              : _game.abducting
+                                              ? 1 - _game.abductionProgress
+                                              : _game.umbrellaTime > 0
+                                              ? _game.umbrellaTime /
+                                                    LeapGame.umbrellaDuration
                                               : (_game.alienTime / 2.2).clamp(
                                                   0.0,
                                                   1.0,
@@ -1021,7 +1048,7 @@ class _LeapScreenState extends State<LeapScreen>
                                             ),
                                             const SizedBox(height: 12),
                                             const Text(
-                                              'Arrastra el dedo a izquierda o derecha para dirigir el salto. También puedes mantener un lado o usar las flechas.\n\n🚀 Cohete: impulso de 2,4 s.\n🛸 OVNI: salto a una plataforma superior.\nEvita las nubes eléctricas.',
+                                              'Arrastra el dedo a izquierda o derecha para dirigir el salto. También puedes mantener un lado o usar las flechas.\n\n🚀 Cohete: impulso de 2,4 s.\n🛸 OVNI: la nave te recoge y te lleva arriba.\n☂️ Paraguas: caída lenta durante 8 s.\nLos trampolines dorados te impulsan más alto.\nEvita las nubes eléctricas.',
                                               textAlign: TextAlign.center,
                                               style: TextStyle(
                                                 fontSize: 13,
@@ -1115,10 +1142,10 @@ class _LeapScreenState extends State<LeapScreen>
   );
 }
 
-class _LeapWorldPainter extends CustomPainter {
+class LeapWorldPainter extends CustomPainter {
   final LeapGame game;
   final CatKind cat;
-  _LeapWorldPainter(this.game, this.cat);
+  LeapWorldPainter(this.game, this.cat);
   @override
   void paint(Canvas canvas, Size size) {
     canvas.save();
@@ -1219,26 +1246,50 @@ class _LeapWorldPainter extends CustomPainter {
       }
     }
     final foot = height - (game.y - game.camera);
-    if (game.alien) {
-      final pulse = .55 + math.sin(game.clock * 15) * .12;
+    if (game.abducting) {
+      final ship = Offset(game.ufoX, height - (game.ufoY - game.camera));
+      final pulse = .34 + math.sin(game.clock * 10) * .045;
       final beam = Path()
-        ..moveTo(game.x - 18, foot - 43)
-        ..lineTo(game.x - 45, foot + 82)
-        ..lineTo(game.x + 45, foot + 82)
-        ..lineTo(game.x + 18, foot - 43)
+        ..moveTo(ship.dx - 15, ship.dy + 9)
+        ..lineTo(game.x - 33, foot + 5)
+        ..quadraticBezierTo(game.x, foot + 15, game.x + 33, foot + 5)
+        ..lineTo(ship.dx + 15, ship.dy + 9)
         ..close();
       canvas.drawPath(
         beam,
         Paint()
-          ..shader = LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              const Color(0xff9cff8e).withValues(alpha: pulse),
-              const Color(0xff72f4ca).withValues(alpha: .04),
-            ],
-          ).createShader(Rect.fromLTWH(game.x - 45, foot - 43, 90, 125)),
+          ..shader =
+              LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  const Color(0xffcaffbd).withValues(alpha: pulse + .15),
+                  const Color(0xff72f4ca).withValues(alpha: .08),
+                ],
+              ).createShader(
+                Rect.fromLTRB(ship.dx - 33, ship.dy, ship.dx + 33, foot + 15),
+              ),
       );
+      for (var i = 0; i < 4; i++) {
+        final flow = (game.clock * .9 + i / 4) % 1;
+        final ringY = foot - (foot - ship.dy - 16) * flow;
+        canvas.drawOval(
+          Rect.fromCenter(
+            center: Offset(game.x, ringY),
+            width: 57 - flow * 29,
+            height: 9 - flow * 4,
+          ),
+          Paint()
+            ..color = const Color(
+              0xffd1ffc2,
+            ).withValues(alpha: math.sin(flow * math.pi) * .42)
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1.3,
+        );
+      }
+    }
+    if (game.umbrellaOpen) {
+      _umbrella(canvas, Offset(game.x, foot - 77), game.clock);
     }
     if (cat == CatKind.lady && game.vy > 0 && !game.boosting) {
       const colors = [
@@ -1454,6 +1505,44 @@ class _LeapWorldPainter extends CustomPainter {
           }
         }
       }
+      if (platform.trampoline) {
+        final bounce = platform.springAt == null
+            ? 0.0
+            : (1 - (game.clock - platform.springAt!) / .35).clamp(0.0, 1.0);
+        final springWidth = math.min(38.0, platform.width * .65);
+        final springPaint = Paint()
+          ..color = const Color(0xffb8e6df)
+          ..strokeWidth = 2
+          ..style = PaintingStyle.stroke;
+        for (final dx in [-springWidth * .3, springWidth * .3]) {
+          final zig = Path()..moveTo(platform.x + dx, y + 3);
+          for (var n = 0; n < 4; n++) {
+            zig.lineTo(
+              platform.x + dx + (n.isEven ? -3 : 3),
+              y - 1 - n * (2 + bounce * 2),
+            );
+          }
+          canvas.drawPath(zig, springPaint);
+        }
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(
+            Rect.fromCenter(
+              center: Offset(platform.x, y - 8 - bounce * 6),
+              width: springWidth,
+              height: 7,
+            ),
+            const Radius.circular(4),
+          ),
+          Paint()..color = const Color(0xfff6bb59),
+        );
+        canvas.drawLine(
+          Offset(platform.x - 8, y - 9 - bounce * 6),
+          Offset(platform.x + 8, y - 9 - bounce * 6),
+          Paint()
+            ..color = const Color(0xffffedaa)
+            ..strokeWidth = 2,
+        );
+      }
       if (platform.motion > 0 && platform.kind != LeapPlatformKind.airplane) {
         final tp = TextPainter(
           text: const TextSpan(
@@ -1488,6 +1577,12 @@ class _LeapWorldPainter extends CustomPainter {
           _rocket(canvas, at, game.clock);
         case LeapPickupKind.ufo:
           _ufo(canvas, at, game.clock);
+        case LeapPickupKind.umbrella:
+          canvas.save();
+          canvas.translate(at.dx, at.dy - 6);
+          canvas.scale(.58);
+          _umbrella(canvas, Offset.zero, game.clock);
+          canvas.restore();
         case LeapPickupKind.coin:
           final w = 4 + math.sin(game.clock * 3 + pickup.x).abs() * 5;
           canvas.drawOval(
@@ -1502,6 +1597,13 @@ class _LeapWorldPainter extends CustomPainter {
               ..strokeWidth = 1.5,
           );
       }
+    }
+    if (game.abducting || game.ufoDepartureTime > 0) {
+      canvas.save();
+      canvas.translate(game.ufoX, height - (game.ufoY - game.camera));
+      canvas.scale(1.75);
+      _ufo(canvas, Offset.zero, game.clock);
+      canvas.restore();
     }
     canvas.restore();
     canvas.restore();
@@ -2010,6 +2112,58 @@ class _LeapWorldPainter extends CustomPainter {
     canvas.restore();
   }
 
+  void _umbrella(Canvas canvas, Offset at, double t) {
+    canvas.save();
+    canvas.translate(at.dx, at.dy);
+    canvas.rotate(math.sin(t * 3) * .045);
+    final stick = Paint()
+      ..color = const Color(0xffeee4bc)
+      ..strokeWidth = 2.4
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+    canvas.drawPath(
+      Path()
+        ..moveTo(0, -21)
+        ..lineTo(0, 40)
+        ..quadraticBezierTo(0, 48, 8, 44),
+      stick,
+    );
+    final canopy = Path()
+      ..moveTo(-34, 0)
+      ..cubicTo(-29, -36, 29, -36, 34, 0)
+      ..quadraticBezierTo(24, -8, 17, 0)
+      ..quadraticBezierTo(9, -8, 0, 0)
+      ..quadraticBezierTo(-9, -8, -17, 0)
+      ..quadraticBezierTo(-24, -8, -34, 0)
+      ..close();
+    canvas.drawPath(
+      canopy,
+      Paint()
+        ..shader = const LinearGradient(
+          colors: [Color(0xffe88ba6), Color(0xffcfa4f5), Color(0xff80d7d0)],
+        ).createShader(const Rect.fromLTWH(-34, -28, 68, 28)),
+    );
+    final seams = Paint()
+      ..color = const Color(0xbbfff0cf)
+      ..strokeWidth = 1.1
+      ..style = PaintingStyle.stroke;
+    canvas.drawPath(canopy, seams);
+    for (final x in [-17.0, 0.0, 17.0]) {
+      canvas.drawPath(
+        Path()
+          ..moveTo(0, -27)
+          ..quadraticBezierTo(x, -19, x, 0),
+        seams,
+      );
+    }
+    canvas.drawCircle(
+      const Offset(0, -28),
+      2.5,
+      Paint()..color = const Color(0xffffdfa4),
+    );
+    canvas.restore();
+  }
+
   void _ufo(Canvas canvas, Offset at, double t) {
     canvas.save();
     canvas.translate(at.dx, at.dy + math.sin(t * 4) * 3);
@@ -2096,36 +2250,7 @@ class _LeapWorldPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _LeapWorldPainter oldDelegate) => true;
-}
-
-class _AlienEyesPainter extends CustomPainter {
-  const _AlienEyesPainter();
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final eyePaint = Paint()..color = const Color(0xff10152b);
-    final shine = Paint()..color = Colors.white.withValues(alpha: .9);
-    for (final x in [.39, .61]) {
-      final center = Offset(size.width * x, size.height * .36);
-      canvas.drawOval(
-        Rect.fromCenter(
-          center: center,
-          width: size.width * .2,
-          height: size.height * .25,
-        ),
-        eyePaint,
-      );
-      canvas.drawCircle(
-        center + Offset(-size.width * .035, -size.height * .045),
-        size.width * .025,
-        shine,
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _AlienEyesPainter oldDelegate) => false;
+  bool shouldRepaint(covariant LeapWorldPainter oldDelegate) => true;
 }
 
 class _CryingFacePainter extends CustomPainter {

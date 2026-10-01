@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 
 import 'cat_character.dart';
 import 'store.dart';
+import 'game_audio.dart';
 
 // Accents are omitted for typing; Ñ remains a separate letter.
 const _words = <String>[
@@ -403,6 +404,8 @@ class _WordleScreenState extends State<WordleScreen>
               : 'wrong',
         );
         _message = _finished ? _result : '¡Sigue las pistas de colores!';
+        GameAudio.instance.play(_won ? GameSfx.reveal : GameSfx.place);
+        if (_won) GameAudio.instance.play(GameSfx.kitten);
         HapticFeedback.lightImpact();
         _save();
       } else if (_input.length < 5 && RegExp(r'^[A-ZÑ]$').hasMatch(key)) {
@@ -511,7 +514,10 @@ class _WordleScreenState extends State<WordleScreen>
   Widget build(BuildContext context) {
     if (_loading) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Wordlady')),
+        appBar: AppBar(
+          title: const Text('Wordlady'),
+          actions: const [AudioSettingsButton()],
+        ),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
@@ -524,7 +530,10 @@ class _WordleScreenState extends State<WordleScreen>
       }
     }
     return Scaffold(
-      appBar: AppBar(title: const Text('Wordlady')),
+      appBar: AppBar(
+        title: const Text('Wordlady'),
+        actions: const [AudioSettingsButton()],
+      ),
       body: Focus(
         focusNode: _focus,
         autofocus: true,

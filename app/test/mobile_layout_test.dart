@@ -55,7 +55,7 @@ void main() {
       await tester.pump();
       expect(
         find.text('Busca los poderes: 🚀 impulso · 🛸 salto'),
-        findsOneWidget,
+        findsNothing,
       );
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox());

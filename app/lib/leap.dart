@@ -2,7 +2,7 @@ import 'dart:math' as math;
 
 enum LeapPlatformKind { cloud, rock, airplane, storm }
 
-enum LeapPickupKind { coin, rocket, ufo }
+enum LeapPickupKind { coin, rocket, ufo, umbrella }
 
 enum LeapWorldZone {
   underground,
@@ -20,9 +20,11 @@ class LeapPlatform {
   final double baseX, y, width;
   final LeapPlatformKind kind;
   final double motion;
+  final bool trampoline;
   double x;
   bool facingRight = true;
   double? vanishingAt;
+  double? springAt;
   LeapPlatform(
     this.id,
     this.baseX,
@@ -30,6 +32,7 @@ class LeapPlatform {
     this.width,
     this.kind, {
     this.motion = 0,
+    this.trampoline = false,
   }) : x = baseX;
 }
 
@@ -44,6 +47,8 @@ class LeapPickup {
 class LeapGame {
   static const width = 360.0, catWidth = 46.0, catHeight = 52.0;
   static const gravity = 950.0, jumpSpeed = 480.0;
+  static const abductionDuration = 3.2;
+  static const springSpeed = 650.0, umbrellaDuration = 8.0;
   static const stageStretch = 1.6;
   static const meadowHeight = 1600.0 * stageStretch;
   static const neighborhoodHeight = 3200.0 * stageStretch;
@@ -57,11 +62,17 @@ class LeapGame {
   final List<LeapPickup> pickups = [];
   double x = 180, y = 80, vx = 0, vy = jumpSpeed;
   double camera = 0, maxHeight = 80, clock = 0, rocketTime = 0, alienTime = 0;
+  double umbrellaTime = 0;
+  double abductionTime = 0, ufoDepartureTime = 0, ufoX = 0, ufoY = 0;
+  double _abductionFromX = 0, _abductionFromY = 0;
+  LeapPlatform? _abductionTarget;
   double _top = 80, _pathX = 180;
-  double _nextRocketHeight = 520, _nextUfoHeight = 2200;
+  double _nextPowerHeight = 1040;
+  int _powerSequence = 0;
   double _routeDirection = 1;
   int _sameDirectionSteps = 0;
   int _nextId = 1, coins = 0, rockets = 0, ufos = 0, landings = 0;
+  int umbrellas = 0, springJumps = 0;
   bool over = false;
   String endReason = '';
   LeapGame({math.Random? random}) : random = random ?? math.Random() {
@@ -70,7 +81,12 @@ class LeapGame {
   }
   int get points => math.max(0, (maxHeight - 80).floor());
   bool get boosting => rocketTime > 0;
-  bool get alien => alienTime > 0;
+  bool get abducting => _abductionTarget != null;
+  double get abductionProgress =>
+      (abductionTime / abductionDuration).clamp(0.0, 1.0);
+  bool get alien => abducting || alienTime > 0;
+  bool get umbrellaOpen =>
+      umbrellaTime > 0 && vy < 0 && !abducting && !boosting;
 
   LeapWorldZone zoneAt(double height) {
     if (height < meadowHeight) return LeapWorldZone.underground;
@@ -88,9 +104,10 @@ class LeapGame {
   void generate(double ceiling) {
     while (_top < ceiling) {
       final difficulty = (_top / (9000 * stageStretch)).clamp(0.0, 1.0);
-      // A full jump rises about 121 units. These gaps demand more steering while
-      // keeping every platform on the generated route physically reachable.
-      _top += 75 + random.nextDouble() * (20 + difficulty * 20);
+      // Taller, irregular steps stay below the ~121-unit jump apex.
+      final gap =
+          90 + difficulty * 5 + random.nextDouble() * (18 + difficulty * 3);
+      _top += gap;
       var direction = random.nextBool() ? 1.0 : -1.0;
       if (_pathX < 105) {
         direction = 1;
@@ -105,23 +122,36 @@ class LeapGame {
           ? _sameDirectionSteps + 1
           : 1;
       _routeDirection = direction;
-      final horizontalTravel =
-          42 + random.nextDouble() * (48 + difficulty * 15);
+      final landingTime =
+          (jumpSpeed + math.sqrt(jumpSpeed * jumpSpeed - 2 * gravity * gap)) /
+          gravity;
+      // Leave room for reversing velocity and two platforms moving apart.
+      final horizontalTravel = math.min(
+        65 + random.nextDouble() * (40 + difficulty * 8),
+        230 * landingTime - 56,
+      );
       var nextX = _pathX + direction * horizontalTravel;
-      if (nextX < 42 || nextX > 318) {
+      if (nextX < 54 || nextX > 306) {
         _routeDirection = -direction;
         _sameDirectionSteps = 1;
         nextX = _pathX + _routeDirection * horizontalTravel;
       }
-      _pathX = nextX.clamp(42.0, 318.0);
-      final powerup = _top >= _nextUfoHeight
-          ? LeapPickupKind.ufo
-          : _top >= _nextRocketHeight
-          ? LeapPickupKind.rocket
+      _pathX = nextX.clamp(54.0, 306.0);
+      // One shared schedule halves the former combined rocket/UFO density,
+      // including umbrellas rather than adding a third independent stream.
+      final powerup = _top >= _nextPowerHeight
+          ? const [
+              LeapPickupKind.rocket,
+              LeapPickupKind.umbrella,
+              LeapPickupKind.ufo,
+            ][_powerSequence % 3]
           : null;
       // Powers sit above a stationary, reachable platform. Their spacing is
       // bounded, independent of the longer scenery stages.
-      final moving = powerup == null && _top > 850 && random.nextDouble() < .22;
+      final moving =
+          powerup == null &&
+          _top > 650 &&
+          random.nextDouble() < .28 + difficulty * .16;
       final zone = zoneAt(_top);
       final cloudChance = switch (zone) {
         LeapWorldZone.underground => 0,
@@ -149,9 +179,18 @@ class LeapGame {
         _nextId++,
         _pathX,
         _top,
-        kind == LeapPlatformKind.airplane ? 96 : 86 - difficulty * 20,
+        powerup != null
+            ? 82
+            : kind == LeapPlatformKind.airplane
+            ? 76 + random.nextDouble() * 20
+            : 60 + random.nextDouble() * 28 - difficulty * 8,
         kind,
-        motion: moving ? 12 + difficulty * 10 : 0,
+        motion: moving ? 12 + random.nextDouble() * (6 + difficulty * 4) : 0,
+        trampoline:
+            powerup == null &&
+            !moving &&
+            _top > 500 &&
+            random.nextDouble() < .07,
       );
       platforms.add(platform);
       if (powerup == null && random.nextDouble() < .55) {
@@ -159,11 +198,8 @@ class LeapGame {
       }
       if (powerup != null) {
         pickups.add(LeapPickup(_pathX, _top + 42, powerup));
-        if (powerup == LeapPickupKind.rocket) {
-          _nextRocketHeight = _top + 850 + random.nextDouble() * 250;
-        } else {
-          _nextUfoHeight = _top + 1900 + random.nextDouble() * 500;
-        }
+        _powerSequence++;
+        _nextPowerHeight = _top + 1200 + random.nextDouble() * 350;
       }
       // Storms are optional hazards beside, never in place of the reachable route.
       if (!skyTraffic && _top > 700 && random.nextDouble() < .18) {
@@ -197,6 +233,12 @@ class LeapGame {
   void _advance(double dt, double direction, double viewportHeight) {
     clock += dt;
     alienTime = math.max(0, alienTime - dt);
+    umbrellaTime = math.max(0, umbrellaTime - dt);
+    if (ufoDepartureTime > 0) {
+      ufoDepartureTime = math.max(0, ufoDepartureTime - dt);
+      ufoX += dt * 100;
+      ufoY += dt * 420;
+    }
     for (final p in platforms) {
       final oldX = p.x;
       p.x = (p.baseX + math.sin(clock * 1.5 + p.id) * p.motion).clamp(
@@ -204,6 +246,11 @@ class LeapGame {
         width - p.width / 2,
       );
       if ((p.x - oldX).abs() > .0001) p.facingRight = p.x > oldX;
+    }
+    if (abducting) {
+      _advanceAbduction(dt);
+      _updateWorld(viewportHeight);
+      return;
     }
     vx += (direction * 230 - vx) * math.min(1, dt * 12);
     x = (x + vx * dt) % width;
@@ -213,6 +260,7 @@ class LeapGame {
       vy = 760;
     } else {
       vy -= gravity * dt;
+      if (umbrellaTime > 0 && vy < 0) vy = math.max(vy, -135);
     }
     y += vy * dt;
     // Storms hurt on contact from either direction, including rocket ascent.
@@ -240,14 +288,18 @@ class LeapGame {
             break;
           }
           y = p.y;
-          vy = jumpSpeed;
+          vy = p.trampoline ? springSpeed : jumpSpeed;
+          if (p.trampoline) {
+            springJumps++;
+            p.springAt = clock;
+          }
           landings++;
           if (p.kind == LeapPlatformKind.cloud) p.vanishingAt = clock;
           break;
         }
       }
     }
-    var teleport = false;
+    var collectedUfo = false;
     for (final pickup in pickups) {
       if (!pickup.taken &&
           (x - pickup.x).abs() < 27 &&
@@ -262,11 +314,18 @@ class LeapGame {
             vy = 760;
           case LeapPickupKind.ufo:
             ufos++;
-            teleport = true;
+            collectedUfo = true;
+          case LeapPickupKind.umbrella:
+            umbrellas++;
+            umbrellaTime = umbrellaDuration;
         }
       }
     }
-    if (teleport) _alienTeleport(viewportHeight);
+    if (collectedUfo) _beginAbduction();
+    _updateWorld(viewportHeight);
+  }
+
+  void _updateWorld(double viewportHeight) {
     maxHeight = math.max(maxHeight, y);
     camera = math.max(camera, y - viewportHeight * .57);
     generate(camera + viewportHeight + 180);
@@ -282,7 +341,7 @@ class LeapGame {
     }
   }
 
-  void _alienTeleport(double viewportHeight) {
+  void _beginAbduction() {
     final from = y;
     generate(from + 950);
     final candidates =
@@ -291,7 +350,8 @@ class LeapGame {
               (platform) =>
                   platform.y >= from + 520 &&
                   platform.y <= from + 850 &&
-                  platform.kind != LeapPlatformKind.storm,
+                  platform.kind != LeapPlatformKind.storm &&
+                  platform.vanishingAt == null,
             )
             .toList()
           ..sort((a, b) {
@@ -301,12 +361,54 @@ class LeapGame {
             return safety != 0 ? safety : a.y.compareTo(b.y);
           });
     if (candidates.isEmpty) return;
-    final target = candidates.first;
-    x = target.x;
-    y = target.y;
-    vy = jumpSpeed;
-    maxHeight = math.max(maxHeight, y);
-    camera = math.max(camera, y - viewportHeight * .57);
-    alienTime = 2.2;
+    _abductionTarget = candidates.first;
+    _abductionFromX = x;
+    _abductionFromY = y;
+    abductionTime = 0;
+    ufoDepartureTime = 0;
+    ufoX = x;
+    ufoY = y + 150;
+    rocketTime = 0;
+    umbrellaTime = 0;
+    vx = vy = 0;
+  }
+
+  void _advanceAbduction(double dt) {
+    final target = _abductionTarget!;
+    abductionTime = math.min(abductionDuration, abductionTime + dt);
+    final t = abductionProgress;
+    double smooth(double value) {
+      final v = value.clamp(0.0, 1.0);
+      return v * v * (3 - 2 * v);
+    }
+
+    final capture = smooth(t / .2);
+    final travel = smooth((t - .2) / .6);
+    final release = smooth((t - .8) / .2);
+    x = _abductionFromX + (target.x - _abductionFromX) * travel;
+    y = t < .2
+        ? _abductionFromY + capture * 50
+        : t < .8
+        ? _abductionFromY + 50 + (target.y + 65 - _abductionFromY - 50) * travel
+        : target.y + 65 * (1 - release);
+    ufoX = x;
+    ufoY = t < .8 ? y + 90 + (1 - capture) * 60 : target.y + 155;
+    // During the beam ride, steering, gravity, pickups and hazards are suspended.
+    // The destination keeps moving normally; the ship follows its live position.
+    vx = vy = 0;
+    if (abductionTime >= abductionDuration) {
+      y = target.y;
+      x = target.x;
+      vy = target.trampoline ? springSpeed : jumpSpeed;
+      if (target.trampoline) {
+        springJumps++;
+        target.springAt = clock;
+      }
+      landings++;
+      if (target.kind == LeapPlatformKind.cloud) target.vanishingAt = clock;
+      _abductionTarget = null;
+      alienTime = 2.2;
+      ufoDepartureTime = .65;
+    }
   }
 }

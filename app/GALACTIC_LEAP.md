@@ -18,10 +18,9 @@ código; se incluye además el recurso `assets/gato_cohete.png` para el efecto d
 - Recoge monedas para el monedero de los sobres. Se guardan al recogerlas,
   incluso si la partida termina después.
 - Los cohetes desactivan la gravedad y dan impulso durante 2,4 segundos.
-  Aparecen desde las 520 unidades y vuelven cada 850–1.100 unidades, más
-  el salto hasta la siguiente plataforma; los OVNIs aparecen desde las 2.200.
-  Ambos se distinguen con un halo, sobre plataformas quietas y sin monedas
-  superpuestas. El indicador inferior muestra el poder activo y su duración.
+  Cohetes, paraguas y OVNIs alternan en un calendario compartido, con menos
+  apariciones totales. Se distinguen con un halo sobre plataformas quietas.
+  El indicador inferior muestra el poder activo y su duración.
 - Las nubes eléctricas terminan la partida al tocarlas desde cualquier dirección, incluso usando un cohete.
 - El botón de cámara congela la partida y muestra una captura en un diálogo.
   Al cerrar la vista previa, la partida continúa si estaba en marcha.
@@ -39,6 +38,9 @@ código; se incluye además el recurso `assets/gato_cohete.png` para el efecto d
   nombre de la zona. Cada etapa dura un 60% más; el espacio comienza a 21.120
   puntos, después de atravesar todos los paisajes.
 - La separación vertical máxima permanece por debajo de la altura de salto.
+  Los peldaños varían entre 90 y 116 unidades; el recorrido usa apoyos de
+  distintos anchos y más plataformas móviles conforme aumenta la altura.
+  La separación horizontal se limita según el tiempo disponible del salto.
   La ruta principal contiene nubes o rocas; los peligros aparecen a un lado.
   Al ascender aumentan la separación y las plataformas móviles, y disminuye
   el ancho de apoyo.
@@ -47,9 +49,17 @@ código; se incluye además el recurso `assets/gato_cohete.png` para el efecto d
 - El subsuelo usa plataformas de roca gris y contiene fósiles. Desde la zona
   de rascacielos la ruta utiliza únicamente nubes y aviones móviles; ya no
   aparecen bloques de tierra flotando en el cielo.
-- El OVNI reaparece cada 1.900–2.400 unidades de subida. Teletransporta al gato
-  más de 500 unidades hacia una plataforma segura y, durante unos segundos,
-  lo transforma en alienígena verde con ojos negros y un haz luminoso.
+- Un calendario compartido alterna cohete, paraguas y OVNI. El primer poder
+  aparece desde las 1.040 unidades; la densidad total es aproximadamente la mitad
+  de la anterior, contando también el paraguas.
+- El OVNI recoge al gato con un haz, lo transporta durante 3,2 segundos y lo
+  deposita sobre una plataforma segura, siguiendo su movimiento. La cámara
+  recorre la subida sin teletransporte. Durante el transporte no hay colisiones
+  ni control manual; al soltarlo recupera el salto normal y la nave se aleja.
+- El paraguas dura 8 segundos y limita la caída a 135 unidades/s, sin reducir
+  el salto ascendente. Se despliega automáticamente al empezar a descender.
+- Algunas plataformas inmóviles llevan un trampolín: elevan el impulso de 480
+  a 650 unidades/s y muestran un resorte que reacciona al aterrizar.
 - `lib/leap_screen.dart`: controles, interfaz, captura y pintor del mundo.
   El escenario se adapta al ancho disponible y respeta `SafeArea`, con un
   ancho máximo de 480 px en pantallas grandes.

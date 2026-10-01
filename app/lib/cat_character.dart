@@ -3,6 +3,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'game_audio.dart';
 
 enum CatKind { maru, lady }
 
@@ -80,6 +81,7 @@ class _CatActorState extends State<CatActor> with TickerProviderStateMixin {
   }
 
   void _wakeAndPet() {
+    GameAudio.instance.play(GameSfx.kitten);
     HapticFeedback.lightImpact();
     _wakeTimer?.cancel();
     setState(() {
@@ -272,6 +274,37 @@ class LadyPainter extends CatPainter {
   CatKind get kind => CatKind.lady;
 }
 
+/// The opening scene draws the working foreleg at the wrapper's actual grip.
+class PackOpeningCatPainter extends CustomPainter {
+  final CatKind cat;
+  final double progress;
+  const PackOpeningCatPainter({required this.cat, required this.progress});
+
+  @override
+  void paint(Canvas canvas, Size size) => _CatPainter(
+    cat: cat,
+    action: CatAction.pack,
+    active: false,
+    phase: (progress * 2) % 1,
+    pet: ((progress - .76) / .24).clamp(0.0, 1.0),
+    focus: 1,
+    sleeping: false,
+    reaction: 1,
+    feeding: false,
+    munching: false,
+    digging: false,
+    crying: false,
+    packProgress: 0,
+    showShadow: false,
+    forcedBlink: progress > .45 && progress < .52,
+    hideWorkingPaw: true,
+  ).paint(canvas, size);
+
+  @override
+  bool shouldRepaint(PackOpeningCatPainter old) =>
+      old.cat != cat || old.progress != progress;
+}
+
 class _CatPainter extends CustomPainter {
   final CatKind cat;
   final CatAction action;
@@ -286,6 +319,7 @@ class _CatPainter extends CustomPainter {
   final double packProgress;
   final bool showShadow;
   final bool forcedBlink;
+  final bool hideWorkingPaw;
   const _CatPainter({
     required this.cat,
     required this.action,
@@ -302,6 +336,7 @@ class _CatPainter extends CustomPainter {
     required this.packProgress,
     required this.showShadow,
     this.forcedBlink = false,
+    this.hideWorkingPaw = false,
   });
 
   bool get maru => cat == CatKind.maru;
@@ -456,23 +491,25 @@ class _CatPainter extends CustomPainter {
 
     // One foreleg reaches toward the current activity.
     ellipse(canvas, 37, 86, 12, 8, maru ? dark : fur);
-    canvas.save();
-    canvas.translate(-reach * 9, -reach * 12);
-    canvas.rotate(-reach * .15);
-    ellipse(canvas, 66, 86, 12, 8, maru ? dark : fur);
-    if (reach > .3) {
-      for (final x in [61.0, 66.0, 71.0]) {
-        ellipse(
-          canvas,
-          x,
-          83,
-          1.1,
-          1.2,
-          maru ? const Color(0xff908078) : const Color(0xffe7bac4),
-        );
+    if (!hideWorkingPaw) {
+      canvas.save();
+      canvas.translate(-reach * 9, -reach * 12);
+      canvas.rotate(-reach * .15);
+      ellipse(canvas, 66, 86, 12, 8, maru ? dark : fur);
+      if (reach > .3) {
+        for (final x in [61.0, 66.0, 71.0]) {
+          ellipse(
+            canvas,
+            x,
+            83,
+            1.1,
+            1.2,
+            maru ? const Color(0xff908078) : const Color(0xffe7bac4),
+          );
+        }
       }
+      canvas.restore();
     }
-    canvas.restore();
 
     // Independent head tilt follows a target or a petting tap.
     canvas.save();
@@ -736,5 +773,6 @@ class _CatPainter extends CustomPainter {
       old.crying != crying ||
       old.packProgress != packProgress ||
       old.showShadow != showShadow ||
+      old.hideWorkingPaw != hideWorkingPaw ||
       old.cat != cat;
 }

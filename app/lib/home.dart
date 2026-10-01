@@ -21,6 +21,9 @@ import 'card_ar.dart';
 import 'card_ar_photo_review.dart';
 import 'game_leaderboard.dart';
 import 'menu_swipe.dart';
+import 'collection_album.dart';
+import 'pack_opening.dart';
+import 'game_audio.dart';
 
 const ink = Color(0xff293f39),
     cream = Color(0xfffaf6ee),
@@ -54,6 +57,11 @@ class RinconApp extends StatelessWidget {
   Widget build(BuildContext context) => MaterialApp(
     debugShowCheckedModeBanner: false,
     title: 'Anivermaru',
+    navigatorObservers: [GameAudioRouteObserver()],
+    builder: (context, child) => Listener(
+      onPointerDown: (_) => GameAudio.instance.unlock(),
+      child: child!,
+    ),
     theme: ThemeData(
       useMaterial3: true,
       scaffoldBackgroundColor: cream,
@@ -96,6 +104,7 @@ class _RinconHomeState extends State<RinconHome>
   bool _collectionOwnedOnly = false;
   String? _selectedCollection;
   late final AnimationController _packAnimation;
+  int _packSoundFlags = 0;
   late final PageController _packCarousel;
   int _selectedPackVolume = 0;
   bool _openingPack = false;
@@ -125,7 +134,7 @@ class _RinconHomeState extends State<RinconHome>
     _packAnimation = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 3100),
-    );
+    )..addListener(_packSoundTick);
     _packCarousel = PageController(viewportFraction: .82);
     _refreshCloud();
     _collectionPlayTimer = Timer.periodic(const Duration(seconds: 28), (_) {
@@ -368,7 +377,18 @@ class _RinconHomeState extends State<RinconHome>
     try {
       await Navigator.push(
         context,
-        MaterialPageRoute<void>(builder: (_) => screen),
+        MaterialPageRoute<void>(
+          settings: RouteSettings(
+            name: screen is LeapScreen
+                ? '/leap'
+                : screen is SweetScreen
+                ? '/sweet'
+                : screen is WordleScreen
+                ? '/wordle'
+                : '/blocks',
+          ),
+          builder: (_) => screen,
+        ),
       );
     } finally {
       s.cloud.allowRestore = true;
@@ -401,6 +421,7 @@ class _RinconHomeState extends State<RinconHome>
             child: _MaruversarioTitle(),
           ),
           actions: [
+            const AudioSettingsButton(),
             Chip(
               avatar: const Icon(Icons.toll, size: 18),
               label: Text('${s.coins}'),
@@ -905,10 +926,27 @@ class _RinconHomeState extends State<RinconHome>
     }
   }
 
+  void _packSoundTick() {
+    if (!_openingPack || page != 1) return;
+    for (final cue in [
+      (0, .48, GameSfx.paper),
+      (1, .72, GameSfx.reveal),
+      (2, .8, GameSfx.kitten),
+    ]) {
+      if (_packAnimation.value >= cue.$2 &&
+          _packSoundFlags & (1 << cue.$1) == 0) {
+        _packSoundFlags |= 1 << cue.$1;
+        GameAudio.instance.play(cue.$3);
+      }
+    }
+  }
+
   Future<void> _openPack() async {
     if (_openingPack || s.coins < 20) return;
     final opener = _packCat;
     final selectedVolume = _selectedPackVolume;
+    _packSoundFlags = 0;
+    GameAudio.instance.play(GameSfx.kitten);
     setState(() => _openingPack = true);
     HapticFeedback.mediumImpact();
     await _packAnimation.forward(from: 0);
@@ -1017,7 +1055,7 @@ class _RinconHomeState extends State<RinconHome>
                           child: Row(
                             children: [
                               Container(
-                                width: 32,
+                                width: 42,
                                 height: 52,
                                 decoration: BoxDecoration(
                                   color: Colors.white.withValues(alpha: .16),
@@ -1124,469 +1162,11 @@ class _RinconHomeState extends State<RinconHome>
         ),
       ),
       const SizedBox(height: 24),
-      Center(
-        child: FittedBox(
-          fit: BoxFit.scaleDown,
-          child: SizedBox(
-            width: 340,
-            child: AnimatedBuilder(
-              animation: _packAnimation,
-              builder: (context, _) {
-                final t = _packAnimation.value;
-                final flare = Curves.easeOut.transform(
-                  (t * 1.4).clamp(0.0, 1.0),
-                );
-                final tear = ((t - .42) / .38).clamp(0.0, 1.0);
-                return Transform.translate(
-                  offset: Offset(math.sin(t * math.pi * 12) * 8 * (1 - t), 0),
-                  child: Transform.scale(
-                    scale: 1 + math.sin(t * math.pi) * .09,
-                    child: SizedBox(
-                      width: 310,
-                      height: 286,
-                      child: Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          Container(
-                            width: 216 + flare * 70,
-                            height: 216 + flare * 70,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: const Color(
-                                0xff41d9ff,
-                              ).withValues(alpha: .32 * (1 - flare)),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: const Color(
-                                    0xffa842ff,
-                                  ).withValues(alpha: .6 * (1 - flare)),
-                                  blurRadius: 56 + t * 30,
-                                  spreadRadius: 8 + t * 12,
-                                ),
-                              ],
-                            ),
-                          ),
-                          Positioned(
-                            left: 9,
-                            top: 23,
-                            child: Transform.rotate(
-                              angle: -.105 - math.sin(t * math.pi * 2) * .02,
-                              child: Container(
-                                width: 164,
-                                height: 226,
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                    colors: _selectedPackVolume == 1
-                                        ? const [
-                                            Color(0xff8dffcf),
-                                            Color(0xff29c8bb),
-                                            Color(0xff365bc4),
-                                            Color(0xff28256f),
-                                          ]
-                                        : const [
-                                            Color(0xffffe37c),
-                                            Color(0xffff83c4),
-                                            Color(0xff9564ef),
-                                            Color(0xff432884),
-                                          ],
-                                  ),
-                                  borderRadius: BorderRadius.circular(22),
-                                  border: Border.all(
-                                    color: const Color(0xffd8fff0),
-                                    width: 2.2,
-                                  ),
-                                  boxShadow: const [
-                                    BoxShadow(
-                                      color: Color(0x7736aee2),
-                                      blurRadius: 24,
-                                      offset: Offset(-7, 13),
-                                    ),
-                                  ],
-                                ),
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    const Icon(
-                                      Icons.pets,
-                                      color: Colors.white70,
-                                      size: 42,
-                                    ),
-                                    const SizedBox(height: 12),
-                                    Text(
-                                      'MOMAZOS\nVOL. ${_selectedPackVolume + 1}',
-                                      textAlign: TextAlign.center,
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w900,
-                                        letterSpacing: 1,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 12),
-                                    Text(
-                                      _selectedPackVolume == 1
-                                          ? 'EDICIÓN PAPU'
-                                          : 'BRILLIBRILLI',
-                                      style: const TextStyle(
-                                        color: Color(0xfffff09e),
-                                        fontSize: 8,
-                                        fontWeight: FontWeight.w900,
-                                        letterSpacing: 1,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                          Transform.translate(
-                            offset: Offset(48, 5),
-                            child: Transform(
-                              alignment: Alignment.center,
-                              transform: Matrix4.identity()
-                                ..setEntry(3, 2, .0015)
-                                ..rotateY(
-                                  t > .55
-                                      ? (t - .55) * math.pi * .72
-                                      : math.sin(t * math.pi * 2) * .12,
-                                )
-                                ..rotateZ(math.sin(t * math.pi * 4) * .035),
-                              child: Container(
-                                width: 202,
-                                height: 258,
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                    colors: _selectedPackVolume == 1
-                                        ? const [
-                                            Color(0xffffef77),
-                                            Color(0xff46dbc1),
-                                            Color(0xff3880dd),
-                                            Color(0xff382777),
-                                          ]
-                                        : const [
-                                            Color(0xffffd46b),
-                                            Color(0xffff6bb6),
-                                            Color(0xff8152ff),
-                                            Color(0xff372780),
-                                          ],
-                                  ),
-                                  borderRadius: BorderRadius.circular(24),
-                                  border: Border.all(
-                                    color: const Color(0xfffff0bb),
-                                    width: 2.4,
-                                  ),
-                                  boxShadow: const [
-                                    BoxShadow(
-                                      color: Color(0x995b23bd),
-                                      blurRadius: 28,
-                                      offset: Offset(0, 15),
-                                    ),
-                                    BoxShadow(
-                                      color: Color(0x88fff7d5),
-                                      blurRadius: 12,
-                                      spreadRadius: -4,
-                                    ),
-                                  ],
-                                ),
-                                child: Stack(
-                                  clipBehavior: Clip.none,
-                                  children: [
-                                    Positioned.fill(
-                                      child: ClipRRect(
-                                        borderRadius: BorderRadius.circular(22),
-                                        child: CustomPaint(
-                                          painter: HoloPatternPainter(
-                                            progress: t,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                    Center(
-                                      child: Column(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
-                                        children: [
-                                          const Icon(
-                                            Icons.pets,
-                                            size: 61,
-                                            color: Colors.white,
-                                          ),
-                                          const SizedBox(height: 15),
-                                          Text(
-                                            'MOMAZOS\nVOL. ${_selectedPackVolume + 1} · EDICIÓN\n${_selectedPackVolume == 1 ? 'PAPU' : 'ANIVERSARIO'}',
-                                            textAlign: TextAlign.center,
-                                            maxLines: 4,
-                                            style: TextStyle(
-                                              fontSize: 16,
-                                              height: 1,
-                                              fontWeight: FontWeight.w900,
-                                              letterSpacing: 1.2,
-                                              color: Colors.white,
-                                              shadows: [
-                                                Shadow(
-                                                  color: Color(0xff48217b),
-                                                  blurRadius: 8,
-                                                  offset: Offset(0, 3),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                          const SizedBox(height: 16),
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 12,
-                                              vertical: 5,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              color: const Color(0xfffff3c7),
-                                              borderRadius:
-                                                  BorderRadius.circular(30),
-                                            ),
-                                            child: Text(
-                                              _selectedPackVolume == 1
-                                                  ? '😎  EDICIÓN PAPU  😎'
-                                                  : '✨  EDICIÓN BRILLIBRILLI  ✨',
-                                              style: const TextStyle(
-                                                fontSize: 8,
-                                                fontWeight: FontWeight.w900,
-                                                color: Color(0xff57278d),
-                                                letterSpacing: 1,
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    Positioned(
-                                      left: 7,
-                                      right: 7,
-                                      top: 43,
-                                      child: Container(
-                                        height: 4 + tear * 5,
-                                        decoration: BoxDecoration(
-                                          gradient: const LinearGradient(
-                                            colors: [
-                                              Color(0xff56f8ff),
-                                              Colors.white,
-                                              Color(0xff5689ff),
-                                            ],
-                                          ),
-                                          borderRadius: BorderRadius.circular(
-                                            8,
-                                          ),
-                                          boxShadow: const [
-                                            BoxShadow(
-                                              color: Color(0xff53d9ff),
-                                              blurRadius: 15,
-                                              spreadRadius: 3,
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                    Positioned(
-                                      top: 0,
-                                      left: 0,
-                                      right: 0,
-                                      child: Opacity(
-                                        opacity:
-                                            (1 -
-                                                    ((t - .83) / .17).clamp(
-                                                      0.0,
-                                                      1.0,
-                                                    ))
-                                                .clamp(0.0, 1.0),
-                                        child: Transform.translate(
-                                          offset: Offset(
-                                            (_packCat == CatKind.lady
-                                                    ? -1
-                                                    : 1) *
-                                                tear *
-                                                25,
-                                            -tear * 78,
-                                          ),
-                                          child: Transform.rotate(
-                                            angle:
-                                                (_packCat == CatKind.lady
-                                                    ? -.28
-                                                    : .28) *
-                                                tear,
-                                            child: ClipPath(
-                                              clipper: _TornSealClipper(),
-                                              child: Container(
-                                                height: 52,
-                                                decoration: const BoxDecoration(
-                                                  gradient: LinearGradient(
-                                                    colors: [
-                                                      Color(0xff3a2daf),
-                                                      Color(0xff3ea9f5),
-                                                      Color(0xffa954df),
-                                                    ],
-                                                  ),
-                                                ),
-                                                child: const Center(
-                                                  child: Text(
-                                                    '✦  SOBRE SORPRESA  ✦',
-                                                    style: TextStyle(
-                                                      fontSize: 10,
-                                                      fontWeight:
-                                                          FontWeight.w900,
-                                                      color: Colors.white,
-                                                      letterSpacing: 1,
-                                                    ),
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                    if (_openingPack)
-                                      Positioned.fill(
-                                        child: IgnorePointer(
-                                          child: CustomPaint(
-                                            painter: PackSparklePainter(
-                                              progress: t,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                          if (_openingPack)
-                            Positioned(
-                              bottom: 0,
-                              child: Opacity(
-                                opacity: (1 - t).clamp(0.0, 1.0),
-                                child: const Text(
-                                  '¡ABRIENDO!',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 19,
-                                    fontWeight: FontWeight.w900,
-                                    letterSpacing: 2,
-                                    shadows: [
-                                      Shadow(
-                                        color: Color(0xffca4cff),
-                                        blurRadius: 18,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                          if (_openingPack)
-                            Positioned(
-                              right: _packCat == CatKind.lady
-                                  ? -5 + tear * 12
-                                  : null,
-                              left: _packCat == CatKind.maru
-                                  ? -12 + tear * 12
-                                  : null,
-                              top:
-                                  -46 +
-                                  Curves.easeInOut.transform(
-                                        (t / .35).clamp(0.0, 1.0),
-                                      ) *
-                                      55,
-                              child: Opacity(
-                                opacity:
-                                    ((t / .12).clamp(0.0, 1.0) *
-                                    (1 - ((t - .8) / .2).clamp(0.0, 1.0))),
-                                child: CatActor(
-                                  cat: _packCat,
-                                  size: 118,
-                                  action: CatAction.pack,
-                                  active: true,
-                                  packProgress: t,
-                                  showLabel: false,
-                                ),
-                              ),
-                            ),
-                          if (_openingPack && t > .25 && t < .78)
-                            Positioned(
-                              top: 37,
-                              right: _packCat == CatKind.maru ? 18 : null,
-                              left: _packCat == CatKind.lady ? 18 : null,
-                              child: Opacity(
-                                opacity: math
-                                    .sin((t - .25) / .53 * math.pi)
-                                    .clamp(0.0, 1.0),
-                                child: Transform.rotate(
-                                  angle: _packCat == CatKind.maru ? -.3 : .3,
-                                  child: const Text(
-                                    '✦  ╱╱  ✦',
-                                    style: TextStyle(
-                                      color: Color(0xffffe88b),
-                                      fontSize: 25,
-                                      fontWeight: FontWeight.w900,
-                                      shadows: [
-                                        Shadow(
-                                          color: Colors.white,
-                                          blurRadius: 12,
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          if (_openingPack && t > .72)
-                            Positioned(
-                              top: 58 - ((t - .72) / .28) * 92,
-                              child: Opacity(
-                                opacity: ((t - .72) / .12).clamp(0.0, 1.0),
-                                child: Transform.rotate(
-                                  angle: (1 - t) * .45,
-                                  child: Container(
-                                    width: 96,
-                                    height: 126,
-                                    decoration: BoxDecoration(
-                                      gradient: const LinearGradient(
-                                        colors: [
-                                          Color(0xffffe577),
-                                          Color(0xffff88d1),
-                                          Color(0xff8e66ff),
-                                        ],
-                                      ),
-                                      borderRadius: BorderRadius.circular(13),
-                                      border: Border.all(
-                                        color: Colors.white,
-                                        width: 3,
-                                      ),
-                                      boxShadow: const [
-                                        BoxShadow(
-                                          color: Color(0xffffe577),
-                                          blurRadius: 24,
-                                        ),
-                                      ],
-                                    ),
-                                    child: const Icon(
-                                      Icons.pets,
-                                      color: Colors.white,
-                                      size: 42,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-        ),
+      PackOpeningStage(
+        animation: _packAnimation,
+        volume: _selectedPackVolume,
+        opening: _openingPack,
+        cat: _packCat,
       ),
       const SizedBox(height: 28),
       FilledButton.icon(
@@ -1696,7 +1276,108 @@ class _RinconHomeState extends State<RinconHome>
     }
   }
 
+  Widget _collectionCard(int i, List<int> playfulOwned, {bool animate = true}) {
+    final unlocked = s.cards.containsKey(i);
+    return _CollectionCatPlay(
+      key: ValueKey('cat-card-$i'),
+      cardId: i,
+      enabled:
+          !_inspectingCollection && animate && playfulOwned.take(2).contains(i),
+      cat: playfulOwned.isNotEmpty && i == playfulOwned.first
+          ? CatKind.maru
+          : CatKind.lady,
+      routine: (_collectionShuffle + i) % 3,
+      delay: playfulOwned.isNotEmpty && i == playfulOwned.first ? 0 : 1,
+      child: InkWell(
+        onTap: unlocked ? () => _viewCardVariants(i) : null,
+        borderRadius: BorderRadius.circular(20),
+        child: _RarityFrame(
+          rarity: unlocked
+              ? s.rarities[i] ?? CardRarity.common
+              : CardRarity.common,
+          locked: !unlocked,
+          child: _PaletteSurface(
+            cardId: i,
+            enabled: unlocked,
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: unlocked
+                        ? _CardArt(cardId: i)
+                        : const Center(
+                            child: Text(
+                              '?',
+                              style: TextStyle(fontSize: 46, color: green),
+                            ),
+                          ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    unlocked ? cardNames[i] : 'Por descubrir',
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: unlocked ? Colors.white : ink,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    unlocked
+                        ? '${(s.rarities[i] ?? CardRarity.common).label.toUpperCase()}  ·  ×${s.cards[i]} · ${s.variantsFor(i).length} variantes'
+                        : 'Abre un sobre',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900,
+                      color: unlocked
+                          ? rarityColor(s.rarities[i] ?? CardRarity.common)
+                          : ink,
+                    ),
+                  ),
+                  if (unlocked) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      s.cardOpeners[i] == null
+                          ? 'Descubierta por Maru & Lady'
+                          : 'La abrió ${CatKind.values[s.cardOpeners[i]!] == CatKind.maru ? 'Maru' : 'Lady'}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Color(0xffffedbe),
+                        fontSize: 9,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget collection() {
+    if (_selectedCollection != null) {
+      final ids = cardsForCollection(_selectedCollection!);
+      return CollectionAlbum(
+        key: ValueKey(_selectedCollection),
+        title: _selectedCollection == anniversaryCollectionV2Id
+            ? 'Momazos Vol. 2'
+            : 'Momazos Vol. 1',
+        teal: _selectedCollection == anniversaryCollectionV2Id,
+        cardIds: ids,
+        ownedIds: s.cards.keys.toSet(),
+        onClose: () => setState(() => _selectedCollection = null),
+        cardBuilder: (id, companions, active) =>
+            _collectionCard(id, companions, animate: active),
+      );
+    }
     final query = _collectionQuery.trim().toLowerCase();
     final volumeSelected = _selectedCollection != null;
     final rarityCounts = {
@@ -1881,7 +1562,7 @@ class _RinconHomeState extends State<RinconHome>
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     const Text(
-                                      'SOBRE SORPRESA',
+                                      'ÁLBUM · TOCA PARA ABRIR',
                                       style: TextStyle(
                                         color: Color(0xffbdefff),
                                         fontSize: 9,
@@ -1942,7 +1623,7 @@ class _RinconHomeState extends State<RinconHome>
                               Icon(
                                 volumeSelected
                                     ? Icons.grid_view_rounded
-                                    : Icons.arrow_forward_ios_rounded,
+                                    : Icons.menu_book_rounded,
                                 color: Colors.white,
                                 size: 21,
                               ),
@@ -2107,97 +1788,7 @@ class _RinconHomeState extends State<RinconHome>
                 ),
                 delegate: SliverChildBuilderDelegate((context, displayIndex) {
                   final i = order[displayIndex];
-                  final unlocked = s.cards.containsKey(i);
-                  return _CollectionCatPlay(
-                    key: ValueKey('cat-card-$i'),
-                    cardId: i,
-                    enabled:
-                        !_inspectingCollection &&
-                        playfulOwned.take(2).contains(i),
-                    cat: playfulOwned.isNotEmpty && i == playfulOwned.first
-                        ? CatKind.maru
-                        : CatKind.lady,
-                    routine: (_collectionShuffle + i) % 3,
-                    delay: playfulOwned.isNotEmpty && i == playfulOwned.first
-                        ? 0
-                        : 1,
-                    child: InkWell(
-                      onTap: unlocked ? () => _viewCardVariants(i) : null,
-                      borderRadius: BorderRadius.circular(20),
-                      child: _RarityFrame(
-                        rarity: unlocked
-                            ? s.rarities[i] ?? CardRarity.common
-                            : CardRarity.common,
-                        locked: !unlocked,
-                        child: _PaletteSurface(
-                          cardId: i,
-                          enabled: unlocked,
-                          child: Padding(
-                            padding: const EdgeInsets.all(12),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Expanded(
-                                  child: unlocked
-                                      ? _CardArt(cardId: i)
-                                      : const Center(
-                                          child: Text(
-                                            '?',
-                                            style: TextStyle(
-                                              fontSize: 46,
-                                              color: green,
-                                            ),
-                                          ),
-                                        ),
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  unlocked ? cardNames[i] : 'Por descubrir',
-                                  textAlign: TextAlign.center,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: unlocked ? Colors.white : ink,
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  unlocked
-                                      ? '${(s.rarities[i] ?? CardRarity.common).label.toUpperCase()}  ·  ×${s.cards[i]} · ${s.variantsFor(i).length} variantes'
-                                      : 'Abre un sobre',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w900,
-                                    color: unlocked
-                                        ? rarityColor(
-                                            s.rarities[i] ?? CardRarity.common,
-                                          )
-                                        : ink,
-                                  ),
-                                ),
-                                if (unlocked) ...[
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    s.cardOpeners[i] == null
-                                        ? 'Descubierta por Maru & Lady'
-                                        : 'La abrió ${CatKind.values[s.cardOpeners[i]!] == CatKind.maru ? 'Maru' : 'Lady'}',
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      color: Color(0xffffedbe),
-                                      fontSize: 9,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  );
+                  return _collectionCard(i, playfulOwned);
                 }, childCount: order.length),
               ),
             ),
@@ -2645,8 +2236,8 @@ class _CollectionCatPlayState extends State<_CollectionCatPlay>
     animation: _play,
     builder: (context, _) {
       final t = _play.value;
-      final active = widget.enabled && t > .55;
-      final p = active ? ((t - .55) / .45) : 0.0;
+      final active = widget.enabled && t > .12;
+      final p = active ? ((t - .12) / .88) : 0.0;
       final arrive = Curves.easeOutCubic.transform((p / .22).clamp(0.0, 1.0));
       final leave = Curves.easeInCubic.transform(
         ((p - .78) / .22).clamp(0.0, 1.0),
@@ -3079,15 +2670,8 @@ class _BlockScreenState extends State<BlockScreen>
   GameStore get store => widget.store;
 
   Future<void> _playBlockSound(bool clear) async {
-    try {
-      await const MethodChannel(
-        'anivermaru/sfx',
-      ).invokeMethod<void>('play', {'clear': clear});
-    } on MissingPluginException {
-      await SystemSound.play(SystemSoundType.click);
-    } on PlatformException {
-      // Audio must never interrupt a placement.
-    }
+    GameAudio.instance.play(clear ? GameSfx.clear : GameSfx.place);
+    if (clear) GameAudio.instance.play(GameSfx.kitten);
   }
 
   @override
@@ -3298,6 +2882,7 @@ class _BlockScreenState extends State<BlockScreen>
               color: Colors.white,
             ),
           ),
+          actions: const [AudioSettingsButton(color: Colors.white)],
           backgroundColor: const Color(0xff38206c),
           foregroundColor: Colors.white,
         ),
@@ -4449,66 +4034,6 @@ class _RevealSparklePainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _RevealSparklePainter oldDelegate) =>
       oldDelegate.progress != progress || oldDelegate.color != color;
-}
-
-class PackSparklePainter extends CustomPainter {
-  final double progress;
-  const PackSparklePainter({required this.progress});
-  @override
-  void paint(Canvas canvas, Size size) {
-    final rng = math.Random(29);
-    for (var i = 0; i < 27; i++) {
-      final angle = rng.nextDouble() * math.pi * 2;
-      final distance = 24 + progress * (92 + rng.nextDouble() * 100);
-      final center = Offset(
-        size.width / 2 + math.cos(angle) * distance,
-        size.height / 2 + math.sin(angle) * distance,
-      );
-      final radius = (2 + rng.nextDouble() * 5) * (1 - progress * .45);
-      final p = Paint()
-        ..color =
-            (i % 3 == 0
-                    ? const Color(0xffffef7a)
-                    : i.isEven
-                    ? const Color(0xff75f7ff)
-                    : const Color(0xffff95e5))
-                .withValues(alpha: (1 - progress * .75).clamp(0.0, 1.0))
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2);
-      canvas.drawCircle(center, radius, p);
-      canvas.drawLine(
-        center.translate(-radius * 1.8, 0),
-        center.translate(radius * 1.8, 0),
-        p,
-      );
-      canvas.drawLine(
-        center.translate(0, -radius * 1.8),
-        center.translate(0, radius * 1.8),
-        p,
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant PackSparklePainter old) =>
-      old.progress != progress;
-}
-
-class _TornSealClipper extends CustomClipper<Path> {
-  @override
-  Path getClip(Size size) {
-    final teeth = (size.width / 11).ceil();
-    final edge = Path()
-      ..moveTo(0, 0)
-      ..lineTo(size.width, 0)
-      ..lineTo(size.width, 43);
-    for (var i = teeth; i >= 0; i--) {
-      edge.lineTo(size.width * i / teeth, i.isEven ? 43 : 51);
-    }
-    return edge..close();
-  }
-
-  @override
-  bool shouldReclip(covariant _TornSealClipper oldClipper) => false;
 }
 
 class _CollectionBadge extends StatelessWidget {

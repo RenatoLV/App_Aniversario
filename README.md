@@ -34,6 +34,9 @@ El repositorio incluye **334 memes** de Momazos vol. 1 y vol. 2 y sus imágenes 
 - Block Blaster Maru Editions: juego de bloques 8×8 con puntuación, combos, récord, monedas y SFX Android.
 - Sobres con animación de apertura, rarezas y carta holográfica inclinable.
 - Colección con 334 memes y seis cartas de ejemplo; variantes foil, filtros, álbum por volumen y visor con giro/zoom.
+  Momazos vol. 1 y vol. 2 se abren como libros de dos páginas: desliza, usa las
+  flechas o el selector de páginas. El filtro «Mis cartas» muestra las descubiertas.
+  Maru y Lady juegan con las cartas de la página visible; las pendientes permanecen ocultas.
 - Bloc de notas local y compartido con fotos y dibujos editables.
 - Persistencia local del tablero, monedas, colección y notas.
 - Firebase: Google/nombre de usuario, progreso por cuenta, rankings globales, notas compartidas, Storage y presencia.

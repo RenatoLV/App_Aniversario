@@ -1,10 +1,12 @@
 import 'dart:convert';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'cat_character.dart';
 import 'match3.dart';
 import 'store.dart';
+import 'game_audio.dart';
 
 const _sweetColors = [
   Color(0xffff749d),
@@ -54,7 +56,7 @@ class _SweetScreenState extends State<SweetScreen>
           : _game.lost
           ? SweetPhase.defeat
           : SweetPhase.input,
-      'Combina 3 premios. ¡Maru y Lady te acompañan!',
+      'Desliza una ficha hacia su vecina para combinar 3.',
     );
   }
 
@@ -84,14 +86,27 @@ class _SweetScreenState extends State<SweetScreen>
   }
 
   Future<void> _play(int a, int b) async {
-    if (_busy) return;
-    _game.move(a, b, free: _booster == 'switch');
-    _booster = '';
+    if (_busy || _game.won || _game.lost) return;
+    if (!_game.cells[a].movable || !_game.cells[b].movable) {
+      setState(
+        () => _frame = SweetFrame(
+          _game,
+          SweetPhase.input,
+          'Esa ficha está bloqueada. Prueba otra dirección.',
+        ),
+      );
+      return;
+    }
+    GameAudio.instance.play(GameSfx.place);
+    final moved = _game.move(a, b, free: _booster == 'switch');
+    if (moved) _booster = '';
     _selected = null;
-    await _replay();
+    await _replay(
+      caption: moved ? null : 'Sin combinación: conservas el movimiento.',
+    );
   }
 
-  Future<void> _replay() async {
+  Future<void> _replay({String? caption}) async {
     setState(() => _busy = true);
     await _save();
     for (final frame in _game.frames) {
@@ -99,20 +114,23 @@ class _SweetScreenState extends State<SweetScreen>
       setState(() => _frame = frame);
       if (frame.phase == SweetPhase.clear ||
           frame.phase == SweetPhase.enchant) {
+        GameAudio.instance.play(
+          frame.phase == SweetPhase.enchant ? GameSfx.reveal : GameSfx.clear,
+        );
         HapticFeedback.lightImpact();
         _cats.duration = Duration(
-          milliseconds: frame.phase == SweetPhase.enchant ? 800 : 650,
+          milliseconds: frame.phase == SweetPhase.enchant ? 450 : 360,
         );
         _cats.forward(from: 0);
       }
       await Future<void>.delayed(
         Duration(
           milliseconds: switch (frame.phase) {
-            SweetPhase.clear => 650,
-            SweetPhase.enchant => 800,
-            SweetPhase.swap => 200,
-            SweetPhase.gravity => 180,
-            SweetPhase.spawn => 180,
+            SweetPhase.clear => 360,
+            SweetPhase.enchant => 450,
+            SweetPhase.swap || SweetPhase.input => 220,
+            SweetPhase.gravity => 220,
+            SweetPhase.spawn => 220,
             SweetPhase.victory => 500,
             _ => 60,
           },
@@ -120,6 +138,7 @@ class _SweetScreenState extends State<SweetScreen>
       );
     }
     if (!mounted) return;
+    if (_game.won) GameAudio.instance.play(GameSfx.kitten);
     setState(() {
       _busy = false;
       _frame = SweetFrame(
@@ -133,7 +152,7 @@ class _SweetScreenState extends State<SweetScreen>
             ? '¡Nivel superado! 🐾'
             : _game.lost
             ? '¡Maru y Lady creen en ti! Inténtalo otra vez.'
-            : 'Tu turno: combina premios',
+            : caption ?? 'Desliza una ficha hacia su vecina para combinar 3.',
       );
     });
   }
@@ -157,10 +176,21 @@ class _SweetScreenState extends State<SweetScreen>
   }
 
   void _swipe(int i, Offset end) {
-    if (_dragStart == null || _busy || _booster == 'hammer') return;
+    if (_dragStart == null ||
+        _busy ||
+        _game.won ||
+        _game.lost ||
+        _booster == 'hammer') {
+      return;
+    }
     final delta = end - _dragStart!;
-    _dragStart = null;
     if (delta.distance < 12) return;
+    // Wait for a clear axis instead of guessing on a diagonal gesture.
+    if (math.max(delta.dx.abs(), delta.dy.abs()) <
+        math.min(delta.dx.abs(), delta.dy.abs()) * 1.25) {
+      return;
+    }
+    _dragStart = null; // At most one adjacent swap per continuous drag.
     final x = i % 9, y = i ~/ 9;
     final dx = delta.dx.abs() > delta.dy.abs() ? delta.dx.sign.toInt() : 0;
     final dy = dx == 0 ? delta.dy.sign.toInt() : 0;
@@ -260,6 +290,7 @@ class _SweetScreenState extends State<SweetScreen>
         backgroundColor: const Color(0xfffff5ed),
         title: const Text('Candy Churu Cat'),
         actions: [
+          const AudioSettingsButton(),
           IconButton(onPressed: _help, icon: const Icon(Icons.help_outline)),
           IconButton(
             onPressed: _busy ? null : () => _restart(),
@@ -364,96 +395,110 @@ class _SweetScreenState extends State<SweetScreen>
                                     ),
                                   ],
                                 ),
-                                child: GridView.builder(
-                                  physics: const NeverScrollableScrollPhysics(),
-                                  itemCount: 81,
-                                  gridDelegate:
-                                      const SliverGridDelegateWithFixedCrossAxisCount(
-                                        crossAxisCount: 9,
-                                        crossAxisSpacing: 2,
-                                        mainAxisSpacing: 2,
-                                      ),
-                                  itemBuilder: (context, i) {
-                                    final cell = _frame.cells[i];
-                                    final clearing =
-                                        _frame.phase == SweetPhase.clear &&
-                                        _frame.affected.contains(i);
-                                    return Semantics(
-                                      label:
-                                          'Fila ${i ~/ 9 + 1}, columna ${i % 9 + 1}, ${cell.hole
-                                              ? 'hueco'
-                                              : cell.chocolate
-                                              ? 'chocolate'
-                                              : cell.frosting > 0
-                                              ? 'glaseado'
-                                              : _sweetNames[cell.color.clamp(0, 6)]}',
-                                      button: !cell.hole,
-                                      child: GestureDetector(
-                                        onTap: () => _tap(i),
-                                        onPanStart: (d) =>
-                                            _dragStart = d.globalPosition,
-                                        onPanEnd: (_) => _dragStart = null,
-                                        onPanUpdate: (d) {
-                                          if (_dragStart != null &&
-                                              (d.globalPosition - _dragStart!)
-                                                      .distance >
-                                                  16) {
-                                            _swipe(i, d.globalPosition);
-                                          }
-                                        },
-                                        child: AnimatedScale(
-                                          scale: clearing ? .72 : 1,
-                                          duration: const Duration(
-                                            milliseconds: 250,
-                                          ),
-                                          child: AnimatedContainer(
+                                child: MediaQuery(
+                                  data: MediaQuery.of(context).copyWith(
+                                    // Small tiles need a shorter drag threshold than page scrolling.
+                                    gestureSettings:
+                                        const DeviceGestureSettings(
+                                          touchSlop: 6,
+                                        ),
+                                  ),
+                                  child: GridView.builder(
+                                    physics:
+                                        const NeverScrollableScrollPhysics(),
+                                    itemCount: 81,
+                                    gridDelegate:
+                                        const SliverGridDelegateWithFixedCrossAxisCount(
+                                          crossAxisCount: 9,
+                                          crossAxisSpacing: 2,
+                                          mainAxisSpacing: 2,
+                                        ),
+                                    itemBuilder: (context, i) {
+                                      final cell = _frame.cells[i];
+                                      final clearing =
+                                          _frame.phase == SweetPhase.clear &&
+                                          _frame.affected.contains(i);
+                                      return Semantics(
+                                        label:
+                                            'Fila ${i ~/ 9 + 1}, columna ${i % 9 + 1}, ${cell.hole
+                                                ? 'hueco'
+                                                : cell.chocolate
+                                                ? 'chocolate'
+                                                : cell.frosting > 0
+                                                ? 'glaseado'
+                                                : _sweetNames[cell.color.clamp(0, 6)]}',
+                                        button: !cell.hole,
+                                        child: GestureDetector(
+                                          key: ValueKey('sweet-tile-$i'),
+                                          behavior: HitTestBehavior.opaque,
+                                          dragStartBehavior:
+                                              DragStartBehavior.down,
+                                          onTap: () => _tap(i),
+                                          onPanStart: (d) => _dragStart =
+                                              !_busy &&
+                                                  !_game.won &&
+                                                  !_game.lost &&
+                                                  _booster != 'hammer'
+                                              ? d.globalPosition
+                                              : null,
+                                          onPanEnd: (_) => _dragStart = null,
+                                          onPanCancel: () => _dragStart = null,
+                                          onPanUpdate: (d) =>
+                                              _swipe(i, d.globalPosition),
+                                          child: AnimatedScale(
+                                            scale: clearing ? .72 : 1,
                                             duration: const Duration(
-                                              milliseconds: 200,
+                                              milliseconds: 250,
                                             ),
-                                            decoration: BoxDecoration(
-                                              color: cell.hole
-                                                  ? Colors.transparent
-                                                  : clearing
-                                                  ? const Color(0xffffefaa)
-                                                  : cell.jelly > 0
-                                                  ? const Color(0xffae78c9)
-                                                  : const Color(0xff74577e),
-                                              borderRadius:
-                                                  BorderRadius.circular(8),
-                                              border: Border.all(
-                                                color: _selected == i
-                                                    ? Colors.white
-                                                    : cell.jelly == 2
-                                                    ? const Color(0xffffb1f4)
-                                                    : Colors.transparent,
-                                                width: 2,
-                                              ),
-                                            ),
-                                            child: TweenAnimationBuilder<Offset>(
-                                              key: ValueKey(
-                                                '${_frame.phase}-$i-${cell.color}',
-                                              ),
-                                              tween: Tween<Offset>(
-                                                begin: _tileOrigin(i),
-                                                end: Offset.zero,
-                                              ),
+                                            child: AnimatedContainer(
                                               duration: const Duration(
-                                                milliseconds: 220,
+                                                milliseconds: 200,
                                               ),
-                                              builder: (context, t, child) =>
-                                                  FractionalTranslation(
-                                                    translation: t,
-                                                    child: child,
-                                                  ),
-                                              child: CustomPaint(
-                                                painter: _SweetPainter(cell),
+                                              decoration: BoxDecoration(
+                                                color: cell.hole
+                                                    ? Colors.transparent
+                                                    : clearing
+                                                    ? const Color(0xffffefaa)
+                                                    : cell.jelly > 0
+                                                    ? const Color(0xffae78c9)
+                                                    : const Color(0xff74577e),
+                                                borderRadius:
+                                                    BorderRadius.circular(8),
+                                                border: Border.all(
+                                                  color: _selected == i
+                                                      ? Colors.white
+                                                      : cell.jelly == 2
+                                                      ? const Color(0xffffb1f4)
+                                                      : Colors.transparent,
+                                                  width: 2,
+                                                ),
+                                              ),
+                                              child: TweenAnimationBuilder<Offset>(
+                                                key: ValueKey(
+                                                  '${_frame.phase}-$i-${cell.color}',
+                                                ),
+                                                tween: Tween<Offset>(
+                                                  begin: _tileOrigin(i),
+                                                  end: Offset.zero,
+                                                ),
+                                                duration: const Duration(
+                                                  milliseconds: 220,
+                                                ),
+                                                builder: (context, t, child) =>
+                                                    FractionalTranslation(
+                                                      translation: t,
+                                                      child: child,
+                                                    ),
+                                                child: CustomPaint(
+                                                  painter: _SweetPainter(cell),
+                                                ),
                                               ),
                                             ),
                                           ),
                                         ),
-                                      ),
-                                    );
-                                  },
+                                      );
+                                    },
+                                  ),
                                 ),
                               ),
                               if (_frame.phase == SweetPhase.clear ||
@@ -548,7 +593,7 @@ class _SweetScreenState extends State<SweetScreen>
                             _booster == 'hammer'
                                 ? 'Toca una casilla con el martillo'
                                 : _booster == 'switch'
-                                ? 'Elige dos premios vecinos para el cambio libre'
+                                ? 'Desliza una ficha para un cambio libre'
                                 : _frame.caption,
                             textAlign: TextAlign.center,
                             style: const TextStyle(
@@ -672,19 +717,28 @@ class _SweetScreenState extends State<SweetScreen>
       style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
     ),
   );
-  Widget _tool(String icon, String count, String type, int remaining) =>
-      OutlinedButton(
-        style: OutlinedButton.styleFrom(
-          backgroundColor: _booster == type ? const Color(0xffffdba8) : null,
-        ),
-        onPressed: _busy || _game.won || _game.lost || remaining <= 0
-            ? null
-            : () => setState(() {
-                _booster = _booster == type ? '' : type;
-                _selected = null;
-              }),
-        child: Text('$icon $count'),
-      );
+  Widget _tool(
+    String icon,
+    String count,
+    String type,
+    int remaining,
+  ) => Tooltip(
+    message: type == 'hammer'
+        ? 'Martillo: toca una casilla para romperla sin gastar un movimiento'
+        : 'Cambio libre: desliza dos fichas vecinas aunque no formen combinación',
+    child: OutlinedButton(
+      style: OutlinedButton.styleFrom(
+        backgroundColor: _booster == type ? const Color(0xffffdba8) : null,
+      ),
+      onPressed: _busy || _game.won || _game.lost || remaining <= 0
+          ? null
+          : () => setState(() {
+              _booster = _booster == type ? '' : type;
+              _selected = null;
+            }),
+      child: Text('$icon $count'),
+    ),
+  );
 }
 
 const _sweetNames = [

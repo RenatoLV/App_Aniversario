@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'cat_character.dart';
+import 'game_audio.dart';
 
 enum _RoomMoment { cuddle, churu, litter, thoughts, yarn, window, food, cards }
 
@@ -174,6 +175,7 @@ class _CatRoomState extends State<CatRoom> with TickerProviderStateMixin {
   }
 
   void _pet(CatKind cat) {
+    GameAudio.instance.play(GameSfx.kitten);
     setState(() => _purring = cat);
     _purr.forward(from: 0);
   }
