@@ -327,6 +327,9 @@ class LeapGame {
 
   void _updateWorld(double viewportHeight) {
     maxHeight = math.max(maxHeight, y);
+    // Keep the gameplay camera locked to the cat's scroll threshold. A lagged
+    // camera can leave the generated platforms outside the viewport during a
+    // jump, making the game look like it changed to an empty map.
     camera = math.max(camera, y - viewportHeight * .57);
     generate(camera + viewportHeight + 180);
     platforms.removeWhere(

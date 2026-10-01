@@ -50,6 +50,20 @@ Color rarityColor(CardRarity rarity) => switch (rarity) {
 
 enum _CollectionSort { rarity, name, copies }
 
+class CoinIcon extends StatelessWidget {
+  final double size;
+  const CoinIcon({super.key, this.size = 20});
+
+  @override
+  Widget build(BuildContext context) => Image.asset(
+    'assets/moneda.gif',
+    width: size,
+    height: size,
+    fit: BoxFit.contain,
+    filterQuality: FilterQuality.high,
+  );
+}
+
 class RinconApp extends StatelessWidget {
   final GameStore store;
   const RinconApp({super.key, required this.store});
@@ -423,7 +437,7 @@ class _RinconHomeState extends State<RinconHome>
           actions: [
             const AudioSettingsButton(),
             Chip(
-              avatar: const Icon(Icons.toll, size: 18),
+              avatar: const CoinIcon(size: 20),
               label: Text('${s.coins}'),
             ),
             const SizedBox(width: 16),
@@ -1243,6 +1257,9 @@ class _RinconHomeState extends State<RinconHome>
               ? null
               : CatKind.values[s.cardOpeners[id]!],
           collectionId: s.cardCollections[id] ?? anniversaryCollectionId,
+          variantKeys: variants,
+          variantCopies: s.cardVariants,
+          selectedKey: selected,
         ),
       );
     } finally {
@@ -2934,13 +2951,20 @@ class _BlockScreenState extends State<BlockScreen>
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          Text(
-                            '🪙 ${store.coins}',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w800,
-                              color: Color(0xffffdf7c),
-                              fontSize: 17,
-                            ),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const CoinIcon(size: 22),
+                              const SizedBox(width: 4),
+                              Text(
+                                '${store.coins}',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xffffdf7c),
+                                  fontSize: 17,
+                                ),
+                              ),
+                            ],
                           ),
                           Text(
                             'RÉCORD  ${store.best}',
@@ -4419,6 +4443,9 @@ class _InspectCardDialog extends StatefulWidget {
   final CatKind? opener;
   final String collectionId;
   final CardFinish finish;
+  final List<String> variantKeys;
+  final Map<String, int> variantCopies;
+  final String? selectedKey;
   const _InspectCardDialog({
     required this.cardId,
     required this.copies,
@@ -4426,6 +4453,9 @@ class _InspectCardDialog extends StatefulWidget {
     required this.opener,
     required this.collectionId,
     this.finish = CardFinish.normal,
+    this.variantKeys = const [],
+    this.variantCopies = const {},
+    this.selectedKey,
   });
 
   @override
@@ -4444,6 +4474,20 @@ class _InspectCardDialogState extends State<_InspectCardDialog>
   double _spinBase = 0;
   final _arTextureKey = GlobalKey();
   bool _arBusy = false;
+  late int _variantIndex;
+
+  String? get _variantKey => widget.variantKeys.isEmpty
+      ? null
+      : widget.variantKeys[_variantIndex];
+  CardRarity get _activeRarity => _variantKey == null
+      ? widget.rarity
+      : CardRarity.values.byName(_variantKey!.split(':')[1]);
+  CardFinish get _activeFinish => _variantKey == null
+      ? widget.finish
+      : CardFinish.values.byName(_variantKey!.split(':')[2]);
+  int get _activeCopies => _variantKey == null
+      ? widget.copies
+      : (widget.variantCopies[_variantKey] ?? widget.copies);
 
   Future<void> _openAr() async {
     if (_arBusy) return;
@@ -4582,6 +4626,9 @@ class _InspectCardDialogState extends State<_InspectCardDialog>
   @override
   void initState() {
     super.initState();
+    _variantIndex = widget.selectedKey == null
+        ? 0
+        : math.max(0, widget.variantKeys.indexOf(widget.selectedKey!));
     _palette = CardPalette(
       primary: cardColor(widget.cardId),
       secondary: const Color(0xff49317b),
@@ -4783,7 +4830,7 @@ class _InspectCardDialogState extends State<_InspectCardDialog>
         child: Column(
           children: [
             Expanded(
-              child: _FoilArt(cardId: widget.cardId, finish: widget.finish),
+              child: _FoilArt(cardId: widget.cardId, finish: _activeFinish),
             ),
             const SizedBox(height: 10),
             Text(
@@ -4857,7 +4904,7 @@ class _InspectCardDialogState extends State<_InspectCardDialog>
             ],
           ),
           child: Text(
-            '${widget.rarity.label.toUpperCase()} · ×${widget.copies}',
+            '${_activeRarity.label.toUpperCase()} · ×$_activeCopies',
             style: const TextStyle(
               color: Colors.white,
               fontSize: 8,
@@ -4909,7 +4956,7 @@ class _InspectCardDialogState extends State<_InspectCardDialog>
                 colors: [Color(0xff563394), Color(0xff211246)],
               ),
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: rarityColor(widget.rarity), width: 4),
+        border: Border.all(color: rarityColor(_activeRarity), width: 4),
         boxShadow: [
           BoxShadow(
             color: _palette.accent.withValues(alpha: .58),
@@ -4933,7 +4980,7 @@ class _InspectCardDialogState extends State<_InspectCardDialog>
                 children: [
                   Expanded(
                     child: Text(
-                      '${widget.rarity.label} · ${cardNames[widget.cardId]}',
+                      '${_activeRarity.label} · ${cardNames[widget.cardId]}',
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
@@ -4981,13 +5028,54 @@ class _InspectCardDialogState extends State<_InspectCardDialog>
                     ..rotateX(_tilt)
                     ..rotateY(front ? _turn : _turn + math.pi),
                   child: _RarityFrame(
-                    rarity: widget.rarity,
+                    rarity: _activeRarity,
                     forceShine: _auto.isAnimating,
                     child: RepaintBoundary(key: _arTextureKey, child: card),
                   ),
                 ),
               ),
               const SizedBox(height: 16),
+              if (widget.variantKeys.length > 1) ...[
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    IconButton(
+                      tooltip: 'Carta acumulada anterior',
+                      onPressed: () => setState(() {
+                        _variantIndex = (_variantIndex - 1 + widget.variantKeys.length) % widget.variantKeys.length;
+                        _turn = 0;
+                      }),
+                      icon: const Icon(Icons.chevron_left_rounded, color: Colors.white),
+                    ),
+                    Text(
+                      'Carta ${_variantIndex + 1} de ${widget.variantKeys.length}',
+                      style: const TextStyle(color: Color(0xffffe79b), fontWeight: FontWeight.w800),
+                    ),
+                    IconButton(
+                      tooltip: 'Carta acumulada siguiente',
+                      onPressed: () => setState(() {
+                        _variantIndex = (_variantIndex + 1) % widget.variantKeys.length;
+                        _turn = 0;
+                      }),
+                      icon: const Icon(Icons.chevron_right_rounded, color: Colors.white),
+                    ),
+                  ],
+                ),
+              ],
+              Wrap(
+                alignment: WrapAlignment.center,
+                spacing: 6,
+                children: [
+                  for (final finish in CardFinish.values)
+                    _FinishChip(
+                      finish: finish,
+                      owned: widget.variantKeys.any((key) =>
+                          key.contains(':${_activeRarity.name}:${finish.name}')),
+                      active: finish == _activeFinish,
+                    ),
+                ],
+              ),
+              const SizedBox(height: 4),
               TextButton.icon(
                 onPressed: _arBusy ? null : _openAr,
                 icon: const Icon(Icons.view_in_ar, color: Color(0xffffe79b)),
@@ -5051,6 +5139,31 @@ class _InspectCardDialogState extends State<_InspectCardDialog>
       ),
     );
   }
+}
+
+class _FinishChip extends StatelessWidget {
+  final CardFinish finish;
+  final bool owned, active;
+  const _FinishChip({required this.finish, required this.owned, required this.active});
+
+  @override
+  Widget build(BuildContext context) => Chip(
+    avatar: Icon(
+      owned ? (finish == CardFinish.gold ? Icons.auto_awesome : Icons.style) : Icons.help_outline,
+      size: 15,
+      color: active ? const Color(0xff3b205f) : const Color(0xffffe79b),
+    ),
+    label: Text(owned ? finish.label : '?'),
+    labelStyle: TextStyle(
+      color: active ? const Color(0xff3b205f) : const Color(0xffffe79b),
+      fontSize: 10,
+      fontWeight: FontWeight.w800,
+    ),
+    backgroundColor: active
+        ? const Color(0xffffe79b)
+        : const Color(0x332f1b58),
+    side: BorderSide(color: owned ? const Color(0xffffe79b) : Colors.white24),
+  );
 }
 
 class CardRevealDialog extends StatefulWidget {

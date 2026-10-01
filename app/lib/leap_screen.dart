@@ -23,6 +23,8 @@ class _LeapScreenState extends State<LeapScreen>
     with TickerProviderStateMixin, WidgetsBindingObserver {
   LeapGame _game = LeapGame();
   CatKind _cat = CatKind.maru;
+  String _trail = 'rainbow';
+  final Set<String> _ownedTrails = {'rainbow'};
   late final Ticker _physics;
   late final AnimationController _breath,
       _tail,
@@ -120,6 +122,8 @@ class _LeapScreenState extends State<LeapScreen>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _best = widget.store.prefs.getInt('leap.best') ?? 0;
+    _trail = widget.store.prefs.getString('leap.trail') ?? 'rainbow';
+    _ownedTrails.addAll(widget.store.prefs.getStringList('leap.trails') ?? const []);
     _breath = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 4),
@@ -278,6 +282,68 @@ class _LeapScreenState extends State<LeapScreen>
       if (!_physics.isActive) _physics.start();
       _focus.requestFocus();
     }
+  }
+
+  Future<void> _openTrailShop() async {
+    const trails = [
+      ('none', 'Sin estela', 'El salto limpio, sin rastro detrás del gato', 0, Icons.block_rounded),
+      ('rainbow', 'Arcoíris', 'La estela clásica de Lady', 0, Icons.auto_awesome),
+      ('starlight', 'Polvo estelar', 'Destellos violetas y azules', 600, Icons.star_rounded),
+      ('bubble', 'Burbujas', 'Pompas turquesa con brillo', 1200, Icons.bubble_chart_rounded),
+      ('flame', 'Llamas dulces', 'Chispas cálidas al saltar', 2000, Icons.local_fire_department_rounded),
+      ('aurora', 'Aurora boreal', 'Cintas luminosas verdes y violetas', 3500, Icons.waves_rounded),
+      ('hearts', 'Corazones cósmicos', 'Corazones rosas que flotan al saltar', 5000, Icons.favorite_rounded),
+      ('comet', 'Cometa dorado', 'Una cola dorada con estrellas fugaces', 7500, Icons.bolt_rounded),
+      ('galaxy', 'Galaxia', 'Una espiral de estrellas y polvo cósmico', 10000, Icons.nights_stay_rounded),
+    ];
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 18),
+          children: [
+            const Text('Tienda de estelas', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
+            const Text('Equipa una estela para verla detrás de Maru o Lady.'),
+            const SizedBox(height: 10),
+            for (final trail in trails)
+              ListTile(
+                leading: Icon(trail.$5, color: const Color(0xff7045c7)),
+                title: Text(trail.$2),
+                subtitle: Text(trail.$3),
+                trailing: _trail == trail.$1
+                    ? const Chip(label: Text('EQUIPADA'))
+                    : _ownedTrails.contains(trail.$1)
+                    ? OutlinedButton(
+                        onPressed: () async {
+                          await widget.store.prefs.setString('leap.trail', trail.$1);
+                          if (mounted) setState(() => _trail = trail.$1);
+                          if (context.mounted) Navigator.pop(context);
+                        },
+                        child: const Text('Equipar'),
+                      )
+                    : FilledButton(
+                        onPressed: widget.store.coins < trail.$4
+                            ? null
+                            : () async {
+                                if (trail.$4 > 0) {
+                                  widget.store.coins -= trail.$4;
+                                  await widget.store.save();
+                                }
+                                _ownedTrails.add(trail.$1);
+                                await widget.store.prefs.setStringList('leap.trails', _ownedTrails.toList());
+                                await widget.store.prefs.setString('leap.trail', trail.$1);
+                                if (mounted) setState(() => _trail = trail.$1);
+                                if (context.mounted) Navigator.pop(context);
+                              },
+                        child: Text(trail.$4 == 0 ? 'Equipar' : '${trail.$4} 🪙'),
+                      ),
+              ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -545,7 +611,7 @@ class _LeapScreenState extends State<LeapScreen>
                                 _dragOrigins.remove(e.pointer);
                               }),
                               child: CustomPaint(
-                                painter: LeapWorldPainter(_game, _cat),
+                                painter: LeapWorldPainter(_game, _cat, trail: _trail),
                               ),
                             ),
                           ),
@@ -1047,6 +1113,12 @@ class _LeapScreenState extends State<LeapScreen>
                                               ],
                                             ),
                                             const SizedBox(height: 12),
+                                            OutlinedButton.icon(
+                                              onPressed: _openTrailShop,
+                                              icon: const Icon(Icons.storefront_rounded),
+                                              label: Text('Tienda de estelas · ${widget.store.coins} 🪙'),
+                                            ),
+                                            const SizedBox(height: 8),
                                             const Text(
                                               'Arrastra el dedo a izquierda o derecha para dirigir el salto. También puedes mantener un lado o usar las flechas.\n\n🚀 Cohete: impulso de 2,4 s.\n🛸 OVNI: la nave te recoge y te lleva arriba.\n☂️ Paraguas: caída lenta durante 8 s.\nLos trampolines dorados te impulsan más alto.\nEvita las nubes eléctricas.',
                                               textAlign: TextAlign.center,
@@ -1145,7 +1217,51 @@ class _LeapScreenState extends State<LeapScreen>
 class LeapWorldPainter extends CustomPainter {
   final LeapGame game;
   final CatKind cat;
-  LeapWorldPainter(this.game, this.cat);
+  final String trail;
+  LeapWorldPainter(this.game, this.cat, {this.trail = 'rainbow'});
+
+  void _zoneHazard(Canvas canvas, Offset at, double width, LeapWorldZone zone, int seed) {
+    final space = zone == LeapWorldZone.space;
+    final portal = zone == LeapWorldZone.upperSky || zone == LeapWorldZone.heaven;
+    final color = space ? const Color(0xffff5368) : portal ? const Color(0xffff793d) : zone == LeapWorldZone.underground ? const Color(0xffbd83ff) : const Color(0xfff59b57);
+    canvas.save();
+    canvas.translate(at.dx, at.dy);
+    final bounds = Rect.fromLTWH(-width / 2, -23, width, 30);
+    canvas.drawOval(bounds.inflate(5), Paint()..color = color.withValues(alpha: .18 + math.sin(game.clock * 6 + seed) * .06)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6));
+    if (space) {
+      canvas.drawPath(Path()..moveTo(-width / 2, 5)..lineTo(-width * .22, -10)..quadraticBezierTo(0, -25, width * .22, -10)..lineTo(width / 2, 5)..quadraticBezierTo(0, 17, -width / 2, 5)..close(), Paint()..color = const Color(0xffa72d46));
+      canvas.drawOval(Rect.fromLTWH(-16, -20, 32, 19), Paint()..color = const Color(0xff99ffcf));
+      for (var i = 0; i < 5; i++) {
+        canvas.drawCircle(Offset(-width * .35 + i * width * .175, 3), 2.5, Paint()..color = color.withValues(alpha: .6 + math.sin(game.clock * 9 + i) * .35));
+      }
+    } else if (portal) {
+      canvas.drawOval(bounds, Paint()..color = const Color(0xff270e3e));
+      for (var i = 0; i < 3; i++) {
+        canvas.drawOval(bounds.deflate(i * 3), Paint()..color = color.withValues(alpha: .8 - i * .2)..style = PaintingStyle.stroke..strokeWidth = 2);
+      }
+    } else if (zone == LeapWorldZone.city || zone == LeapWorldZone.neighborhood) {
+      canvas.drawRRect(RRect.fromRectAndRadius(bounds, const Radius.circular(4)), Paint()..color = const Color(0xff3c465b));
+      final sparks = Path()..moveTo(-width / 2, -8);
+      for (var i = 1; i <= 10; i++) {
+        sparks.lineTo(-width / 2 + width * i / 10, -8 + math.sin(game.clock * 15 + i * 3) * 8);
+      }
+      canvas.drawPath(sparks, Paint()..color = const Color(0xffffdd75)..style = PaintingStyle.stroke..strokeWidth = 2);
+    } else {
+      for (var i = 0; i < 5; i++) {
+        final x = -width / 2 + i * width / 5;
+        final peak = -15.0 - (i % 2) * 9;
+        canvas.drawPath(Path()..moveTo(x, 6)..lineTo(x + width / 10, peak)..lineTo(x + width / 5, 6)..close(), Paint()..color = Color.lerp(color, const Color(0xff422c55), i / 7)!);
+        canvas.drawLine(Offset(x + width / 10, peak + 4), Offset(x + width / 10, 3), Paint()..color = Colors.white.withValues(alpha: .4)..strokeWidth = 1);
+      }
+    }
+    for (var i = 0; i < 8; i++) {
+      final t = (game.clock * .9 + i / 8) % 1;
+      final angle = i * math.pi / 4 + game.clock * .5;
+      final point = Offset(math.cos(angle) * width * (.25 + t * .3), -5 + math.sin(angle) * (10 + t * 14));
+      canvas.drawCircle(point, 1.5 * (1 - t), Paint()..color = color.withValues(alpha: 1 - t));
+    }
+    canvas.restore();
+  }
   @override
   void paint(Canvas canvas, Size size) {
     canvas.save();
@@ -1291,8 +1407,22 @@ class LeapWorldPainter extends CustomPainter {
     if (game.umbrellaOpen) {
       _umbrella(canvas, Offset(game.x, foot - 77), game.clock);
     }
-    if (cat == CatKind.lady && game.vy > 0 && !game.boosting) {
-      const colors = [
+    if (trail != 'none' && game.vy > 0 && !game.boosting) {
+      final colors = trail == 'aurora'
+          ? [const Color(0xff5affca), const Color(0xff77baff), const Color(0xffcd83ff)]
+          : trail == 'hearts'
+          ? [const Color(0xffff6baf), const Color(0xffffb4da), const Color(0xffff86bb)]
+          : trail == 'comet'
+          ? [const Color(0xffffd354), const Color(0xffffefae), const Color(0xffffa64d)]
+          : trail == 'galaxy'
+          ? [const Color(0xff926bff), const Color(0xff5ddfff), const Color(0xffff8cdd)]
+          : trail == 'starlight'
+          ? [const Color(0xffa98cff), const Color(0xff55d7ff), const Color(0xffd4b4ff)]
+          : trail == 'bubble'
+          ? [const Color(0xff72f4e4), const Color(0xff8ce7ff), const Color(0xffb7fff1)]
+          : trail == 'flame'
+          ? [const Color(0xffff6b61), const Color(0xffffb347), const Color(0xffffe07a)]
+          : [
         Color(0xffef86a1),
         Color(0xffffc078),
         Color(0xffffe98c),
@@ -1300,23 +1430,70 @@ class LeapWorldPainter extends CustomPainter {
         Color(0xff90d6ff),
         Color(0xffb7a0e9),
       ];
-      for (var n = 0; n < 6; n++) {
+      final count = trail == 'rainbow' ? 6 : 3;
+      final trailOffset = game.vx.abs() < 1
+          ? 0.0
+          : -game.vx.sign * math.min(game.vx.abs() * .08, 22);
+      for (var n = 0; n < count; n++) {
         final path = Path()
-          ..moveTo(game.x - 19 + n * 5, foot - 18)
+          // Keep the trail behind the cat's feet. Starting above the foot
+          // made it appear to pass through the character during jumps.
+          ..moveTo(game.x - (count - 1) * 2.5 + n * 5, foot - 8)
           ..quadraticBezierTo(
-            game.x - game.vx * .12 + n * 5,
-            foot + 35,
-            game.x - game.vx * .22 + n * 5,
-            foot + 80,
+            game.x + trailOffset - 14 + n * 5,
+            foot + 28,
+            game.x + trailOffset - 14 + n * 5,
+            foot + 64,
           );
-        canvas.drawPath(
+        if (trail == 'rainbow' || trail == 'aurora' || trail == 'comet') {
+          canvas.drawPath(
           path,
           Paint()
-            ..color = colors[n].withValues(alpha: .55)
+            ..shader = LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [colors[n % colors.length].withValues(alpha: .7), colors[n % colors.length].withValues(alpha: 0)],
+            ).createShader(Rect.fromLTWH(game.x - 40, foot - 8, 80, 72))
             ..style = PaintingStyle.stroke
-            ..strokeWidth = 5
+            ..strokeWidth = trail == 'bubble' ? 7 : 5
             ..strokeCap = StrokeCap.round,
         );
+        }
+        if (trail == 'bubble') {
+          canvas.drawCircle(
+            Offset(game.x - game.vx * .18 + n * 7, foot + 35 + math.sin(game.clock * 3 + n) * 8),
+            4 + (n % 2) * 3,
+            Paint()..color = colors[n % colors.length].withValues(alpha: .42),
+          );
+        }
+      }
+      for (var n = 0; n < 14 && trail != 'rainbow'; n++) {
+        final age = (game.clock * 1.4 + n / 14) % 1;
+        final spread = math.sin(n * 2.4 + game.clock * 2) * (4 + age * 17);
+        final at = Offset(game.x + trailOffset * age + spread, foot - 6 + age * 78);
+        final radius = (1 - age) * 4 + .5;
+        final ink = Paint()..color = colors[n % colors.length].withValues(alpha: (1 - age) * .8);
+        if (trail == 'bubble') {
+          ink..style = PaintingStyle.stroke..strokeWidth = 1.2;
+          canvas.drawCircle(at, radius + 2, ink);
+        } else if (trail == 'hearts') {
+          canvas.drawPath(Path()
+            ..moveTo(at.dx, at.dy + radius)
+            ..cubicTo(at.dx - radius * 2, at.dy, at.dx - radius, at.dy - radius * 2, at.dx, at.dy - radius * .5)
+            ..cubicTo(at.dx + radius, at.dy - radius * 2, at.dx + radius * 2, at.dy, at.dx, at.dy + radius)
+            ..close(), ink);
+        } else if (trail == 'flame') {
+          canvas.drawOval(Rect.fromCenter(center: at, width: radius * 2, height: radius * 4), ink);
+        } else {
+          final star = Path();
+          for (var point = 0; point < 8; point++) {
+            final angle = point * math.pi / 4;
+            final r = point.isEven ? radius * 1.6 : radius * .4;
+            final x = at.dx + math.cos(angle) * r, y = at.dy + math.sin(angle) * r;
+            if (point == 0) { star.moveTo(x, y); } else { star.lineTo(x, y); }
+          }
+          canvas.drawPath(star..close(), ink);
+        }
       }
     }
     if (game.boosting) {
@@ -1329,7 +1506,9 @@ class LeapWorldPainter extends CustomPainter {
       final opacity = 1 - vanish;
       final y = height - (platform.y - game.camera) + vanish * 14;
       if (y < -40 || y > height + 40) continue;
-      if (platform.kind == LeapPlatformKind.rock) {
+      if (platform.kind == LeapPlatformKind.storm && game.zoneAt(platform.y) != LeapWorldZone.skyscrapers) {
+        _zoneHazard(canvas, Offset(platform.x, y), platform.width, game.zoneAt(platform.y), platform.id);
+      } else if (platform.kind == LeapPlatformKind.rock) {
         final subterranean = platform.y < LeapGame.meadowHeight;
         final left = platform.x - platform.width / 2,
             right = platform.x + platform.width / 2;

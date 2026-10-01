@@ -105,9 +105,18 @@ class SweetGame {
   final List<int> _secondColors = [];
   List<int> _celebrations = [];
   SweetEffect _effect = SweetEffect.match;
-  SweetGame({this.level = 1, int seed = 73421})
+  SweetGame({
+    this.level = 1,
+    int seed = 73421,
+    int? hammers,
+    int? switches,
+    int? extraMoves,
+  })
     : randomState = seed,
       id = '$seed-$level' {
+    this.hammers = hammers ?? 3;
+    this.switches = switches ?? 2;
+    this.extraMoves = extraMoves ?? 1;
     cells = List.generate(size * size, (i) => SweetCell());
     // New mechanics enter progressively; targets stay visible under the pieces.
     for (var y = 2; y <= 6; y++) {

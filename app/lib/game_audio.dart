@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
@@ -33,7 +34,8 @@ class GameAudio with WidgetsBindingObserver {
   SharedPreferences? _prefs;
   final Map<GameSfx, AudioPlayer> _effects = {};
   final Map<GameSfx, int> _lastEffect = {};
-  final Map<String, String> _tracks = {};
+  final Map<String, List<String>> _tracks = {};
+  final Map<String, int> _trackIndex = {};
   final Set<AudioPlayer> _musicPlayers = {};
   final Stopwatch _clock = Stopwatch()..start();
   AudioPlayer? _music;
@@ -69,8 +71,16 @@ class GameAudio with WidgetsBindingObserver {
               )
               as Map<String, dynamic>;
       for (final entry in manifest.entries) {
-        if (entry.value is String && (entry.value as String).isNotEmpty) {
-          _tracks[entry.key] = 'audio/music/${entry.value}';
+        final values = entry.value is List
+            ? (entry.value as List).whereType<String>().toList()
+            : entry.value is String && (entry.value as String).isNotEmpty
+            ? [entry.value as String]
+            : <String>[];
+        if (values.isNotEmpty) {
+          _tracks[entry.key] = [
+            for (final value in values) 'audio/music/$value',
+          ];
+          _trackIndex[entry.key] = math.Random().nextInt(values.length);
         }
       }
     } catch (_) {
@@ -122,6 +132,15 @@ class GameAudio with WidgetsBindingObserver {
     _queueMusic();
   }
 
+  /// Skip the current song and start the next one in this scene's rotation.
+  void skipMusic() {
+    final list = _tracks[_scene];
+    if (list == null || list.length < 2) return;
+    _trackIndex[_scene] = ((_trackIndex[_scene] ?? 0) + 1) % list.length;
+    _musicAsset = null;
+    _queueMusic();
+  }
+
   void pauseGame(bool paused) {
     _paused = paused;
     if (paused) _silenceNow();
@@ -147,6 +166,7 @@ class GameAudio with WidgetsBindingObserver {
     double? sfxGain,
     double? musicGain,
   }) {
+    final musicStateChanged = music != null && music != musicEnabled;
     effectsEnabled = effects ?? effectsEnabled;
     musicEnabled = music ?? musicEnabled;
     effectsVolume = (sfxGain ?? effectsVolume).clamp(0, 1);
@@ -162,6 +182,12 @@ class GameAudio with WidgetsBindingObserver {
         );
       }
     }
+    // Changing a slider must never restart or crossfade the current song.
+    // Update the active player directly and preserve its playback position.
+    if (musicGain != null && _music != null && musicEnabled) {
+      _currentGain = musicVolume;
+      unawaited(_safe(() => _music!.setVolume(musicVolume)));
+    }
     unawaited(
       _safe(() async {
         await _prefs?.setBool('audio.effects', effectsEnabled);
@@ -171,14 +197,15 @@ class GameAudio with WidgetsBindingObserver {
       }),
     );
     changes.value++;
-    _queueMusic();
+    if (musicStateChanged) _queueMusic();
   }
 
   void _queueMusic() {
     final revision = ++_revision;
     if (_prefs == null || !_unlocked) return;
-    final asset = musicEnabled && !_background && !_paused
-        ? _tracks[_scene]
+    final list = _tracks[_scene];
+    final asset = musicEnabled && !_background && !_paused && list != null
+        ? list[_trackIndex[_scene] ?? 0]
         : null;
     // Serial transitions plus revision checks prevent an old screen from
     // starting its music after a faster navigation has already selected another.
@@ -207,7 +234,16 @@ class GameAudio with WidgetsBindingObserver {
       if (asset != null) {
         next = AudioPlayer();
         _musicPlayers.add(next);
-        await next.setReleaseMode(ReleaseMode.loop);
+        await next.setReleaseMode(ReleaseMode.stop);
+        final player = next;
+        player.onPlayerComplete.listen((_) {
+          if (_music != player) return;
+          final list = _tracks[_scene];
+          if (list == null || list.length < 2) return;
+          _trackIndex[_scene] = ((_trackIndex[_scene] ?? 0) + 1) % list.length;
+          _musicAsset = null;
+          _queueMusic();
+        });
         await next.play(AssetSource(asset), volume: 0);
       }
       for (var i = 1; i <= 20; i++) {
@@ -307,7 +343,16 @@ class AudioSettingsButton extends StatelessWidget {
                         onChanged: audio.effectsEnabled
                             ? (v) => audio.configure(sfxGain: v)
                             : null,
-                        onChangeEnd: (_) => audio.play(GameSfx.kitten),
+                      ),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton.icon(
+                          onPressed: audio.musicEnabled
+                              ? audio.skipMusic
+                              : null,
+                          icon: const Icon(Icons.skip_next_rounded),
+                          label: const Text('Siguiente canción'),
+                        ),
                       ),
                       SwitchListTile(
                         contentPadding: EdgeInsets.zero,

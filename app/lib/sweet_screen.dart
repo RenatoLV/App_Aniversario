@@ -33,6 +33,8 @@ class _SweetScreenState extends State<SweetScreen>
   int? _selected;
   String _booster = '';
   Offset? _dragStart;
+  String? _powerAction;
+  int? _powerTarget;
   @override
   void initState() {
     super.initState();
@@ -98,6 +100,12 @@ class _SweetScreenState extends State<SweetScreen>
       return;
     }
     GameAudio.instance.play(GameSfx.place);
+    if (_booster == 'switch') {
+      _powerAction = 'switch';
+      _powerTarget = b;
+      _cats.duration = const Duration(milliseconds: 720);
+      _cats.forward(from: 0);
+    }
     final moved = _game.move(a, b, free: _booster == 'switch');
     if (moved) _booster = '';
     _selected = null;
@@ -128,7 +136,7 @@ class _SweetScreenState extends State<SweetScreen>
           milliseconds: switch (frame.phase) {
             SweetPhase.clear => 360,
             SweetPhase.enchant => 450,
-            SweetPhase.swap || SweetPhase.input => 220,
+            SweetPhase.swap || SweetPhase.input => 300,
             SweetPhase.gravity => 220,
             SweetPhase.spawn => 220,
             SweetPhase.victory => 500,
@@ -155,6 +163,10 @@ class _SweetScreenState extends State<SweetScreen>
             : caption ?? 'Desliza una ficha hacia su vecina para combinar 3.',
       );
     });
+    if (mounted && _powerAction != null) {
+      await Future<void>.delayed(const Duration(milliseconds: 180));
+      if (mounted) setState(() { _powerAction = null; _powerTarget = null; });
+    }
   }
 
   void _tap(int i) {
@@ -163,6 +175,10 @@ class _SweetScreenState extends State<SweetScreen>
       if (_game.hammer(i)) {
         _booster = '';
         _selected = null;
+        _powerAction = 'hammer';
+        _powerTarget = i;
+        _cats.duration = const Duration(milliseconds: 760);
+        _cats.forward(from: 0);
         _replay();
       }
       return;
@@ -226,9 +242,14 @@ class _SweetScreenState extends State<SweetScreen>
       _game = SweetGame(
         level: _game.level + (next ? 1 : 0),
         seed: DateTime.now().millisecondsSinceEpoch & 0xffffffff,
+        hammers: _game.hammers + (next ? 1 : 0),
+        switches: _game.switches + (next ? 1 : 0),
+        extraMoves: _game.extraMoves + (next ? 1 : 0),
       );
       _selected = null;
       _booster = '';
+      _powerAction = null;
+      _powerTarget = null;
       _frame = SweetFrame(
         _game,
         SweetPhase.input,
@@ -366,11 +387,7 @@ class _SweetScreenState extends State<SweetScreen>
                           Expanded(child: _stat('🍮', '$jelly', 'gelatinas')),
                           const SizedBox(width: 8),
                           Expanded(
-                            child: _stat(
-                              '🐾',
-                              '${_frame.moves}',
-                              'movimientos',
-                            ),
+                            child: _movementStat(),
                           ),
                         ],
                       ),
@@ -482,13 +499,22 @@ class _SweetScreenState extends State<SweetScreen>
                                                   end: Offset.zero,
                                                 ),
                                                 duration: const Duration(
-                                                  milliseconds: 220,
+                                                  milliseconds: 300,
                                                 ),
-                                                builder: (context, t, child) =>
-                                                    FractionalTranslation(
-                                                      translation: t,
-                                                      child: child,
+                                                curve: Curves.easeOutCubic,
+                                                builder: (context, t, child) {
+                                                  // Move by the real grid step so the
+                                                  // candy tracks the neighbouring cell
+                                                  // even when the board has spacing.
+                                                  final step = (boardSize - 8) / 9;
+                                                  return Transform.translate(
+                                                    offset: Offset(
+                                                      t.dx * step,
+                                                      t.dy * step,
                                                     ),
+                                                    child: child,
+                                                  );
+                                                },
                                                 child: CustomPaint(
                                                   painter: _SweetPainter(cell),
                                                 ),
@@ -501,6 +527,60 @@ class _SweetScreenState extends State<SweetScreen>
                                   ),
                                 ),
                               ),
+                              if (_powerAction != null && _powerTarget != null)
+                                Positioned.fill(
+                                  child: IgnorePointer(
+                                    child: AnimatedBuilder(
+                                      animation: _cats,
+                                      builder: (context, _) {
+                                        final t = Curves.easeOutCubic.transform(_cats.value);
+                                        final target = _powerTarget!;
+                                        final cell = boardSize / 9;
+                                        final center = Offset(
+                                          (target % 9 + .5) * cell,
+                                          (target ~/ 9 + .5) * cell,
+                                        );
+                                        final hammer = _powerAction == 'hammer';
+                                        final start = hammer
+                                            ? Offset(center.dx - cell * 1.7, center.dy - cell * 1.5)
+                                            : Offset(center.dx - cell * 2.2, center.dy);
+                                        final end = hammer
+                                            ? Offset(center.dx - cell * .25, center.dy - cell * .85)
+                                            : Offset(center.dx + cell * .8, center.dy);
+                                        final pos = Offset.lerp(start, end, t)!;
+                                        return Stack(
+                                          children: [
+                                            Positioned(
+                                              left: pos.dx - 29,
+                                              top: pos.dy - 29,
+                                              child: Transform.rotate(
+                                                angle: hammer
+                                                    ? -.55 + math.sin(t * math.pi * 4) * .65
+                                                    : math.sin(t * math.pi * 2) * .12,
+                                                child: CatActor(
+                                                  cat: hammer ? CatKind.maru : CatKind.lady,
+                                                  size: 58,
+                                                  action: CatAction.blocks,
+                                                  active: true,
+                                                  showLabel: false,
+                                                ),
+                                              ),
+                                            ),
+                                            if (hammer && t > .58)
+                                              Positioned(
+                                                left: center.dx - 18,
+                                                top: center.dy - 18,
+                                                child: Transform.scale(
+                                                  scale: (t - .58) / .42,
+                                                  child: const Text('✦', style: TextStyle(fontSize: 38, color: Color(0xffffe36f), shadows: [Shadow(color: Colors.white, blurRadius: 12)])),
+                                                ),
+                                              ),
+                                          ],
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                ),
                               if (_frame.phase == SweetPhase.clear ||
                                   _frame.phase == SweetPhase.enchant)
                                 Positioned.fill(
@@ -717,6 +797,29 @@ class _SweetScreenState extends State<SweetScreen>
       style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
     ),
   );
+
+  Widget _movementStat() => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(14),
+    ),
+    child: FittedBox(
+      fit: BoxFit.scaleDown,
+      child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 360),
+          transitionBuilder: (child, animation) => ScaleTransition(
+            scale: CurvedAnimation(parent: animation, curve: Curves.easeOutBack),
+            child: child,
+          ),
+          child: Text(
+            '🐾 ${_frame.moves} movimientos',
+            key: ValueKey(_frame.moves),
+            style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14),
+          ),
+      ),
+    ),
+  );
   Widget _tool(
     String icon,
     String count,
@@ -736,7 +839,34 @@ class _SweetScreenState extends State<SweetScreen>
               _booster = _booster == type ? '' : type;
               _selected = null;
             }),
-      child: Text('$icon $count'),
+      child: AnimatedScale(
+        scale: _booster == type ? 1.08 : 1,
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutBack,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 2),
+              child: Text('$icon $count'),
+            ),
+            if (_booster == type)
+              Positioned(
+                right: -12,
+                top: -25,
+                child: IgnorePointer(
+                  child: CatActor(
+                    cat: type == 'hammer' ? CatKind.maru : CatKind.lady,
+                    size: 28,
+                    action: CatAction.blocks,
+                    active: true,
+                    showLabel: false,
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
     ),
   );
 }
@@ -932,6 +1062,27 @@ class _SweetPainter extends CustomPainter {
         canvas.drawLine(const Offset(5, 5), const Offset(35, 35), p);
         canvas.drawLine(const Offset(35, 5), const Offset(5, 35), p);
         canvas.drawCircle(const Offset(20, 20), 6, p);
+      }
+    }
+    if (cell.jelly > 0 && !cell.hole) {
+      final jellyPaint = Paint()
+        ..color = const Color(0xffffc9f5).withValues(alpha: .42)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.4;
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          const Rect.fromLTWH(2.5, 2.5, 35, 35),
+          const Radius.circular(8),
+        ),
+        jellyPaint,
+      );
+      jellyPaint
+        ..color = Colors.white.withValues(alpha: .34)
+        ..style = PaintingStyle.fill;
+      canvas.drawOval(const Rect.fromLTWH(8, 7, 8, 3), jellyPaint);
+      if (cell.jelly > 1) {
+        jellyPaint.color = const Color(0xffffefff).withValues(alpha: .55);
+        canvas.drawOval(const Rect.fromLTWH(25, 29, 7, 3), jellyPaint);
       }
     }
     canvas.restore();
