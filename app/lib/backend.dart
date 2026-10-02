@@ -24,6 +24,25 @@ class Backend {
   static bool _googleReady = false;
   static String? _nickname;
 
+  static String loginErrorMessage(Object error) {
+    if (error is GoogleSignInException) {
+      if (error.code == GoogleSignInExceptionCode.canceled) {
+        return 'Inicio de sesión cancelado.';
+      }
+      return 'Google no pudo completar el acceso (${error.code.name}). ${error.description ?? "Revisa Google Play Services y tu conexión."}';
+    }
+    if (error is FirebaseAuthException) {
+      return 'Firebase no pudo validar el acceso (${error.code}). ${error.message ?? "Vuelve a intentarlo."}';
+    }
+    if (error is FirebaseException) {
+      return 'El acceso a los datos falló (${error.plugin}: ${error.code}). ${error.message ?? "Vuelve a intentarlo."}';
+    }
+    if (error is TimeoutException) {
+      return 'La conexión tardó demasiado. Vuelve a intentarlo.';
+    }
+    return 'No pudimos completar el acceso: $error';
+  }
+
   static Future<void> initialize() async {
     try {
       await Firebase.initializeApp(options: AppFirebaseOptions.current);
@@ -66,10 +85,16 @@ class Backend {
         await auth.signInWithPopup(provider);
       } else {
         if (!_googleReady) {
-          await GoogleSignIn.instance.initialize();
+          await GoogleSignIn.instance.initialize(
+            serverClientId:
+                '273979503185-uedtn2kteikv8u0gi0tvqb7otpa9gkje.apps.googleusercontent.com',
+          );
           _googleReady = true;
         }
         final account = await GoogleSignIn.instance.authenticate();
+        if (account.authentication.idToken == null) {
+          throw StateError('Google no entregó el token de acceso.');
+        }
         await auth.signInWithCredential(
           GoogleAuthProvider.credential(
             idToken: account.authentication.idToken,

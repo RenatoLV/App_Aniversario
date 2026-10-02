@@ -4,6 +4,26 @@ async function main() {
   const account = auth.getGlobalDefaultAccount();
   if (!account) throw Error('Run firebase login first');
   const token = await auth.getAccessToken(account.tokens.refresh_token, ['https://www.googleapis.com/auth/cloud-platform']);
+  if (process.argv.includes('--auth-config')) {
+    const headers = {Authorization:'Bearer '+token.access_token};
+    const base = 'https://identitytoolkit.googleapis.com/admin/v2/projects/cumplemes/defaultSupportedIdpConfigs/google.com';
+    const provider = await (await fetch(base,{headers})).json();
+    console.log('Google provider', JSON.stringify({enabled:provider.enabled,clientId:provider.clientId,error:provider.error?.message}));
+    const config = require('../android/app/google-services.json');
+    const key = config.client[0].api_key[0].current_key;
+    const loginProbe = await fetch('https://identitytoolkit.googleapis.com/v1/accounts:createAuthUri?key='+encodeURIComponent(key), {
+      method:'POST', headers:{'Content-Type':'application/json','X-Android-Package':'cl.nuestrorincon.nuestro_rincon','X-Android-Cert':'EFDD2C7633E0AD0B824B9E00C086B6EB55F4B916'},
+      body:JSON.stringify({providerId:'google.com',continueUri:'http://localhost'})
+    });
+    const probe = await loginProbe.json();
+    console.log('Android authentication API probe',JSON.stringify({status:loginProbe.status,error:probe.error?.message}));
+    const lookup = await (await fetch('https://apikeys.googleapis.com/v2/keys:lookupKey?keyString='+encodeURIComponent(key),{headers})).json();
+    if (lookup.name) {
+      const info = await (await fetch('https://apikeys.googleapis.com/v2/'+lookup.name,{headers})).json();
+      console.log('Android API restrictions',JSON.stringify(info.restrictions || {}));
+    } else console.log('Key lookup',JSON.stringify({error:lookup.error?.message}));
+    return;
+  }
   if (process.argv.includes('--migrate-leaderboard') || process.argv.includes('--audit-leaderboard')) {
     const base = 'https://firestore.googleapis.com/v1/projects/cumplemes/databases/(default)/documents';
     const headers = {Authorization:'Bearer '+token.access_token,'Content-Type':'application/json'};

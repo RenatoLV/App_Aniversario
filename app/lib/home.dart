@@ -254,12 +254,9 @@ class _RinconHomeState extends State<RinconHome>
     try {
       await Backend.activate('', '', chooseNickname: _chooseNickname);
       await _refreshCloud();
-    } catch (_) {
+    } catch (error) {
       if (mounted) {
-        setState(
-          () => _cloudError =
-              'No se pudo iniciar sesión. Comprueba que Google esté habilitado en Firebase y vuelve a intentarlo.',
-        );
+        setState(() => _cloudError = Backend.loginErrorMessage(error));
       }
     } finally {
       if (mounted) setState(() => _cloudBusy = false);
@@ -438,10 +435,7 @@ class _RinconHomeState extends State<RinconHome>
           actions: [
             const AudioSettingsButton(),
             const AppUpdateButton(),
-            Chip(
-              avatar: const CoinIcon(size: 20),
-              label: Text('${s.coins}'),
-            ),
+            Chip(avatar: const CoinIcon(size: 20), label: Text('${s.coins}')),
             const SizedBox(width: 16),
           ],
         ),
@@ -3159,47 +3153,15 @@ class _BlockScreenState extends State<BlockScreen>
                                             borderRadius: BorderRadius.circular(
                                               5,
                                             ),
-                                            border: Border(
-                                              top: BorderSide(
-                                                color: ghost
-                                                    ? Colors.white
-                                                    : g.board[i] > 0
-                                                    ? Colors.white.withValues(
-                                                        alpha: .84,
-                                                      )
-                                                    : const Color(0xff473a71),
-                                                width: ghost ? 2 : 1.2,
-                                              ),
-                                              left: BorderSide(
-                                                color: ghost
-                                                    ? Colors.white
-                                                    : g.board[i] > 0
-                                                    ? Colors.white.withValues(
-                                                        alpha: .60,
-                                                      )
-                                                    : const Color(0xff413461),
-                                                width: ghost ? 2 : 1,
-                                              ),
-                                              bottom: BorderSide(
-                                                color: g.board[i] > 0
-                                                    ? Colors.black.withValues(
-                                                        alpha: .24,
-                                                      )
-                                                    : Colors.black.withValues(
-                                                        alpha: .16,
-                                                      ),
-                                                width: 2,
-                                              ),
-                                              right: BorderSide(
-                                                color: g.board[i] > 0
-                                                    ? Colors.black.withValues(
-                                                        alpha: .19,
-                                                      )
-                                                    : Colors.black.withValues(
-                                                        alpha: .10,
-                                                      ),
-                                                width: 1.5,
-                                              ),
+                                            border: Border.all(
+                                              color: ghost
+                                                  ? Colors.white
+                                                  : g.board[i] > 0
+                                                  ? Colors.white.withValues(
+                                                      alpha: .84,
+                                                    )
+                                                  : const Color(0xff473a71),
+                                              width: ghost ? 2 : 1.2,
                                             ),
                                             boxShadow: ghost || g.board[i] > 0
                                                 ? [
@@ -3394,9 +3356,9 @@ class _BlockScreenState extends State<BlockScreen>
                                           (draggable, context, position) =>
                                               Offset(
                                                 boardStep / 2,
-                                                boardStep / 2 + 72,
+                                                boardStep / 2,
                                               ),
-                                      feedbackOffset: const Offset(0, -72),
+                                      feedbackOffset: Offset.zero,
                                       onDragStarted: () => store.selectPiece(t),
                                       onDraggableCanceled: (_, _) =>
                                           setState(() => _hover = null),
@@ -4478,9 +4440,8 @@ class _InspectCardDialogState extends State<_InspectCardDialog>
   bool _arBusy = false;
   late int _variantIndex;
 
-  String? get _variantKey => widget.variantKeys.isEmpty
-      ? null
-      : widget.variantKeys[_variantIndex];
+  String? get _variantKey =>
+      widget.variantKeys.isEmpty ? null : widget.variantKeys[_variantIndex];
   CardRarity get _activeRarity => _variantKey == null
       ? widget.rarity
       : CardRarity.values.byName(_variantKey!.split(':')[1]);
@@ -5044,22 +5005,34 @@ class _InspectCardDialogState extends State<_InspectCardDialog>
                     IconButton(
                       tooltip: 'Carta acumulada anterior',
                       onPressed: () => setState(() {
-                        _variantIndex = (_variantIndex - 1 + widget.variantKeys.length) % widget.variantKeys.length;
+                        _variantIndex =
+                            (_variantIndex - 1 + widget.variantKeys.length) %
+                            widget.variantKeys.length;
                         _turn = 0;
                       }),
-                      icon: const Icon(Icons.chevron_left_rounded, color: Colors.white),
+                      icon: const Icon(
+                        Icons.chevron_left_rounded,
+                        color: Colors.white,
+                      ),
                     ),
                     Text(
                       'Carta ${_variantIndex + 1} de ${widget.variantKeys.length}',
-                      style: const TextStyle(color: Color(0xffffe79b), fontWeight: FontWeight.w800),
+                      style: const TextStyle(
+                        color: Color(0xffffe79b),
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                     IconButton(
                       tooltip: 'Carta acumulada siguiente',
                       onPressed: () => setState(() {
-                        _variantIndex = (_variantIndex + 1) % widget.variantKeys.length;
+                        _variantIndex =
+                            (_variantIndex + 1) % widget.variantKeys.length;
                         _turn = 0;
                       }),
-                      icon: const Icon(Icons.chevron_right_rounded, color: Colors.white),
+                      icon: const Icon(
+                        Icons.chevron_right_rounded,
+                        color: Colors.white,
+                      ),
                     ),
                   ],
                 ),
@@ -5071,8 +5044,11 @@ class _InspectCardDialogState extends State<_InspectCardDialog>
                   for (final finish in CardFinish.values)
                     _FinishChip(
                       finish: finish,
-                      owned: widget.variantKeys.any((key) =>
-                          key.contains(':${_activeRarity.name}:${finish.name}')),
+                      owned: widget.variantKeys.any(
+                        (key) => key.contains(
+                          ':${_activeRarity.name}:${finish.name}',
+                        ),
+                      ),
                       active: finish == _activeFinish,
                     ),
                 ],
@@ -5146,12 +5122,18 @@ class _InspectCardDialogState extends State<_InspectCardDialog>
 class _FinishChip extends StatelessWidget {
   final CardFinish finish;
   final bool owned, active;
-  const _FinishChip({required this.finish, required this.owned, required this.active});
+  const _FinishChip({
+    required this.finish,
+    required this.owned,
+    required this.active,
+  });
 
   @override
   Widget build(BuildContext context) => Chip(
     avatar: Icon(
-      owned ? (finish == CardFinish.gold ? Icons.auto_awesome : Icons.style) : Icons.help_outline,
+      owned
+          ? (finish == CardFinish.gold ? Icons.auto_awesome : Icons.style)
+          : Icons.help_outline,
       size: 15,
       color: active ? const Color(0xff3b205f) : const Color(0xffffe79b),
     ),
@@ -5161,9 +5143,7 @@ class _FinishChip extends StatelessWidget {
       fontSize: 10,
       fontWeight: FontWeight.w800,
     ),
-    backgroundColor: active
-        ? const Color(0xffffe79b)
-        : const Color(0x332f1b58),
+    backgroundColor: active ? const Color(0xffffe79b) : const Color(0x332f1b58),
     side: BorderSide(color: owned ? const Color(0xffffe79b) : Colors.white24),
   );
 }
