@@ -1,24 +1,21 @@
 name: Android release
 on:
   push:
-    tags: ['v*']
+    branches: [main]
+    paths: ['app/**', '.github/workflows/android-release.yml']
   workflow_dispatch:
-    inputs:
-      tag:
-        description: Existing release tag (for example v1.1.1)
-        required: true
 permissions:
   contents: write
 concurrency:
-  group: android-release-${{ github.event.inputs.tag || github.ref_name }}
+  group: android-release
   cancel-in-progress: false
 jobs:
   release:
     runs-on: ubuntu-latest
+    env:
+      RELEASE_BUILD: ${{ github.run_number }}
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.inputs.tag || github.ref }}
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -27,12 +24,12 @@ jobs:
         with:
           flutter-version: '3.35.6'
           cache: true
-      - name: Validate version
-        env:
-          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+      - name: Assign increasing Android build number
         run: |
           VERSION=$(sed -n 's/^version: \([^+]*\)+.*/\1/p' app/pubspec.yaml)
-          test "$TAG" = "v$VERSION"
+          BUILD=$((1000 + RELEASE_BUILD))
+          echo "ANDROID_BUILD_NUMBER=$BUILD" >> "$GITHUB_ENV"
+          echo "TAG=v$VERSION-build$BUILD" >> "$GITHUB_ENV"
       - name: Restore preserved signing key
         env:
           KEY: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
@@ -51,16 +48,16 @@ jobs:
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           flutter pub get
+          flutter analyze --no-pub
           flutter test
-          flutter build apk --release --target-platform android-arm64
+          flutter build apk --release --target-platform android-arm64 --build-number "$ANDROID_BUILD_NUMBER"
           node tool/prepare_release.cjs
       - name: Publish APK and update metadata
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.event.inputs.tag || github.ref_name }}
         run: |
           if ! gh release view "$TAG" >/dev/null 2>&1; then
-            gh release create "$TAG" --verify-tag --title "Anivermaru $TAG" --generate-notes --latest
+            gh release create "$TAG" --target "$GITHUB_SHA" --title "Anivermaru $TAG" --generate-notes --latest
           fi
           gh release upload "$TAG" app/build/release/* --clobber
       - name: Remove signing key

@@ -4,10 +4,11 @@ GitHub Releases distribuye APK Android ARM64 firmadas siempre con la misma clave
 
 Para publicar cambios:
 
-1. Aumenta `version` en `app/pubspec.yaml`: por ejemplo `1.1.2+4`. El número después de `+` debe aumentar siempre.
-2. Confirma y sube los cambios a `main`.
-3. Ejecuta `git tag v1.1.2` y `git push origin v1.1.2`.
-4. GitHub Actions prueba y compila el código etiquetado, firma la APK y publica APK, `update.json` y checksum en Releases. También se puede ejecutar **Android release** manualmente indicando una etiqueta existente.
+1. Confirma y sube cambios de `app/` a `main`. Puedes cambiar el nombre de versión en `app/pubspec.yaml`, por ejemplo `1.1.2+4`.
+2. GitHub Actions asigna un número de compilación creciente (1000 + número de ejecución), prueba y compila el commit, firma la APK y publica APK, `update.json` y checksum en Releases. La etiqueta se crea automáticamente, por ejemplo `v1.1.2-build1004`.
+3. También se puede ejecutar **Android release** manualmente desde Actions. Cada ejecución nueva genera una versión instalable más reciente; repetir una misma ejecución mantiene su número.
+
+No reinicies el contador de este workflow ni publiques después una APK local con un número inferior al último publicado. Para compilación local posterior usa `--build-number` con un número mayor y pasa ese mismo valor mediante `ANDROID_BUILD_NUMBER` a `prepare_release.cjs`.
 
 Para activar la compilación en GitHub hay que configurar los secretos `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` y `ANDROID_KEY_PASSWORD` con la clave actual. Este paso está pendiente de autorización para transferir la clave privada a los secretos cifrados de GitHub. Nunca publiques ni reemplaces esa clave: Android solo permite actualizar sobre una APK con la misma firma. Guarda una copia privada de seguridad. En compilaciones locales se utiliza la clave actual de `~/.android/debug.keystore`; CI exige los secretos de firma y nunca genera una clave alternativa.
 

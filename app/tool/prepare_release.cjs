@@ -6,10 +6,12 @@ const version = fs.readFileSync(path.join(app, 'pubspec.yaml'), 'utf8').match(/^
 if (!version) throw Error('Expected versionName+versionCode in pubspec.yaml');
 const dir = path.join(app, 'build', 'release');
 fs.mkdirSync(dir, {recursive: true});
-const name = `Anivermaru-${version[1]}-arm64.apk`;
+const code = Number(process.env.ANDROID_BUILD_NUMBER || version[2]);
+if (!Number.isSafeInteger(code) || code < 1) throw Error('Invalid Android version code');
+const name = `Anivermaru-${version[1]}-${code}-arm64.apk`;
 const apk = fs.readFileSync(path.join(app, 'build/app/outputs/flutter-apk/app-release.apk'));
 fs.writeFileSync(path.join(dir, name), apk);
 const sha256 = crypto.createHash('sha256').update(apk).digest('hex');
-fs.writeFileSync(path.join(dir, 'update.json'), JSON.stringify({versionName: version[1], versionCode: Number(version[2]), apk: name, sha256}, null, 2));
+fs.writeFileSync(path.join(dir, 'update.json'), JSON.stringify({versionName: version[1], versionCode: code, apk: name, sha256}, null, 2));
 fs.writeFileSync(path.join(dir, 'SHA256SUMS.txt'), `${sha256}  ${name}\n`);
 console.log(`Prepared v${version[1]} (${version[2]}) in ${dir}`);
