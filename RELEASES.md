@@ -10,7 +10,7 @@ Para publicar cambios:
 
 No reinicies el contador de este workflow ni publiques después una APK local con un número inferior al último publicado. Para compilación local posterior usa `--build-number` con un número mayor y pasa ese mismo valor mediante `ANDROID_BUILD_NUMBER` a `prepare_release.cjs`.
 
-Para activar la compilación en GitHub hay que configurar los secretos `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` y `ANDROID_KEY_PASSWORD` con la clave actual. Este paso está pendiente de autorización para transferir la clave privada a los secretos cifrados de GitHub. Nunca publiques ni reemplaces esa clave: Android solo permite actualizar sobre una APK con la misma firma. Guarda una copia privada de seguridad. En compilaciones locales se utiliza la clave actual de `~/.android/debug.keystore`; CI exige los secretos de firma y nunca genera una clave alternativa.
+Los secretos `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` y `ANDROID_KEY_PASSWORD` ya están configurados con la clave actual, con autorización expresa del propietario. Nunca publiques ni reemplaces esa clave: Android solo permite actualizar sobre una APK con la misma firma. Guarda una copia privada de seguridad. En compilaciones locales se utiliza la clave actual de `~/.android/debug.keystore`; CI exige los secretos de firma y nunca genera una clave alternativa.
 
 Esta distribución conserva la firma de la APK 1.1.0 creada en este equipo. Instalaciones antiguas con otra firma requieren migrar por separado. No desinstales una instalación antigua sin respaldar los datos.
 
