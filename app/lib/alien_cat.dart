@@ -3,13 +3,20 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import 'cat_character.dart';
+import 'cat_clothing.dart';
 
 /// A complete alien silhouette, rather than eyes layered over the normal cat.
 class AlienCatPainter extends CustomPainter {
   final CatKind cat;
   final double phase, blink;
+  final CatOutfit outfit;
 
-  const AlienCatPainter({required this.cat, this.phase = 0, this.blink = 0});
+  const AlienCatPainter({
+    required this.cat,
+    this.phase = 0,
+    this.blink = 0,
+    this.outfit = const CatOutfit(),
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -58,6 +65,12 @@ class AlienCatPainter extends CustomPainter {
       ..cubicTo(74, 74, 58, 69, 60, 54)
       ..close();
     skin(body, const Rect.fromLTWH(28, 54, 45, 42));
+    canvas.save();
+    canvas.translate(50, 0);
+    canvas.scale(.8, 1);
+    canvas.translate(-50, 0);
+    paintCatBodyClothing(canvas, outfit);
+    canvas.restore();
     canvas.drawPath(
       Path()
         ..moveTo(46, 62)
@@ -204,6 +217,7 @@ class AlienCatPainter extends CustomPainter {
         whiskers,
       );
     }
+    paintCatHeadClothing(canvas, outfit, alien: true);
     canvas.restore();
   }
 
@@ -211,5 +225,6 @@ class AlienCatPainter extends CustomPainter {
   bool shouldRepaint(covariant AlienCatPainter oldDelegate) =>
       cat != oldDelegate.cat ||
       phase != oldDelegate.phase ||
-      blink != oldDelegate.blink;
+      blink != oldDelegate.blink ||
+      outfit != oldDelegate.outfit;
 }

@@ -10,7 +10,8 @@ enum _RoomMoment { cuddle, churu, litter, thoughts, yarn, window, food, cards }
 class CatRoom extends StatefulWidget {
   final List<int> ownedCards;
   final Widget Function(int)? cardBuilder;
-  const CatRoom({super.key, this.ownedCards = const [], this.cardBuilder});
+  final VoidCallback? onOpenCare;
+  const CatRoom({super.key, this.ownedCards = const [], this.cardBuilder, this.onOpenCare});
   @override
   State<CatRoom> createState() => _CatRoomState();
 }
@@ -175,13 +176,20 @@ class _CatRoomState extends State<CatRoom> with TickerProviderStateMixin {
   }
 
   void _pet(CatKind cat) {
+    CatCareScope.maybeOf(context)?.pet(cat);
     GameAudio.instance.play(GameSfx.kitten);
     setState(() => _purring = cat);
     _purr.forward(from: 0);
   }
 
+  Widget _openable(Widget child) => GestureDetector(
+    onDoubleTap: widget.onOpenCare,
+    behavior: HitTestBehavior.opaque,
+    child: child,
+  );
+
   @override
-  Widget build(BuildContext context) => Container(
+  Widget build(BuildContext context) => _openable(Container(
     padding: const EdgeInsets.fromLTRB(10, 12, 10, 10),
     decoration: BoxDecoration(
       color: const Color(0xfffffdf8),
@@ -753,16 +761,18 @@ class _CatRoomState extends State<CatRoom> with TickerProviderStateMixin {
               ),
             ),
             const SizedBox(height: 7),
-            const Text(
-              'Tócalos para darles cariño · mantén pulsado y arrastra para moverlos',
+            Text(
+              widget.onOpenCare == null
+                ? 'Tócalos para darles cariño · mantén pulsado y arrastra para moverlos'
+                : 'Dos toques en la casita para cuidar y vestir a tus gatos',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 10, color: Color(0xff69776d)),
+              style: const TextStyle(fontSize: 10, color: Color(0xff69776d)),
             ),
           ],
         );
       },
     ),
-  );
+  ));
 }
 
 class _RoomThought extends StatelessWidget {

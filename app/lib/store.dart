@@ -109,6 +109,7 @@ class PocketNote {
 
 class GameStore extends ChangeNotifier {
   final SharedPreferences prefs;
+  late final CatCare catCare = CatCare(onChanged: save);
   final NoteCloud _noteCloud;
   BlockGame game = BlockGame();
   int coins = 30, best = 0;
@@ -150,6 +151,7 @@ class GameStore extends ChangeNotifier {
     if (raw == null) return;
     try {
       final j = jsonDecode(raw) as Map<String, dynamic>;
+      catCare.restore(j['catCare']);
       _dirtyNotes.addAll(List<String>.from(j['dirtyNotes'] ?? []));
       coins = j['coins'] as int;
       _wordleRewards.addAll(List<String>.from(j['wordleRewards'] ?? []));
@@ -383,6 +385,7 @@ class GameStore extends ChangeNotifier {
   void _reloadProgress() {
     final restored = GameStore(prefs);
     coins = restored.coins;
+    catCare.restore(restored.catCare.toJson(), notify: true);
     best = restored.best;
     cards = restored.cards;
     rarities = restored.rarities;
@@ -416,6 +419,7 @@ class GameStore extends ChangeNotifier {
   Future<void> save() {
     final snapshot = jsonEncode({
       'coins': coins,
+      'catCare': catCare.toJson(),
       'wordleRewards': _wordleRewards.toList(),
       'best': best,
       'packsSinceLegendary': packsSinceLegendary,

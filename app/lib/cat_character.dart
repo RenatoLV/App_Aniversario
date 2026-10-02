@@ -4,8 +4,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'game_audio.dart';
-
-enum CatKind { maru, lady }
+import 'cat_care.dart';
+import 'cat_clothing.dart';
+export 'cat_care.dart';
 
 enum CatAction { idle, pack, blocks, collection, notes }
 
@@ -25,6 +26,7 @@ class CatActor extends StatefulWidget {
   final bool crying;
   final double packProgress;
   final VoidCallback? onPet;
+  final CatOutfit? outfit;
 
   const CatActor({
     super.key,
@@ -42,6 +44,7 @@ class CatActor extends StatefulWidget {
     this.crying = false,
     this.packProgress = 0,
     this.onPet,
+    this.outfit,
   });
 
   @override
@@ -195,6 +198,9 @@ class _CatActorState extends State<CatActor> with TickerProviderStateMixin {
                   child: CustomPaint(
                     painter: _CatPainter(
                       cat: widget.cat,
+                      outfit:
+                          widget.outfit ??
+                          CatCareScope.outfitOf(context, widget.cat),
                       action: widget.action,
                       active: widget.active,
                       phase: _idle.value,
@@ -234,11 +240,18 @@ class _CatActorState extends State<CatActor> with TickerProviderStateMixin {
 /// Shared anatomy for games: preserves Maru's stripes and Lady's patches.
 abstract class CatPainter extends CustomPainter {
   final double phase, blink, joy;
-  const CatPainter({this.phase = 0, this.blink = 0, this.joy = 0});
+  final CatOutfit outfit;
+  const CatPainter({
+    this.phase = 0,
+    this.blink = 0,
+    this.joy = 0,
+    this.outfit = const CatOutfit(),
+  });
   CatKind get kind;
   @override
   void paint(Canvas canvas, Size size) => _CatPainter(
     cat: kind,
+    outfit: outfit,
     action: CatAction.blocks,
     active: true,
     phase: phase,
@@ -257,19 +270,20 @@ abstract class CatPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant CatPainter old) =>
       old.kind != kind ||
+      old.outfit != outfit ||
       old.phase != phase ||
       old.blink != blink ||
       old.joy != joy;
 }
 
 class MaruPainter extends CatPainter {
-  const MaruPainter({super.phase, super.blink, super.joy});
+  const MaruPainter({super.phase, super.blink, super.joy, super.outfit});
   @override
   CatKind get kind => CatKind.maru;
 }
 
 class LadyPainter extends CatPainter {
-  const LadyPainter({super.phase, super.blink, super.joy});
+  const LadyPainter({super.phase, super.blink, super.joy, super.outfit});
   @override
   CatKind get kind => CatKind.lady;
 }
@@ -278,11 +292,17 @@ class LadyPainter extends CatPainter {
 class PackOpeningCatPainter extends CustomPainter {
   final CatKind cat;
   final double progress;
-  const PackOpeningCatPainter({required this.cat, required this.progress});
+  final CatOutfit outfit;
+  const PackOpeningCatPainter({
+    required this.cat,
+    required this.progress,
+    this.outfit = const CatOutfit(),
+  });
 
   @override
   void paint(Canvas canvas, Size size) => _CatPainter(
     cat: cat,
+    outfit: outfit,
     action: CatAction.pack,
     active: false,
     phase: (progress * 2) % 1,
@@ -302,11 +322,12 @@ class PackOpeningCatPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(PackOpeningCatPainter old) =>
-      old.cat != cat || old.progress != progress;
+      old.cat != cat || old.progress != progress || old.outfit != outfit;
 }
 
 class _CatPainter extends CustomPainter {
   final CatKind cat;
+  final CatOutfit outfit;
   final CatAction action;
   final bool active;
   final double phase, pet, focus;
@@ -322,6 +343,7 @@ class _CatPainter extends CustomPainter {
   final bool hideWorkingPaw;
   const _CatPainter({
     required this.cat,
+    this.outfit = const CatOutfit(),
     required this.action,
     required this.active,
     required this.phase,
@@ -489,6 +511,7 @@ class _CatPainter extends CustomPainter {
       ellipse(canvas, 49, 76, 15, 19, chest);
     }
 
+    paintCatBodyClothing(canvas, outfit);
     // One foreleg reaches toward the current activity.
     ellipse(canvas, 37, 86, 12, 8, maru ? dark : fur);
     if (!hideWorkingPaw) {
@@ -676,6 +699,7 @@ class _CatPainter extends CustomPainter {
         1,
       );
     }
+    paintCatHeadClothing(canvas, outfit);
     canvas.restore();
     canvas.restore();
 
@@ -774,5 +798,6 @@ class _CatPainter extends CustomPainter {
       old.packProgress != packProgress ||
       old.showShadow != showShadow ||
       old.hideWorkingPaw != hideWorkingPaw ||
-      old.cat != cat;
+      old.cat != cat ||
+      old.outfit != outfit;
 }

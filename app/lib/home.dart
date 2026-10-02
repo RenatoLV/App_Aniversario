@@ -25,6 +25,7 @@ import 'collection_album.dart';
 import 'pack_opening.dart';
 import 'game_audio.dart';
 import 'app_updates.dart';
+import 'cat_care_screen.dart';
 
 const ink = Color(0xff293f39),
     cream = Color(0xfffaf6ee),
@@ -73,9 +74,12 @@ class RinconApp extends StatelessWidget {
     debugShowCheckedModeBanner: false,
     title: 'Anivermaru',
     navigatorObservers: [GameAudioRouteObserver()],
-    builder: (context, child) => Listener(
-      onPointerDown: (_) => GameAudio.instance.unlock(),
-      child: child!,
+    builder: (context, child) => CatCareScope(
+      care: store.catCare,
+      child: Listener(
+        onPointerDown: (_) => GameAudio.instance.unlock(),
+        child: child!,
+      ),
     ),
     theme: ThemeData(
       useMaterial3: true,
@@ -661,6 +665,9 @@ class _RinconHomeState extends State<RinconHome>
       ),
       const SizedBox(height: 12),
       CatRoom(
+        onOpenCare: () => Navigator.of(context).push(
+          MaterialPageRoute<void>(builder: (_) => CatCareScreen(store: s)),
+        ),
         ownedCards: s.cards.keys.toList(),
         cardBuilder: (id) => _CardArt(cardId: id),
       ),

@@ -31,6 +31,10 @@ El repositorio incluye **334 memes** de Momazos vol. 1 y vol. 2 y sus imágenes 
   están en `app/assets/wordle_dictionary_license.txt`.
 
 - Escena interactiva de Maru y Lady: caricias, movimiento, siestas, pensamientos, churu y caja de arena.
+- La casita: doble toque en el recuadro de los gatos para darles comida, bañarlos
+  y vestirlos. Cada gato conserva sus cuidados y su ropa; las ocho prendas iniciales
+  se combinan por categoría y aparecen también en juegos, sobres y animaciones.
+  Detalles y personalización: [app/CAT_CARE.md](app/CAT_CARE.md).
 - Block Blaster Maru Editions: juego de bloques 8×8 con puntuación, combos, récord, monedas y SFX Android.
 - Sobres con animación de apertura, rarezas y carta holográfica inclinable.
 - Colección con 334 memes y seis cartas de ejemplo; variantes foil, filtros, álbum por volumen y visor con giro/zoom.
