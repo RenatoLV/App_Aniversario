@@ -31,11 +31,23 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        if (System.getenv("ANDROID_KEYSTORE_PATH") != null) {
+            create("distribution") {
+                storeFile = file(System.getenv("ANDROID_KEYSTORE_PATH"))
+                storePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("ANDROID_KEY_ALIAS")
+                keyPassword = System.getenv("ANDROID_KEY_PASSWORD")
+            }
+        }
+    }
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            // Preserve the current certificate locally and restore it explicitly in CI.
+            check(System.getenv("CI") != "true" || System.getenv("ANDROID_KEYSTORE_PATH") != null) {
+                "CI release requires the preserved distribution signing key"
+            }
+            signingConfig = signingConfigs.findByName("distribution") ?: signingConfigs.getByName("debug")
         }
     }
 }

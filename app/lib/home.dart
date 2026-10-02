@@ -24,6 +24,7 @@ import 'menu_swipe.dart';
 import 'collection_album.dart';
 import 'pack_opening.dart';
 import 'game_audio.dart';
+import 'app_updates.dart';
 
 const ink = Color(0xff293f39),
     cream = Color(0xfffaf6ee),
@@ -436,6 +437,7 @@ class _RinconHomeState extends State<RinconHome>
           ),
           actions: [
             const AudioSettingsButton(),
+            const AppUpdateButton(),
             Chip(
               avatar: const CoinIcon(size: 20),
               label: Text('${s.coins}'),

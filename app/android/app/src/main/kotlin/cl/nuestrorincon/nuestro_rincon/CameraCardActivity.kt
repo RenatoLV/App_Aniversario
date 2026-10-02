@@ -6,6 +6,8 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.*
+import android.graphics.drawable.GradientDrawable
+import android.content.res.ColorStateList
 import android.hardware.camera2.*
 import android.os.*
 import android.view.*
@@ -54,27 +56,35 @@ class CameraCardActivity : Activity(), TextureView.SurfaceTextureListener {
         }
         fun row() = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; panel.addView(this) }
         fun button(row: LinearLayout, label: String, action: () -> Unit): Button = Button(this).apply {
-            text = label; textSize = 13f; isAllCaps = false; minWidth = 0
+            text = label; textSize = 12f; isAllCaps = false; minWidth = 0
+            setTextColor(Color.WHITE)
+            background = GradientDrawable().apply {
+                setColor(0xff443859.toInt()); cornerRadius = dp(18).toFloat()
+                setStroke(dp(1), 0xff827491.toInt())
+            }
+            backgroundTintList = ColorStateList.valueOf(0xff443859.toInt())
+            elevation = dp(2).toFloat()
+            contentDescription = label
             setOnClickListener { action() }
-            row.addView(this, LinearLayout.LayoutParams(0, dp(48), 1f))
+            row.addView(this, LinearLayout.LayoutParams(0, dp(52), 1f).apply { setMargins(dp(4), dp(4), dp(4), dp(4)) })
         }
         val first = row()
-        button(first, "Volver") { finish() }
+        button(first, "‹ Volver") { finish() }
         button(first, "−") { card.zoom = (card.zoom / 1.2f).coerceIn(.25f, 3f) }
         button(first, "+") { card.zoom = (card.zoom * 1.2f).coerceIn(.25f, 3f) }
-        shutter = button(first, "Foto") { capture() }.apply { isEnabled = false }
+        shutter = button(first, "◎ Foto") { capture() }.apply { isEnabled = false; backgroundTintList = ColorStateList.valueOf(0xff177963.toInt()) }
         val second = row()
-        button(second, "Mover") {
+        button(second, "✥ Mover") {
             card.moveMode = !card.moveMode
             instructions.text = if (card.moveMode) "Arrastra para mover · pellizca para cambiar el tamaño"
                 else "Desliza para girar 360° · pellizca para acercar o alejar"
-            (second.getChildAt(0) as Button).text = if (card.moveMode) "Girar" else "Mover"
+            (second.getChildAt(0) as Button).text = if (card.moveMode) "↻ Girar" else "✥ Mover"
         }
-        button(second, "Pausar giro") {
+        button(second, "Ⅱ Giro") {
             card.autoSpin = !card.autoSpin
-            (second.getChildAt(1) as Button).text = if (card.autoSpin) "Pausar giro" else "Auto 360°"
+            (second.getChildAt(1) as Button).text = if (card.autoSpin) "Ⅱ Giro" else "↻ 360°"
         }
-        button(second, "Centrar") { card.reset() }
+        button(second, "⊙ Centrar") { card.reset() }
         root.addView(panel, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM))
         root.setOnApplyWindowInsetsListener { _, insets ->
             val bars = if (Build.VERSION.SDK_INT >= 30)
@@ -118,8 +128,11 @@ class CameraCardActivity : Activity(), TextureView.SurfaceTextureListener {
             sensorRotation = info.get(CameraCharacteristics.SENSOR_ORIENTATION) ?: 90
             val sizes = info.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)!!
                 .getOutputSizes(SurfaceTexture::class.java)
+            val displayRotation = windowManager.defaultDisplay.rotation * 90
+            val swap = (sensorRotation - displayRotation + 360) % 180 != 0
+            val desiredRatio = if (swap) preview.height.toFloat() / preview.width else preview.width.toFloat() / preview.height
             val size = sizes.filter { it.width <= 1920 && it.height <= 1080 }
-                .minByOrNull { abs(it.width.toFloat() / it.height - 16f / 9) * 10000 + abs(it.width - 1280) }
+                .minByOrNull { abs(it.width.toFloat() / it.height - desiredRatio) * 10000 + abs(it.width - 1280) }
                 ?: sizes.minBy { it.width * it.height }
             bufferWidth = size.width; bufferHeight = size.height
             preview.surfaceTexture!!.setDefaultBufferSize(bufferWidth, bufferHeight)
@@ -162,14 +175,21 @@ class CameraCardActivity : Activity(), TextureView.SurfaceTextureListener {
         val swapped = rotation == 90 || rotation == 270
         val buffer = RectF(0f, 0f, (if (swapped) bufferHeight else bufferWidth).toFloat(),
             (if (swapped) bufferWidth else bufferHeight).toFloat())
-        val matrix = Matrix()
-        // Undo TextureView's stretch of the raw sensor buffer before rotating and center-cropping.
-        matrix.setScale(bufferWidth / view.width(), bufferHeight / view.height())
-        matrix.postTranslate(-bufferWidth / 2f, -bufferHeight / 2f)
-        matrix.postRotate(rotation.toFloat())
+        // Map all four stretched TextureView corners back to the sensor's aspect ratio.
+        // An explicit corner mapping avoids device-dependent matrix concatenation order.
+        val sensor = Matrix().apply {
+            setTranslate(-bufferWidth / 2f, -bufferHeight / 2f)
+            postRotate(rotation.toFloat())
+        }
+        val corners = floatArrayOf(0f, 0f, bufferWidth.toFloat(), 0f, bufferWidth.toFloat(), bufferHeight.toFloat(), 0f, bufferHeight.toFloat())
+        sensor.mapPoints(corners)
         val scale = maxOf(view.width() / buffer.width(), view.height() / buffer.height())
-        matrix.postScale(scale, scale)
-        matrix.postTranslate(view.centerX(), view.centerY())
+        for (i in corners.indices step 2) {
+            corners[i] = corners[i] * scale + view.centerX()
+            corners[i + 1] = corners[i + 1] * scale + view.centerY()
+        }
+        val matrix = Matrix()
+        matrix.setPolyToPoly(floatArrayOf(0f, 0f, view.width(), 0f, view.width(), view.height(), 0f, view.height()), 0, corners, 0, 4)
         preview.setTransform(matrix)
     }
     override fun onSurfaceTextureAvailable(t: SurfaceTexture, w: Int, h: Int) { openCamera() }

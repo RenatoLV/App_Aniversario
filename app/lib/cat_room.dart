@@ -191,7 +191,8 @@ class _CatRoomState extends State<CatRoom> with TickerProviderStateMixin {
     child: LayoutBuilder(
       builder: (context, c) {
         final width = c.maxWidth;
-        final catSize = math.min(168.0, (width - 20) / 2);
+        // Leave room for the active cat in the middle and its companion at the side.
+        final catSize = math.min(148.0, width * .30);
         final height = (width * .4 + 165).clamp(285.0, 380.0);
         final litter = _moment == _RoomMoment.litter;
         final meal = _moment == _RoomMoment.food;

@@ -54,6 +54,28 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "anivermaru/updates")
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "version" -> {
+                        @Suppress("DEPRECATION")
+                        val info = packageManager.getPackageInfo(packageName, 0)
+                        @Suppress("DEPRECATION")
+                        val code = if (android.os.Build.VERSION.SDK_INT >= 28) info.longVersionCode else info.versionCode.toLong()
+                        result.success(mapOf("name" to info.versionName, "code" to code))
+                    }
+                    "openDownload" -> {
+                        val url = call.argument<String>("url") ?: ""
+                        if (!url.startsWith("https://github.com/RenatoLV/App_Aniversario/releases/download/")) {
+                            result.error("url", "Descarga no válida", null)
+                        } else try {
+                            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                            result.success(null)
+                        } catch (_: Exception) { result.error("browser", "No se pudo abrir la descarga", null) }
+                    }
+                    else -> result.notImplemented()
+                }
+            }
         EventChannel(flutterEngine.dartExecutor.binaryMessenger, "anivermaru/tilt")
             .setStreamHandler(object : EventChannel.StreamHandler {
                 override fun onListen(arguments: Any?, events: EventChannel.EventSink) {

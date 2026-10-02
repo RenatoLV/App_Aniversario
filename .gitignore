@@ -1,5 +1,8 @@
 .tools/
+app/tool/github_cli.cjs
+firebase-debug.log
 **/.dart_tool/
+**/.kotlin/
 **/build/
 **/local.properties
 **/key.properties
