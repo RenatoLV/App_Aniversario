@@ -8,6 +8,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'firebase_options.dart';
+import 'bloc_people.dart';
 
 class Backend {
   static bool configured = false;
@@ -64,6 +65,11 @@ class Backend {
     if (data == null) return null;
     space = data['spaceId'] as String?;
     _nickname = data['nickname'] as String?;
+    unawaited(
+      BlocPeople.publish(
+        _nickname ?? auth.currentUser!.displayName ?? 'Jugador',
+      ).catchError((_) {}),
+    );
     return {
       'user_id': uid,
       'space_id': space,
@@ -159,6 +165,7 @@ class Backend {
     }
     await batch.commit();
     _nickname = name;
+    unawaited(BlocPeople.publish(name).catchError((_) {}));
     if (space != null) await startPresence(space!);
   }
 
@@ -308,7 +315,9 @@ class Backend {
     if (author == null) {
       throw StateError('Inicia sesión para sincronizar el bloc.');
     }
-    final image = note['imageBase64'] as String?;
+    final image = note['deleted'] == true
+        ? null
+        : note['imageBase64'] as String?;
     String? path = note['mediaPath'] as String?;
     if (image != null && path != null && !_mediaCache.containsKey(path)) {
       try {
@@ -359,6 +368,7 @@ class Backend {
         .doc(id)
         .set({
           'body': note['text'],
+          'deleted': note['deleted'] == true,
           'x': note['x'],
           'y': note['y'],
           'scale': note['scale'],

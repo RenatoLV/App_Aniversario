@@ -1,3 +1,6 @@
+import 'bloc_drawing.dart';
+import 'bloc_board.dart';
+import 'bloc_people.dart';
 import 'paw_background.dart';
 import 'dart:async';
 import 'dart:convert';
@@ -116,6 +119,7 @@ class _RinconHomeState extends State<RinconHome>
     with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   Timer? _cloudRetry;
   bool _refreshingCloud = false;
+  final _blocKey = GlobalKey<BlocBoardState>();
   int page = 0;
   String _collectionQuery = '';
   final TextEditingController _collectionSearch = TextEditingController();
@@ -133,7 +137,6 @@ class _RinconHomeState extends State<RinconHome>
   String? _cloudError;
   bool _cloudBusy = false;
   StreamSubscription<List<Map<String, dynamic>>>? _scoreSubscription;
-  Timer? _catNoteTimer;
   Timer? _collectionPlayTimer;
   int _collectionShuffle = 0;
   bool _inspectingCollection = false;
@@ -161,16 +164,6 @@ class _RinconHomeState extends State<RinconHome>
       if (mounted && page == 2) {
         setState(() => _collectionShuffle++);
       }
-    });
-    _catNoteTimer = Timer.periodic(const Duration(seconds: 14), (_) {
-      if (!mounted || page != 3 || s.notes.isEmpty) return;
-      final note = s.notes[math.Random().nextInt(s.notes.length)];
-      final random = math.Random();
-      setState(() {
-        note.x = (note.x + (random.nextDouble() - .5) * .14).clamp(0.0, 1.0);
-        note.y = (note.y + (random.nextDouble() - .5) * .10).clamp(0.0, 1.0);
-      });
-      s.saveNote(note);
     });
   }
 
@@ -417,7 +410,6 @@ class _RinconHomeState extends State<RinconHome>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _cloudRetry?.cancel();
-    _catNoteTimer?.cancel();
     _scoreSubscription?.cancel();
     _collectionPlayTimer?.cancel();
     _packAnimation.dispose();
@@ -444,35 +436,37 @@ class _RinconHomeState extends State<RinconHome>
             const SizedBox(width: 16),
           ],
         ),
-        body: PawBackground(child: SafeArea(
-          child: Column(
-            children: [
-              if (s.saveError != null || s.noteSyncError != null)
-                MaterialBanner(
-                  content: Text((s.saveError ?? s.noteSyncError)!),
-                  actions: [
-                    TextButton(
-                      onPressed: s.retrySavedData,
-                      child: const Text('Reintentar'),
+        body: PawBackground(
+          child: SafeArea(
+            child: Column(
+              children: [
+                if (s.saveError != null || s.noteSyncError != null)
+                  MaterialBanner(
+                    content: Text((s.saveError ?? s.noteSyncError)!),
+                    actions: [
+                      TextButton(
+                        onPressed: s.retrySavedData,
+                        child: const Text('Reintentar'),
+                      ),
+                    ],
+                  ),
+                Expanded(
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 650),
+                      child: switch (page) {
+                        0 => home(),
+                        1 => packs(),
+                        2 => collection(),
+                        _ => notes(),
+                      },
                     ),
-                  ],
-                ),
-              Expanded(
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 650),
-                    child: switch (page) {
-                      0 => home(),
-                      1 => packs(),
-                      2 => collection(),
-                      _ => notes(),
-                    },
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        )),
+        ),
         bottomNavigationBar: NavigationBar(
           selectedIndex: page,
           onDestinationSelected: (i) => setState(() => page = i),
@@ -518,7 +512,15 @@ class _RinconHomeState extends State<RinconHome>
 
   Future<void> _shareBloc() async {
     if (_cloudMember == null) await _activateCloud();
-    if (mounted && _cloudMember != null) await _joinSpace();
+    if (mounted && _cloudMember != null) {
+      final joined = await showModalBottomSheet<bool>(
+        context: context,
+        isScrollControlled: true,
+        showDragHandle: true,
+        builder: (_) => BlocPeopleSheet(onCode: _joinSpace),
+      );
+      if (joined == true) await _refreshCloud();
+    }
   }
 
   Widget _gameSpotlight({
@@ -1278,6 +1280,7 @@ class _RinconHomeState extends State<RinconHome>
     setState(() => s.notes.add(note));
     try {
       await s.saveNote(note, waitForSync: false);
+      _blocKey.currentState?.focus(note);
       if (mounted) {
         setState(() => page = 3);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1860,6 +1863,9 @@ class _RinconHomeState extends State<RinconHome>
         edited = note;
       }
       s.saveNote(edited);
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _blocKey.currentState?.focus(edited),
+      );
     }
   }
 
@@ -1892,6 +1898,7 @@ class _RinconHomeState extends State<RinconHome>
       );
       setState(() => s.notes.add(note));
       await s.saveNote(note, waitForSync: false);
+      _blocKey.currentState?.focus(note);
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1934,7 +1941,7 @@ class _RinconHomeState extends State<RinconHome>
     final bytes = await showDialog<Uint8List>(
       context: context,
       barrierDismissible: false,
-      builder: (_) => _DrawingDialog(
+      builder: (_) => BlocDrawingDialog(
         initialImage: note?.imageBase64 == null
             ? null
             : base64Decode(note!.imageBase64!),
@@ -1949,12 +1956,14 @@ class _RinconHomeState extends State<RinconHome>
       );
       setState(() => s.notes.add(created));
       await s.saveNote(created, waitForSync: false);
+      _blocKey.currentState?.focus(created);
     } else {
       setState(() {
         note.imageBase64 = base64Encode(bytes);
         note.mediaKind = 'drawing';
       });
       await s.saveNote(note, waitForSync: false);
+      _blocKey.currentState?.focus(note);
     }
   }
 
@@ -1962,245 +1971,19 @@ class _RinconHomeState extends State<RinconHome>
       note.mediaKind == 'drawing' ||
       (note.mediaKind == null && note.text == 'Nuestro dibujo');
 
-  Widget _noteImage(PocketNote note) {
-    try {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(4),
-        child: Image.memory(
-          base64Decode(note.imageBase64!),
-          width: double.infinity,
-          fit: BoxFit.cover,
-          gaplessPlayback: true,
-        ),
-      );
-    } catch (_) {
-      return const Center(child: Icon(Icons.broken_image_outlined));
-    }
-  }
-
-  Future<void> _resizeNote(PocketNote note) async {
-    final scale = await showModalBottomSheet<double>(
-      context: context,
-      showDragHandle: true,
-      builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const ListTile(
-              title: Text(
-                'Tamaño de la nota',
-                style: TextStyle(fontWeight: FontWeight.w900),
-              ),
-              subtitle: Text('Mantén pulsada cualquier nota para cambiarlo.'),
-            ),
-            for (final option in const [
-              (0.46, 'Mini', Icons.crop_square),
-              (0.68, 'Pequeña', Icons.check_box_outline_blank),
-              (1.0, 'Mediana', Icons.rectangle_outlined),
-              (1.28, 'Grande', Icons.aspect_ratio),
-            ])
-              ListTile(
-                leading: Icon(option.$3),
-                title: Text(option.$2),
-                trailing: (note.scale - option.$1).abs() < .02
-                    ? const Icon(Icons.check_circle, color: Color(0xff138267))
-                    : null,
-                onTap: () => Navigator.pop(context, option.$1),
-              ),
-          ],
-        ),
-      ),
-    );
-    if (scale == null) return;
-    setState(() => note.scale = scale);
-    await s.saveNote(note, waitForSync: false);
-  }
-
-  Widget notes() => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Nuestro bloc',
-              style: TextStyle(
-                fontSize: 30,
-                fontWeight: FontWeight.w800,
-                color: ink,
-              ),
-            ),
-            ...[
-              TextButton.icon(
-                onPressed: _cloudBusy || !Backend.configured
-                    ? null
-                    : _shareBloc,
-                icon: const Icon(Icons.group_add_outlined),
-                label: const Text('Compartir / unirme al bloc'),
-              ),
-              if (_cloudError != null)
-                Text(_cloudError!, style: const TextStyle(color: Colors.red)),
-              if (_cloudMember != null)
-                ValueListenableBuilder<String>(
-                  valueListenable: Backend.presenceStatus,
-                  builder: (context, value, _) =>
-                      Text(value, style: const TextStyle(fontSize: 12)),
-                ),
-            ],
-            Text(
-              _cloudMember == null
-                  ? 'Arrastra para explorar el mural. Mantén una nota para cambiar su tamaño.\nConecta el espacio para compartirlas.'
-                  : 'Arrastra para explorar el mural. Mantén una nota para cambiar su tamaño.\nLos cambios se comparten entre ambos dispositivos.',
-              style: const TextStyle(fontSize: 12, height: 1.5),
-            ),
-            const SizedBox(height: 8),
-            const LaserMouse(),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                FilledButton.icon(
-                  onPressed: () => editNote(),
-                  icon: const Icon(Icons.add),
-                  label: const Text('Una notita'),
-                ),
-                OutlinedButton.icon(
-                  onPressed: _drawNote,
-                  icon: const Icon(Icons.draw_outlined),
-                  label: const Text('Pintar'),
-                ),
-                OutlinedButton.icon(
-                  onPressed: _choosePhotoSource,
-                  icon: const Icon(Icons.add_a_photo_outlined),
-                  label: const Text('Foto'),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-      Expanded(
-        child: LayoutBuilder(
-          builder: (context, c) {
-            final muralWidth = math.max(c.maxWidth * 2.4, 1050.0);
-            final muralHeight = math.max(c.maxHeight * 2.8, 1350.0);
-            return Container(
-              color: const Color(0xffeae8dc),
-              child: InteractiveViewer(
-                constrained: false,
-                minScale: .55,
-                maxScale: 1.8,
-                boundaryMargin: const EdgeInsets.all(80),
-                child: SizedBox(
-                  width: muralWidth,
-                  height: muralHeight,
-                  child: Stack(
-                    children: [
-                      Positioned.fill(
-                        child: CustomPaint(painter: _MuralGridPainter()),
-                      ),
-                      if (s.notes.isEmpty)
-                        const Positioned(
-                          left: 40,
-                          top: 40,
-                          child: Text(
-                            'Aquí empieza nuestro gran mural ♡',
-                            textAlign: TextAlign.center,
-                          ),
-                        ),
-                      for (final n in s.notes)
-                        Builder(
-                          builder: (context) {
-                            final noteWidth = 170 * n.scale;
-                            final noteHeight = 160 * n.scale;
-                            final maxX = muralWidth - noteWidth;
-                            final maxY = muralHeight - noteHeight;
-                            return AnimatedPositioned(
-                              duration: const Duration(milliseconds: 650),
-                              curve: Curves.easeInOutCubic,
-                              left: n.x * maxX,
-                              top: n.y * maxY,
-                              child: GestureDetector(
-                                onTap: () =>
-                                    _isDrawing(n) ? _drawNote(n) : editNote(n),
-                                onLongPress: () => _resizeNote(n),
-                                onPanUpdate: (d) => setState(() {
-                                  n.x = (n.x + d.delta.dx / maxX).clamp(
-                                    0.0,
-                                    1.0,
-                                  );
-                                  n.y = (n.y + d.delta.dy / maxY).clamp(
-                                    0.0,
-                                    1.0,
-                                  );
-                                }),
-                                onPanEnd: (_) => s.saveNote(n),
-                                child: Container(
-                                  width: noteWidth,
-                                  height: noteHeight,
-                                  padding: EdgeInsets.all(
-                                    math.max(7, 16 * n.scale),
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xffffe8ac),
-                                    borderRadius: BorderRadius.circular(4),
-                                    boxShadow: const [
-                                      BoxShadow(
-                                        color: Color(0x18000000),
-                                        blurRadius: 8,
-                                        offset: Offset(0, 4),
-                                      ),
-                                    ],
-                                  ),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      const Icon(
-                                        Icons.favorite,
-                                        size: 15,
-                                        color: Color(0xffb77661),
-                                      ),
-                                      SizedBox(
-                                        height: n.imageBase64 == null ? 10 : 5,
-                                      ),
-                                      if (n.imageBase64 != null)
-                                        Expanded(flex: 3, child: _noteImage(n)),
-                                      if (n.imageBase64 != null)
-                                        const SizedBox(height: 5),
-                                      Expanded(
-                                        flex: n.imageBase64 == null ? 5 : 1,
-                                        child: Text(
-                                          n.text,
-                                          overflow: TextOverflow.ellipsis,
-                                          maxLines: n.imageBase64 == null
-                                              ? 5
-                                              : 1,
-                                          style: const TextStyle(
-                                            color: ink,
-                                            fontSize: 14,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          },
-        ),
-      ),
-    ],
+  Widget notes() => BlocBoard(
+    key: _blocKey,
+    store: s,
+    onAdd: () => editNote(),
+    onDraw: _drawNote,
+    onPhoto: _choosePhotoSource,
+    onShare: _shareBloc,
+    onEdit: (n) => _isDrawing(n) ? _drawNote(n) : editNote(n),
+    status:
+        _cloudError ??
+        (_cloudMember == null
+            ? 'Guardado en este dispositivo · conecta Google para compartir'
+            : 'Bloc compartido · los cambios se sincronizan'),
   );
 }
 
@@ -2384,292 +2167,6 @@ class _PackCarouselArrow extends StatelessWidget {
       ),
     ),
   );
-}
-
-class _MuralGridPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = const Color(0x18a49e8c)
-      ..strokeWidth = 1;
-    for (double x = 0; x < size.width; x += 80) {
-      canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
-    }
-    for (double y = 0; y < size.height; y += 80) {
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-class _DrawingDialog extends StatefulWidget {
-  final Uint8List? initialImage;
-  const _DrawingDialog({this.initialImage});
-
-  @override
-  State<_DrawingDialog> createState() => _DrawingDialogState();
-}
-
-class _DrawingDialogState extends State<_DrawingDialog> {
-  final GlobalKey _canvasKey = GlobalKey();
-  final List<_DrawStroke> _strokes = [];
-  final List<_DrawStroke> _redo = [];
-  Color _color = const Color(0xff34245f);
-  double _width = 5;
-  _DrawingTool _tool = _DrawingTool.pencil;
-  bool _saving = false;
-
-  void _start(DragStartDetails details) => setState(() {
-    _redo.clear();
-    _strokes.add(
-      _DrawStroke(
-        _tool == _DrawingTool.eraser ? const Color(0xfffffcf3) : _color,
-        _tool == _DrawingTool.eraser ? _width * 2 : _width,
-        [details.localPosition],
-        opacity: _tool == _DrawingTool.marker ? .42 : 1,
-      ),
-    );
-  });
-
-  void _update(DragUpdateDetails details) =>
-      setState(() => _strokes.last.points.add(details.localPosition));
-
-  Future<void> _save() async {
-    if (_saving) return;
-    setState(() => _saving = true);
-    try {
-      await WidgetsBinding.instance.endOfFrame;
-      final boundary =
-          _canvasKey.currentContext!.findRenderObject()!
-              as RenderRepaintBoundary;
-      final image = await boundary.toImage(pixelRatio: 2);
-      final data = await image.toByteData(format: ui.ImageByteFormat.png);
-      image.dispose();
-      if (mounted && data != null) {
-        Navigator.pop(context, data.buffer.asUint8List());
-      }
-    } finally {
-      if (mounted) setState(() => _saving = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) => Dialog(
-    insetPadding: const EdgeInsets.all(14),
-    child: ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 430),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
-              children: [
-                const Expanded(
-                  child: Text(
-                    'Pinta algo para el mural',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
-                  ),
-                ),
-                IconButton(
-                  onPressed: () => Navigator.pop(context),
-                  icon: const Icon(Icons.close),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            AspectRatio(
-              aspectRatio: 4 / 3,
-              child: RepaintBoundary(
-                key: _canvasKey,
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onPanStart: _start,
-                  onPanUpdate: _update,
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      if (widget.initialImage != null)
-                        Image.memory(widget.initialImage!, fit: BoxFit.fill),
-                      CustomPaint(
-                        painter: _DrawingPainter(
-                          _strokes,
-                          paintBackground: widget.initialImage == null,
-                        ),
-                        child: const SizedBox.expand(),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            SegmentedButton<_DrawingTool>(
-              segments: const [
-                ButtonSegment(
-                  value: _DrawingTool.pencil,
-                  icon: Icon(Icons.edit_outlined),
-                  label: Text('Lápiz'),
-                ),
-                ButtonSegment(
-                  value: _DrawingTool.marker,
-                  icon: Icon(Icons.brush_outlined),
-                  label: Text('Marcador'),
-                ),
-                ButtonSegment(
-                  value: _DrawingTool.eraser,
-                  icon: Icon(Icons.auto_fix_normal_outlined),
-                  label: Text('Goma'),
-                ),
-              ],
-              selected: {_tool},
-              onSelectionChanged: (value) =>
-                  setState(() => _tool = value.first),
-            ),
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                for (final color in const [
-                  Color(0xff34245f),
-                  Color(0xffe65d74),
-                  Color(0xff397fc4),
-                  Color(0xff36a56f),
-                  Color(0xffffb83f),
-                  Color(0xffff8a45),
-                  Color(0xff8e5ac7),
-                  Color(0xffef7fb0),
-                  Color(0xff22aeb8),
-                  Color(0xff6d4c41),
-                  Colors.black,
-                  Colors.white,
-                ])
-                  InkWell(
-                    onTap: () => setState(() {
-                      _color = color;
-                      if (_tool == _DrawingTool.eraser) {
-                        _tool = _DrawingTool.pencil;
-                      }
-                    }),
-                    borderRadius: BorderRadius.circular(20),
-                    child: Container(
-                      width: 30,
-                      height: 30,
-                      decoration: BoxDecoration(
-                        color: color,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: _color == color
-                              ? const Color(0xff34245f)
-                              : const Color(0xffcbc4b7),
-                          width: _color == color ? 3 : 1,
-                        ),
-                      ),
-                    ),
-                  ),
-                DropdownButton<double>(
-                  value: _width,
-                  items: const [
-                    DropdownMenuItem(value: 3, child: Text('Fino')),
-                    DropdownMenuItem(value: 5, child: Text('Medio')),
-                    DropdownMenuItem(value: 9, child: Text('Grueso')),
-                    DropdownMenuItem(value: 14, child: Text('Extra grueso')),
-                  ],
-                  onChanged: (value) => setState(() => _width = value ?? 5),
-                ),
-                IconButton(
-                  onPressed: _strokes.isEmpty
-                      ? null
-                      : () => setState(() => _redo.add(_strokes.removeLast())),
-                  icon: const Icon(Icons.undo),
-                  tooltip: 'Deshacer',
-                ),
-                IconButton(
-                  onPressed: _redo.isEmpty
-                      ? null
-                      : () => setState(() => _strokes.add(_redo.removeLast())),
-                  icon: const Icon(Icons.redo),
-                  tooltip: 'Rehacer',
-                ),
-                IconButton(
-                  onPressed: _strokes.isEmpty
-                      ? null
-                      : () => setState(() {
-                          _redo.addAll(_strokes.reversed);
-                          _strokes.clear();
-                        }),
-                  icon: const Icon(Icons.delete_outline),
-                  tooltip: 'Limpiar',
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            FilledButton.icon(
-              onPressed: _strokes.isEmpty || _saving ? null : _save,
-              icon: _saving
-                  ? const SizedBox.square(
-                      dimension: 17,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.push_pin_outlined),
-              label: const Text('Pegar en el mural'),
-            ),
-          ],
-        ),
-      ),
-    ),
-  );
-}
-
-class _DrawStroke {
-  final Color color;
-  final double width;
-  final List<Offset> points;
-  final double opacity;
-  _DrawStroke(this.color, this.width, this.points, {this.opacity = 1});
-}
-
-enum _DrawingTool { pencil, marker, eraser }
-
-class _DrawingPainter extends CustomPainter {
-  final List<_DrawStroke> strokes;
-  final bool paintBackground;
-  _DrawingPainter(this.strokes, {this.paintBackground = true});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (paintBackground) {
-      canvas.drawRect(
-        Offset.zero & size,
-        Paint()..color = const Color(0xfffffcf3),
-      );
-    }
-    for (final stroke in strokes) {
-      final paint = Paint()
-        ..color = stroke.color.withValues(alpha: stroke.opacity)
-        ..strokeWidth = stroke.width
-        ..strokeCap = StrokeCap.round
-        ..strokeJoin = StrokeJoin.round
-        ..style = PaintingStyle.stroke;
-      if (stroke.points.length == 1) {
-        canvas.drawCircle(stroke.points.first, stroke.width / 2, paint);
-        continue;
-      }
-      final path = Path()
-        ..moveTo(stroke.points.first.dx, stroke.points.first.dy);
-      for (final point in stroke.points.skip(1)) {
-        path.lineTo(point.dx, point.dy);
-      }
-      canvas.drawPath(path, paint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _DrawingPainter oldDelegate) => true;
 }
 
 class BlockScreen extends StatefulWidget {

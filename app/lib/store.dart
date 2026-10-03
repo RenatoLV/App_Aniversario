@@ -78,6 +78,7 @@ extension CardRarityLook on CardRarity {
 }
 
 class PocketNote {
+  bool deleted;
   String text;
   double x, y;
   String? cloudId;
@@ -94,8 +95,10 @@ class PocketNote {
     this.mediaKind,
     this.mediaPath,
     this.scale = 1,
+    this.deleted = false,
   });
   Map<String, dynamic> toJson() => {
+    'deleted': deleted,
     'text': text,
     'x': x,
     'y': y,
@@ -130,6 +133,7 @@ class GameStore extends ChangeNotifier {
   StreamSubscription<List<Map<String, dynamic>>>? _notesSubscription;
   List<Map<String, dynamic>> _latestCloudNotes = [];
   final Set<String> _dirtyNotes = {};
+  final Set<String> _editingNotes = {};
   int get pendingNoteCount => _dirtyNotes.length;
   String? saveError;
   String? _noteReadError;
@@ -190,6 +194,7 @@ class GameStore extends ChangeNotifier {
               mediaKind: n['mediaKind'] as String?,
               mediaPath: n['mediaPath'] as String?,
               scale: (n['scale'] as num?)?.toDouble() ?? 1,
+              deleted: n['deleted'] == true,
             ),
           )
           .toList();
@@ -228,6 +233,7 @@ class GameStore extends ChangeNotifier {
       );
       notes = [];
       _dirtyNotes.clear();
+      _editingNotes.clear();
     }
     for (final note in notes) {
       if (oldSpace == null || note.cloudId == null) {
@@ -301,24 +307,35 @@ class GameStore extends ChangeNotifier {
     for (final row in _latestCloudNotes) {
       final id = row['id'] as String;
       final local = localById[id];
-      merged.add(
-        _dirtyNotes.contains(id) && local != null
-            ? local
-            : PocketNote(
-                row['body'] as String,
-                (row['x'] as num).toDouble(),
-                (row['y'] as num).toDouble(),
-                cloudId: id,
-                imageBase64:
-                    row['imageBase64'] as String? ??
-                    (local?.mediaPath == row['mediaPath']
-                        ? local?.imageBase64
-                        : null),
-                mediaKind: row['mediaKind'] as String?,
-                mediaPath: row['mediaPath'] as String?,
-                scale: (row['scale'] as num?)?.toDouble() ?? 1,
-              ),
-      );
+      final next = _dirtyNotes.contains(id) && local != null
+          ? local
+          : PocketNote(
+              row['body'] as String,
+              (row['x'] as num).toDouble(),
+              (row['y'] as num).toDouble(),
+              cloudId: id,
+              imageBase64:
+                  row['imageBase64'] as String? ??
+                  (local?.mediaPath == row['mediaPath']
+                      ? local?.imageBase64
+                      : null),
+              mediaKind: row['mediaKind'] as String?,
+              mediaPath: row['mediaPath'] as String?,
+              scale: (row['scale'] as num?)?.toDouble() ?? 1,
+              deleted: row['deleted'] == true,
+            );
+      // Preserve references held by an open editor, a drag or the undo action.
+      if (local != null && next != local) {
+        local.text = next.text;
+        local.x = next.x;
+        local.y = next.y;
+        local.scale = next.scale;
+        local.deleted = next.deleted;
+        local.imageBase64 = next.imageBase64;
+        local.mediaKind = next.mediaKind;
+        local.mediaPath = next.mediaPath;
+      }
+      merged.add(local ?? next);
     }
     merged.addAll(
       notes.where(
@@ -334,6 +351,7 @@ class GameStore extends ChangeNotifier {
   }
 
   Future<void> saveNote(PocketNote note, {bool waitForSync = true}) async {
+    _editingNotes.remove(note.cloudId);
     if (_cloudSpaceId != null || note.cloudId != null) {
       note.cloudId ??= _noteCloud.newId();
       _dirtyNotes.add(note.cloudId!);
@@ -346,6 +364,23 @@ class GameStore extends ChangeNotifier {
     }
   }
 
+  void beginNoteEdit(PocketNote note) {
+    if (_cloudSpaceId == null && note.cloudId == null) return;
+    note.cloudId ??= _noteCloud.newId();
+    _dirtyNotes.add(note.cloudId!);
+    _editingNotes.add(note.cloudId!);
+  }
+
+  Future<void> deleteNote(PocketNote note) async {
+    note.deleted = true;
+    await saveNote(note, waitForSync: false);
+  }
+
+  Future<void> restoreNote(PocketNote note) async {
+    note.deleted = false;
+    await saveNote(note, waitForSync: false);
+  }
+
   Future<void> _flushNotes() async {
     if (_cloudSpaceId == null || _sendingNotes || _noteCloud.userId == null) {
       return;
@@ -355,7 +390,13 @@ class GameStore extends ChangeNotifier {
     String? errorMessage;
     try {
       for (final note
-          in notes.where((n) => _dirtyNotes.contains(n.cloudId)).toList()) {
+          in notes
+              .where(
+                (n) =>
+                    _dirtyNotes.contains(n.cloudId) &&
+                    !_editingNotes.contains(n.cloudId),
+              )
+              .toList()) {
         final data = note.toJson();
         final before = jsonEncode(data);
         var uploaded = false;

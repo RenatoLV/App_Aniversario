@@ -9,7 +9,14 @@ async function user() {
   assert.equal(response.status,200,JSON.stringify(body));
   return {id:body.localId,token:body.idToken};
 }
-function fields(data) { return Object.fromEntries(Object.entries(data).map(([k,v])=>[k,v===null?{nullValue:null}:typeof v==='number'?Number.isInteger(v)?{integerValue:String(v)}:{doubleValue:v}:{stringValue:v}])); }
+function fields(data) { return Object.fromEntries(Object.entries(data).map(([k,v])=>[k,v===null?{nullValue:null}:typeof v==='boolean'?{booleanValue:v}:typeof v==='number'?Number.isInteger(v)?{integerValue:String(v)}:{doubleValue:v}:{stringValue:v}])); }
+async function stamped(who,path,data,time='updatedAt',allowed=true) {
+  const response=await fetch('http://'+host+'/v1/projects/'+project+'/databases/(default)/documents:commit',{
+    method:'POST',headers:{Authorization:'Bearer '+who.token,'Content-Type':'application/json'},
+    body:JSON.stringify({writes:[{update:{name:'projects/'+project+'/databases/(default)/documents/'+path,fields:fields(data)},
+      updateTransforms:[{fieldPath:time,setToServerValue:'REQUEST_TIME'}]}]})});
+  assert.equal(response.ok,allowed,path+' '+response.status+' '+await response.text());
+}
 async function doc(who, path, data, allowed=true) {
   const response = await fetch('http://'+host+'/v1/projects/'+project+'/databases/(default)/documents/'+path, {
     method:data?'PATCH':'GET', headers:{'Content-Type':'application/json',...(who?{Authorization:'Bearer '+who.token}:{})},
@@ -54,8 +61,37 @@ async function main(){
   await doc(a,'players/'+a.id+'/progress/current',{revision:2,payload:'updated'});
   await doc(a,prefix,{owner:a.id});
   await doc(a,prefix+'/members/'+a.id,{nickname:'A'});
+  await stamped(a,'user_directory/'+a.id,{name:'A',nameKey:'a'},'lastSeen');
+  await stamped(b,'user_directory/'+b.id,{name:'B',nameKey:'b'},'lastSeen');
+  await stamped(b,'user_directory/'+a.id,{name:'Forged',nameKey:'forged'},'lastSeen',false);
+  await doc(b,'user_directory/'+a.id);
+  await doc(null,'user_directory/'+a.id,null,false);
+  await stamped(a,'user_directory/'+a.id,{name:'A',nameKey:'a',email:'private'},'lastSeen',false);
+  const requestPath='bloc_requests/'+a.id+'_'+b.id;
+  const request={fromUid:b.id,toUid:a.id,name:'B',status:'pending',spaceId:null};
+  await stamped(b,requestPath,request);
+  await doc(a,requestPath);await doc(b,requestPath);await doc(c,requestPath,null,false);
+  await stamped(b,requestPath,{...request,status:'accepted',spaceId:room},'updatedAt',false);
+  await stamped(a,requestPath,{...request,status:'accepted',spaceId:atomicRoom},'updatedAt',false);
+  await stamped(a,requestPath,{...request,status:'rejected'});
+  await stamped(b,requestPath,request);
+  await stamped(a,requestPath,{...request,status:'accepted',spaceId:room});
+  await stamped(a,requestPath,{...request,status:'pending',spaceId:null},'updatedAt',false);
+  await stamped(b,requestPath,request,'updatedAt',false);
+  async function query(who, collectionId, field, value, allowed = true) {
+    const structuredQuery={from:[{collectionId}],...(field?{where:{fieldFilter:{field:{fieldPath:field},op:'EQUAL',value:{stringValue:value}}}}:{orderBy:[{field:{fieldPath:'nameKey'},direction:'ASCENDING'}]})};
+    const result=await fetch('http://'+host+'/v1/projects/'+project+'/databases/(default)/documents:runQuery',{
+      method:'POST',headers:{Authorization:'Bearer '+who.token,'Content-Type':'application/json'},body:JSON.stringify({structuredQuery})});
+    assert.equal(result.ok,allowed,'Query permission '+collectionId+': '+await result.text());
+  }
+  await query(a,'user_directory');
+  await query(b,'bloc_requests','fromUid',b.id);
+  await query(a,'bloc_requests','toUid',a.id);
+  await query(c,'bloc_requests','fromUid',b.id,false);
   const note={body:'hola',x:.1,y:.2,scale:1,mediaKind:null,mediaPath:null,editor:a.id,updatedAt:'now'};
   await doc(a,prefix+'/notes/one',note);
+  await doc(a,prefix+'/notes/deleted',{...note,deleted:true});
+  await doc(a,prefix+'/notes/deleted',{...note,deleted:false});
   await doc(b,prefix+'/notes/one',null,false);
   await doc(b,prefix+'/members/'+a.id,{nickname:'forged'},false);
   await storage(a,prefix+'/notes/one/image',true);

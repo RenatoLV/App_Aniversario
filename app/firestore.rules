@@ -28,6 +28,34 @@ service cloud.firestore {
         match /recovery/{backup} { allow read, create: if signedIn() && request.auth.uid == uid; }
       }
     }
+    match /user_directory/{uid} {
+      allow read: if signedIn();
+      allow create, update: if signedIn() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['name','nameKey','lastSeen'])
+        && request.resource.data.name is string && request.resource.data.name.size() <= 200
+        && request.resource.data.nameKey is string && request.resource.data.nameKey.size() <= 200
+        && request.resource.data.lastSeen == request.time;
+    }
+    match /bloc_requests/{id} {
+      allow read: if signedIn() && (resource.data.fromUid == request.auth.uid || resource.data.toUid == request.auth.uid);
+      allow create: if signedIn() && request.resource.data.keys().hasOnly(['fromUid','toUid','name','status','spaceId','updatedAt'])
+        && request.resource.data.fromUid == request.auth.uid
+        && request.resource.data.toUid != request.auth.uid
+        && id == request.resource.data.toUid + '_' + request.auth.uid
+        && exists(/databases/$(database)/documents/user_directory/$(request.resource.data.toUid))
+        && request.resource.data.name is string && request.resource.data.name.size() <= 200
+        && request.resource.data.status == 'pending' && request.resource.data.spaceId == null
+        && request.resource.data.updatedAt == request.time;
+      allow update: if signedIn()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','spaceId','updatedAt'])
+        && request.resource.data.updatedAt == request.time
+        && ((resource.data.toUid == request.auth.uid && resource.data.status == 'pending'
+          && (request.resource.data.status == 'rejected' && request.resource.data.spaceId == null
+            || request.resource.data.status == 'accepted'
+              && get(/databases/$(database)/documents/spaces/$(request.resource.data.spaceId)).data.owner == request.auth.uid))
+          || (resource.data.fromUid == request.auth.uid && resource.data.status == 'rejected'
+            && request.resource.data.status == 'pending' && request.resource.data.spaceId == null));
+    }
     match /spaces/{space} {
       // Knowing the 20-character random room ID is the invitation capability.
       allow get: if signedIn();
@@ -40,9 +68,10 @@ service cloud.firestore {
       match /notes/{id} {
         allow read: if member(space);
         allow create, update: if member(space)
-          && request.resource.data.keys().hasOnly(['body','x','y','scale','mediaKind','mediaPath','editor','updatedAt'])
+          && request.resource.data.keys().hasOnly(['body','x','y','scale','mediaKind','mediaPath','editor','updatedAt','deleted'])
           && request.resource.data.editor == request.auth.uid
           && request.resource.data.body is string && request.resource.data.body.size() <= 20000
+          && (!('deleted' in request.resource.data) || request.resource.data.deleted is bool)
           && request.resource.data.x is number && request.resource.data.y is number
           && request.resource.data.scale is number && request.resource.data.scale > 0 && request.resource.data.scale <= 5
           && (request.resource.data.mediaPath == null || request.resource.data.mediaPath.matches('spaces/' + space + '/notes/' + id + '/[^/]+'));

@@ -118,7 +118,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400));
     await tester.tap(find.text('Nuestro bloc'));
     await tester.pump(const Duration(milliseconds: 400));
-    expect(find.text('Compartir / unirme al bloc'), findsOneWidget);
+    expect(find.byTooltip('Compartir / unirme al bloc'), findsOneWidget);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
   });

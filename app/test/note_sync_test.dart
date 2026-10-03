@@ -49,6 +49,50 @@ class FakeNotes implements NoteCloud {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   test(
+    'Cloud snapshots preserve a dragged note and deletion can be undone after sync',
+    () async {
+      SharedPreferences.setMockInitialValues({});
+      final cloud = FakeNotes()..account = 'alice';
+      final prefs = await SharedPreferences.getInstance();
+      final store = GameStore(prefs, noteCloud: cloud);
+      await store.connectCloud('shared-space');
+      final note = PocketNote('Mi foto', .1, .2);
+      store.notes.add(note);
+      await store.saveNote(note);
+      Map<String, dynamic> row({bool deleted = false}) => {
+        'id': note.cloudId,
+        'body': note.text,
+        'x': .1,
+        'y': .2,
+        'scale': 1,
+        'deleted': deleted,
+        'fromCache': false,
+      };
+      store.beginNoteEdit(note);
+      note.x = .7;
+      cloud.rows.add([row()]);
+      await Future<void>.delayed(Duration.zero);
+      await store.retryNotes();
+      expect(store.notes.single, same(note));
+      expect(note.x, .7);
+      expect(cloud.sent[note.cloudId]!['x'], .1);
+      await store.saveNote(note);
+      expect(cloud.sent[note.cloudId]!['x'], .7);
+      await store.deleteNote(note);
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      cloud.rows.add([row(deleted: true)]);
+      await Future<void>.delayed(Duration.zero);
+      expect(store.notes.single, same(note));
+      expect(GameStore(prefs).notes.single.deleted, isTrue);
+      await store.restoreNote(note);
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(cloud.sent[note.cloudId]!['deleted'], isFalse);
+      expect(GameStore(prefs).notes.single.deleted, isFalse);
+      store.dispose();
+      await cloud.rows.close();
+    },
+  );
+  test(
     'Saving a note returns after local persistence while cloud upload waits',
     () async {
       SharedPreferences.setMockInitialValues({});
