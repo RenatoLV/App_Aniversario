@@ -748,27 +748,6 @@ class _CatPainter extends CustomPainter {
     canvas.restore();
     canvas.restore();
 
-    if (feeding && !sleeping) {
-      // The treat tip meets the mouth; a paw holds the diagonal packet.
-      final sway = math.sin(phase * math.pi * 8) * .5;
-      canvas.save();
-      canvas.translate(50, 63);
-      canvas.rotate(maru ? -.24 : .24);
-      canvas.translate(-50, -63);
-      final tube = Path()
-        ..moveTo(48, 65 + sway)
-        ..lineTo(52, 65 + sway)
-        ..lineTo(54, 84 + sway)
-        ..lineTo(46, 84 + sway)
-        ..close();
-      path(canvas, tube, const Color(0xffff82aa));
-      line(canvas, 48, 69 + sway, 52, 69 + sway, const Color(0xffb84d75), 1.3);
-      ellipse(canvas, 50, 64 + sway, 1.6, 1, const Color(0xffead8a7));
-      line(canvas, 48, 76 + sway, 52, 76 + sway, Colors.white, 1.5);
-      ellipse(canvas, 46, 79, 4, 5, maru ? dark : const Color(0xfffffdf5));
-      canvas.restore();
-    }
-
     if (sleeping) {
       final drift = math.sin(phase * math.pi * 2) * 2;
       for (final i in [0, 1, 2]) {

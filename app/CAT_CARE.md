@@ -8,6 +8,9 @@ y su conjunto de ropa.
   Cada alimento tiene dibujos, movimientos y efectos propios antes de recuperar
   comida y cariño: croquetas, pescado, churú, atún, salmón, pollo, camarón, huevo,
   calabaza y caldo.
+  El refri muestra existencias y permite comprar porciones por 10–40 monedas.
+  Alimentar consume una porción; ambos gatos comparten inventario. La migración
+  entrega una porción inicial de cada alimento, sin reponerlas al volver a abrir.
 - **Baño:** selecciona o arrastra el jabón y frota al gato hasta hacer espuma.
   Cambia a la regadera para enjuagarlo. El agua borra progresivamente las manchas
   de lodo; la limpieza se recupera cuando terminas el enjuague. También puedes
@@ -25,6 +28,9 @@ No modifican la dificultad de los juegos ni eliminan las mascotas.
 ## Guardado y dibujos compartidos
 
 `GameStore.catCare` guarda necesidades, fecha y ropa en `rincon.v1`. El respaldo
+incluye también `catCare.foodInventory`, junto con las monedas descontadas por
+las compras. Firebase sincroniza el mismo payload de progreso y conserva sus
+reglas de acceso por usuario; no necesita una colección ni reglas adicionales. El respaldo
 existente de Firebase incluye esos datos. Las partidas antiguas sin ese campo
 conservan sus monedas y colección y reciben los valores iniciales de cuidados.
 

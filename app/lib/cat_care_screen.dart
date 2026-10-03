@@ -62,6 +62,17 @@ class _CatCareScreenState extends State<CatCareScreen>
       _fridgeOpen = false;
       _message = '$name: ${meal.reaction}';
     });
+    if (!await care.takeFood(meal)) {
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _message =
+              'No queda ${meal.label.toLowerCase()}. Compra más en el refri.';
+        });
+      }
+      return;
+    }
+    if (!mounted) return;
     GameAudio.instance.play(GameSfx.kitten);
     try {
       await _action.forward(from: 0).orCancel;
@@ -513,9 +524,13 @@ class _CatCareScreenState extends State<CatCareScreen>
 
   Widget _foodTray() => Column(
     children: [
+      Text(
+        'Monedas: ${widget.store.coins} · En el refri: ${care.stock(_food)} ${_food.label.toLowerCase()}',
+      ),
+      const SizedBox(height: 8),
       FilledButton.icon(
         key: const ValueKey('care-feed'),
-        onPressed: _busy ? null : () => _feed(),
+        onPressed: _busy || care.stock(_food) == 0 ? null : () => _feed(),
         icon: const Icon(Icons.restaurant_rounded),
         label: Text(_busy ? 'Comiendo…' : 'Dar ${_food.label.toLowerCase()}'),
       ),
@@ -591,12 +606,13 @@ class _CatCareScreenState extends State<CatCareScreen>
                           physics: const NeverScrollableScrollPhysics(),
                           mainAxisSpacing: 8,
                           crossAxisSpacing: 8,
-                          childAspectRatio: .95,
+                          childAspectRatio: .7,
                           children: [
                             for (final food in CatFood.values)
                               Draggable<CatFood>(
                                 data: food,
-                                maxSimultaneousDrags: _busy ? 0 : 1,
+                                maxSimultaneousDrags:
+                                    _busy || care.stock(food) == 0 ? 0 : 1,
                                 feedback: Material(
                                   color: Colors.transparent,
                                   child: FoodIcon(food: food, size: 64),
@@ -634,10 +650,35 @@ class _CatCareScreenState extends State<CatCareScreen>
                                             maxLines: 1,
                                           ),
                                           Text(
-                                            '+${food.nutrition} comida',
+                                            'Guardados: ${care.stock(food)} · +${food.nutrition}',
                                             style: const TextStyle(
                                               fontSize: 9,
                                               color: Color(0xff708376),
+                                            ),
+                                          ),
+                                          TextButton(
+                                            key: ValueKey(
+                                              'buy-food-${food.name}',
+                                            ),
+                                            onPressed: _busy
+                                                ? null
+                                                : () async {
+                                                    final bought = await widget
+                                                        .store
+                                                        .buyCatFood(food);
+                                                    if (mounted) {
+                                                      setState(
+                                                        () => _message = bought
+                                                            ? '${food.label} guardado en el refri'
+                                                            : 'Necesitas ${food.price} monedas para comprar ${food.label.toLowerCase()}',
+                                                      );
+                                                    }
+                                                  },
+                                            child: Text(
+                                              'Comprar ${food.price} 🪙',
+                                              style: const TextStyle(
+                                                fontSize: 10,
+                                              ),
                                             ),
                                           ),
                                         ],

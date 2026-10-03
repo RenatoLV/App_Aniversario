@@ -5,6 +5,30 @@ import 'package:nuestro_rincon/cat_care.dart';
 import 'package:nuestro_rincon/store.dart';
 
 void main() {
+  test(
+    'Food purchases deduct coins, consume stock and survive cloud snapshots',
+    () async {
+      SharedPreferences.setMockInitialValues({});
+      final prefs = await SharedPreferences.getInstance();
+      final store = GameStore(prefs);
+      store.coins = 100;
+      expect(await store.buyCatFood(CatFood.salmon), isTrue);
+      expect(store.coins, 60);
+      expect(store.catCare.stock(CatFood.salmon), 2);
+      expect(await store.catCare.takeFood(CatFood.salmon), isTrue);
+      final restored = GameStore(prefs);
+      expect(restored.coins, 60);
+      expect(restored.catCare.stock(CatFood.salmon), 1);
+      final core = jsonDecode(jsonDecode(store.cloud.snapshot())['rincon.v1']);
+      expect(core['catCare']['foodInventory']['salmon'], 1);
+      store.coins = 0;
+      expect(await store.buyCatFood(CatFood.salmon), isFalse);
+      expect(store.catCare.stock(CatFood.salmon), 1);
+      expect(await store.catCare.takeFood(CatFood.salmon), isTrue);
+      expect(await store.catCare.takeFood(CatFood.salmon), isFalse);
+      expect(GameStore(prefs).catCare.stock(CatFood.salmon), 0);
+    },
+  );
   test('Wardrobe has ten unique garments per category and ten foods', () {
     expect(catWardrobe.length, 40);
     expect(catWardrobe.map((item) => item.id).toSet().length, 40);

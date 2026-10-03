@@ -365,6 +365,18 @@ enum CatFood {
 }
 
 extension CatFoodLabel on CatFood {
+  int get price => switch (this) {
+    CatFood.kibble => 10,
+    CatFood.pumpkin => 12,
+    CatFood.egg => 15,
+    CatFood.broth => 18,
+    CatFood.churu => 20,
+    CatFood.tuna => 25,
+    CatFood.chicken => 28,
+    CatFood.fish => 30,
+    CatFood.shrimp => 35,
+    CatFood.salmon => 40,
+  };
   String get label => switch (this) {
     CatFood.kibble => 'Croquetas',
     CatFood.fish => 'Pescadito',
@@ -435,6 +447,21 @@ class _CatProfile {
 }
 
 class CatCare extends ChangeNotifier {
+  // One welcome portion per food, shared by both cats; subsequently purchased.
+  final Map<CatFood, int> _stock = {for (final food in CatFood.values) food: 1};
+  int stock(CatFood food) => _stock[food] ?? 0;
+  Future<void> addFood(CatFood food) async {
+    _stock[food] = stock(food) + 1;
+    await _changed();
+  }
+
+  Future<bool> takeFood(CatFood food) async {
+    if (stock(food) <= 0) return false;
+    _stock[food] = stock(food) - 1;
+    await _changed();
+    return true;
+  }
+
   final DateTime Function() now;
   final Future<void> Function()? onChanged;
   late final Map<CatKind, _CatProfile> _profiles = {
@@ -506,6 +533,9 @@ class CatCare extends ChangeNotifier {
   }
 
   Map<String, dynamic> toJson() => {
+    'foodInventory': {
+      for (final food in CatFood.values) food.name: stock(food),
+    },
     for (final cat in CatKind.values)
       cat.name: {
         'food': _profiles[cat]!.food,
@@ -516,6 +546,13 @@ class CatCare extends ChangeNotifier {
       },
   };
   void restore(dynamic data, {bool notify = false}) {
+    final inventory = data is Map ? data['foodInventory'] : null;
+    for (final food in CatFood.values) {
+      final value = inventory is Map ? inventory[food.name] : null;
+      _stock[food] = inventory is Map
+          ? (value is num ? value.toInt().clamp(0, 999999) : 0)
+          : 1;
+    }
     _profiles.clear();
     for (final cat in CatKind.values) {
       final p = _CatProfile(now());

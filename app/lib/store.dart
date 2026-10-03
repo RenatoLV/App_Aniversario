@@ -416,6 +416,15 @@ class GameStore extends ChangeNotifier {
     await Backend.signOut();
   }
 
+  Future<bool> buyCatFood(CatFood food) async {
+    if (coins < food.price) return false;
+    coins -= food.price;
+    // CatCare's callback persists coins and stock in the same cloud snapshot.
+    await catCare.addFood(food);
+    notifyListeners();
+    return true;
+  }
+
   Future<void> save() {
     final snapshot = jsonEncode({
       'coins': coins,
