@@ -531,6 +531,7 @@ class _RinconHomeState extends State<RinconHome>
 
   Widget _gameSpotlight({
     required String gameId,
+    bool showLeaderboard = true,
     required String eyebrow,
     required String title,
     required String description,
@@ -623,7 +624,7 @@ class _RinconHomeState extends State<RinconHome>
                   ),
                 ),
                 const SizedBox(height: 17),
-                _leaderboardButton(gameId, title, accent),
+                if (showLeaderboard) _leaderboardButton(gameId, title, accent),
                 const SizedBox(height: 8),
                 Container(
                   padding: const EdgeInsets.symmetric(
@@ -883,6 +884,7 @@ class _RinconHomeState extends State<RinconHome>
       const SizedBox(height: 24),
       _gameSpotlight(
         gameId: 'bomber-miau',
+        showLeaderboard: false,
         eyebrow: 'DUELO DE PATITAS',
         title: 'Bomber Miau',
         description:

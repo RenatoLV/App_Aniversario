@@ -35,6 +35,11 @@ class _BomberScreenState extends State<BomberScreen> {
     if (busy) return;
     setState(() => busy = true);
     try {
+      // The server reads the saved wardrobe; finish any recent outfit change
+      // before asking it to create the room's immutable character appearance.
+      await widget.store.save();
+      await widget.store.cloud.sync();
+      if (!mounted) return;
       final result = await BomberNetwork.request(
         action,
         room: room,
