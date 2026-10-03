@@ -157,7 +157,16 @@ void main() {
       );
       await tester.tap(find.byKey(const ValueKey('care-feed')));
       await tester.pump();
-      await tester.pump(const Duration(seconds: 2));
+      await tester.pump(const Duration(milliseconds: 700));
+      final eating = tester.widget<CatActor>(find.byType(CatActor));
+      expect(
+        eating.feeding,
+        isFalse,
+        reason: 'Meal scenes must not draw the legacy churú',
+      );
+      expect(eating.mealProgress, closeTo(.25, .02));
+      await capture(tester, boundary, 'cat-care-eating');
+      await tester.pump(const Duration(seconds: 3));
       await tester.pump();
       expect(store.catCare.needs(CatKind.maru).food, 50);
       await tester.tap(find.text('Baño'));
@@ -240,7 +249,7 @@ void main() {
     await tester.pump();
     await finger.up();
     await tester.pump();
-    await tester.pump(const Duration(seconds: 2));
+    await tester.pump(const Duration(seconds: 3));
     await tester.pump();
     expect(store.catCare.needs(CatKind.maru).food, 58);
     await tester.tap(find.text('Baño'));

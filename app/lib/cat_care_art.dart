@@ -310,6 +310,7 @@ void paintFood(Canvas c, CatFood food) {
   }
 }
 
+/// One meal prop, paced bites and a gentle approach/finish, without flying food.
 class FeedingScenePainter extends CustomPainter {
   final CatFood food;
   final double phase;
@@ -318,180 +319,107 @@ class FeedingScenePainter extends CustomPainter {
   void paint(Canvas c, Size size) {
     c.save();
     c.scale(size.width / 100, size.height / 100);
-    final t = phase.clamp(0.0, 1.0), wave = math.sin(t * math.pi * 8);
-    final mouth = Offset(
-      50,
-      food == CatFood.churu || food == CatFood.broth ? 58 : 68,
-    );
-    void prop(Offset at, double s, {double rotation = 0, double alpha = 1}) {
+    final t = phase.clamp(0.0, 1.0);
+    final approach = Curves.easeInOut.transform((t / .2).clamp(0.0, 1.0));
+    final finish = Curves.easeInOut.transform(((t - .8) / .2).clamp(0.0, 1.0));
+    final eating = approach * (1 - finish);
+    final cycle = ((t - .2) / .6).clamp(0.0, 1.0) * 3;
+    final bite = math.sin((cycle % 1) * math.pi);
+    final liquid = food == CatFood.churu || food == CatFood.broth;
+    void prop(Offset at, double span, {double rotation = 0}) {
       c.save();
       c.translate(at.dx, at.dy);
       c.rotate(rotation);
-      c.scale(s / 100);
+      c.scale(span / 100);
       c.translate(-50, -50);
-      if (alpha < 1) {
-        c.saveLayer(
-          const Rect.fromLTWH(0, 0, 100, 100),
-          Paint()..color = Colors.white.withValues(alpha: alpha),
-        );
-      }
       paintFood(c, food);
-      if (alpha < 1) c.restore();
       c.restore();
     }
 
-    void crumbs(Color color, int count) {
-      for (var i = 0; i < count; i++) {
-        final p = (t * 2.8 + i * .19) % 1;
-        c.drawCircle(
-          Offset(mouth.dx + math.sin(i * 2.3) * p * 16, mouth.dy + 6 + p * 17),
-          1.1 + (i % 2) * .5,
-          _p(color.withValues(alpha: (1 - p) * .9)),
+    if (food == CatFood.churu) {
+      // A single tube held beside the muzzle; its tip follows the lean.
+      prop(Offset(60, 80 - eating * 4), 32, rotation: -.55);
+      if (t > .2 && t < .8) {
+        c.drawOval(
+          Rect.fromCenter(
+            center: Offset(52, 67 + bite),
+            width: 3.2,
+            height: 2 + bite * 2,
+          ),
+          _p(const Color(0xffed8ca3)),
         );
       }
-    }
-
-    switch (food) {
-      case CatFood.kibble:
-        prop(const Offset(50, 94), 32);
-        for (var i = 0; i < 5; i++) {
-          final p = (t * 3 + i * .2) % 1;
-          c.drawCircle(
-            Offset(43 + i * 3.0, 94 - p * 25),
-            1.8,
-            _p(food.color.withValues(alpha: 1 - p * .6)),
+    } else {
+      final bowl =
+          food == CatFood.kibble ||
+          food == CatFood.tuna ||
+          food == CatFood.broth;
+      if (!bowl) {
+        c.drawOval(
+          const Rect.fromLTWH(32, 88, 36, 8),
+          _p(const Color(0xffb8ceca)),
+        );
+        c.drawOval(
+          const Rect.fromLTWH(34, 88, 32, 5),
+          _p(const Color(0xffedf4e8)),
+        );
+      }
+      final span = food == CatFood.broth ? 32.0 : 28.0;
+      // Food stays on its dish and diminishes after each bite.
+      final remaining = 1 - .16 * cycle.floor().clamp(0, 3);
+      prop(
+        Offset(50, food == CatFood.broth ? 87 : 89),
+        bowl ? span : span * remaining,
+        rotation: food == CatFood.fish ? -.12 : 0,
+      );
+      if (t > .2 && t < .8) {
+        if (liquid) {
+          c.drawOval(
+            Rect.fromCenter(
+              center: Offset(50, 69 + bite),
+              width: 3,
+              height: 2 + bite * 2,
+            ),
+            _p(const Color(0xffed8ca3)),
+          );
+        } else {
+          // A small morsel, rather than an entire fish or plate, meets the mouth.
+          final lift = Curves.easeInOut.transform((bite * 1.3).clamp(0.0, 1.0));
+          final x = food == CatFood.chicken || food == CatFood.salmon
+              ? 54.0
+              : 47.0;
+          final color = switch (food) {
+            CatFood.egg => const Color(0xffffda73),
+            CatFood.tuna => const Color(0xffc79489),
+            CatFood.chicken => const Color(0xffe3b382),
+            _ => food.color,
+          };
+          c.drawOval(
+            Rect.fromCenter(
+              center: Offset(x + (50 - x) * lift, 84 - 15 * lift),
+              width: 3.5 * (1 - lift * .5),
+              height: 2.5 * (1 - lift * .5),
+            ),
+            _p(color),
           );
         }
-        crumbs(food.color, 8);
-      case CatFood.fish:
-        final p = (t * 2) % 1;
-        prop(
-          Offset(25 + 25 * p, 89 - 25 * math.sin(p * math.pi / 2)),
-          24,
-          rotation: wave * .2,
-          alpha: 1 - p * .7,
-        );
-        crumbs(const Color(0xff8bc1ce), 5);
-      case CatFood.churu:
-        prop(Offset(65 + wave * 1.5, 72), 32, rotation: -.55);
-        c.drawOval(
-          Rect.fromCenter(
-            center: Offset(53, 61 + wave * 1.5),
-            width: 5,
-            height: 4 + wave.abs() * 3,
-          ),
-          _p(const Color(0xffec94a8)),
-        );
-        c.drawCircle(
-          Offset(58, 62 - wave.abs() * 2),
-          1.5,
-          _p(const Color(0xffdfc399)),
-        );
-      case CatFood.tuna:
-        prop(const Offset(24, 89), 27);
-        c.drawArc(
-          Rect.fromLTWH(12, 73 - t * 8, 18, 7),
-          0,
-          math.pi,
-          false,
-          _p(const Color(0xffa4b8b6), 2),
-        );
-        final p = (t * 3) % 1;
-        c.drawOval(
-          Rect.fromCenter(
-            center: Offset(25 + 25 * p, 85 - 19 * p),
-            width: 5,
-            height: 3,
-          ),
-          _p(const Color(0xffd1a99b)),
-        );
-        crumbs(const Color(0xffc4a497), 5);
-      case CatFood.salmon:
-        prop(const Offset(60, 94), 30);
-        final p = (t * 3) % 1;
-        prop(
-          Offset(62 - 12 * p, 88 - 21 * p),
-          11,
-          rotation: -p * .6,
-          alpha: 1 - p * .8,
-        );
-        crumbs(food.color, 4);
-      case CatFood.chicken:
-        prop(
-          Offset(61 + wave * 2, 76 + wave.abs() * 2),
-          30,
-          rotation: -.8 + wave * .1,
-        );
-        crumbs(const Color(0xffe9c598), 7);
-      case CatFood.shrimp:
-        final p = (t * 2) % 1;
-        prop(
-          Offset(20 + 31 * p, 88 - math.sin(p * math.pi) * 30),
-          23,
-          rotation: p * 1.3,
-          alpha: 1 - p * .6,
-        );
-        crumbs(food.color, 3);
-      case CatFood.egg:
-        prop(const Offset(50, 92), 28);
-        final crack = (t * 3).clamp(0.0, 1.0);
-        c.drawArc(
-          Rect.fromLTWH(34 - crack * 6, 78, 12, 13),
-          0,
-          math.pi,
-          false,
-          _p(const Color(0xfffff2d9), 3),
-        );
-        c.drawArc(
-          Rect.fromLTWH(53 + crack * 6, 79, 12, 13),
-          0,
-          math.pi,
-          false,
-          _p(const Color(0xfffff2d9), 3),
-        );
-        final p = (t * 2) % 1;
-        c.drawCircle(Offset(50, 89 - p * 21), 3 * (1 - p * .6), _p(food.color));
-      case CatFood.pumpkin:
-        c.save();
-        c.translate(50, 90);
-        c.scale(1 + wave * .08, 1 - wave * .08);
-        prop(Offset.zero, 30);
-        c.restore();
-        final p = (t * 2.5) % 1;
-        c.drawOval(
-          Rect.fromCenter(center: Offset(52, 86 - p * 18), width: 7, height: 3),
-          _p(const Color(0xffffd191)),
-        );
-        crumbs(food.color, 3);
-      case CatFood.broth:
-        prop(const Offset(50, 84), 37);
-        for (var i = 0; i < 3; i++) {
-          final p = (t + i * .25) % 1;
+      }
+      if (food == CatFood.broth) {
+        for (var i = 0; i < 2; i++) {
+          final steam = (t * 1.5 + i * .5) % 1;
           c.drawPath(
             Path()
-              ..moveTo(39 + i * 10.0, 78 - p * 24)
+              ..moveTo(42 + i * 13.0, 80 - steam * 10)
               ..quadraticBezierTo(
-                35 + i * 10.0,
-                72 - p * 24,
-                40 + i * 10.0,
-                68 - p * 24,
+                39 + i * 13.0,
+                76 - steam * 10,
+                43 + i * 13.0,
+                72 - steam * 10,
               ),
-            _p(const Color(0xffeef6df).withValues(alpha: 1 - p), 1),
+            _p(const Color(0xfff8f1dc).withValues(alpha: (1 - steam) * .6), .8),
           );
         }
-        c.drawOval(
-          Rect.fromCenter(
-            center: Offset(50, 61),
-            width: 4,
-            height: 4 + wave.abs() * 3,
-          ),
-          _p(const Color(0xffe9a0ad)),
-        );
-        c.drawCircle(
-          Offset(55, 65 + wave.abs() * 3),
-          1.3,
-          _p(const Color(0xffb3d5d9)),
-        );
+      }
     }
     c.restore();
   }

@@ -22,6 +22,7 @@ class CatActor extends StatefulWidget {
   final bool movable;
   final bool feeding;
   final bool munching;
+  final double? mealProgress;
   final bool digging;
   final bool crying;
   final double packProgress;
@@ -41,6 +42,7 @@ class CatActor extends StatefulWidget {
     this.movable = false,
     this.feeding = false,
     this.munching = false,
+    this.mealProgress,
     this.digging = false,
     this.crying = false,
     this.packProgress = 0,
@@ -208,13 +210,14 @@ class _CatActorState extends State<CatActor> with TickerProviderStateMixin {
                           CatCareScope.cleanlinessOf(context, widget.cat),
                       action: widget.action,
                       active: widget.active,
-                      phase: _idle.value,
+                      phase: widget.mealProgress ?? _idle.value,
                       pet: _pet.value,
                       focus: widget.focus,
                       sleeping: _sleeping,
                       reaction: _reaction,
                       feeding: widget.feeding,
                       munching: widget.munching,
+                      mealProgress: widget.mealProgress,
                       digging: widget.digging,
                       crying: widget.crying,
                       packProgress: widget.packProgress,
@@ -363,6 +366,7 @@ class _CatPainter extends CustomPainter {
   final int reaction;
   final bool feeding;
   final bool munching;
+  final double? mealProgress;
   final bool digging;
   final bool crying;
   final double packProgress;
@@ -382,6 +386,7 @@ class _CatPainter extends CustomPainter {
     required this.reaction,
     required this.feeding,
     required this.munching,
+    this.mealProgress,
     required this.digging,
     required this.crying,
     required this.packProgress,
@@ -567,7 +572,16 @@ class _CatPainter extends CustomPainter {
     // Independent head tilt follows a target or a petting tap.
     canvas.save();
     if (sleeping) canvas.translate(0, 8);
-    if (munching) canvas.translate(0, 10 + math.sin(phase * math.pi * 8) * 2);
+    if (mealProgress != null) {
+      final t = mealProgress!.clamp(0.0, 1.0);
+      final lean =
+          Curves.easeInOut.transform((t / .2).clamp(0.0, 1.0)) *
+          (1 - Curves.easeInOut.transform(((t - .8) / .2).clamp(0.0, 1.0)));
+      final chew = math.sin(t * math.pi * 12);
+      canvas.translate(0, lean * (8 + chew * .65));
+    } else if (munching) {
+      canvas.translate(0, 10 + math.sin(phase * math.pi * 8) * 2);
+    }
     canvas.translate(50, sleeping ? 51 : 45);
     canvas.rotate(
       gaze * .08 + math.sin(pet * math.pi) * .13 + (active ? wave * .035 : 0),
@@ -699,7 +713,7 @@ class _CatPainter extends CustomPainter {
       line(canvas, 50, 60, 45, 62, maru ? dark : const Color(0xff8b8588), 1.3);
       line(canvas, 50, 60, 55, 62, maru ? dark : const Color(0xff8b8588), 1.3);
     }
-    if ((feeding || munching) && !sleeping) {
+    if ((feeding || (munching && mealProgress == null)) && !sleeping) {
       final lick = (math.sin(phase * math.pi * 8) + 1) / 2;
       ellipse(
         canvas,
@@ -824,6 +838,7 @@ class _CatPainter extends CustomPainter {
       old.action != action ||
       old.feeding != feeding ||
       old.munching != munching ||
+      old.mealProgress != mealProgress ||
       old.digging != digging ||
       old.crying != crying ||
       old.packProgress != packProgress ||
