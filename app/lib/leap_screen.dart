@@ -1247,6 +1247,21 @@ class LeapWorldPainter extends CustomPainter {
       }
       canvas.drawPath(sparks, Paint()..color = const Color(0xffffdd75)..style = PaintingStyle.stroke..strokeWidth = 2);
     } else {
+      // Jagged stone ledge supports the crystals; no cloud beneath the spikes.
+      final rock = Path()
+        ..moveTo(-width / 2, 4)..lineTo(width / 2, 4)
+        ..lineTo(width / 2 - 4, 13)..lineTo(width * .23, 18)
+        ..lineTo(-width * .17, 20)..lineTo(-width / 2 + 6, 14)..close();
+      canvas.drawPath(rock, Paint()..shader = LinearGradient(
+        colors: zone == LeapWorldZone.underground
+          ? const [Color(0xff716184),Color(0xff3e354b)]
+          : const [Color(0xffb18a64),Color(0xff655345)],
+        begin: Alignment.topCenter, end: Alignment.bottomCenter,
+      ).createShader(Rect.fromLTWH(-width/2,4,width,16)));
+      canvas.drawPath(Path()..moveTo(-width*.32,8)..lineTo(-width*.12,12)
+        ..lineTo(-width*.05,19)..moveTo(width*.29,6)..lineTo(width*.17,13)
+        ..lineTo(width*.3,16), Paint()..color=const Color(0xff302b3d).withValues(alpha:.45)
+        ..style=PaintingStyle.stroke..strokeWidth=1.2);
       for (var i = 0; i < 5; i++) {
         final x = -width / 2 + i * width / 5;
         final peak = -15.0 - (i % 2) * 9;
@@ -1578,7 +1593,11 @@ class LeapWorldPainter extends CustomPainter {
         canvas.save();
         canvas.translate(platform.x, y + 2);
         canvas.scale(platform.facingRight ? 1 : -1, 1);
-        _airplanePlatform(canvas, Offset.zero, platform.width);
+        if (game.zoneAt(platform.y) == LeapWorldZone.space) {
+          _satellitePlatform(canvas, platform.width);
+        } else {
+          _airplanePlatform(canvas, Offset.zero, platform.width);
+        }
         canvas.restore();
       } else {
         final storm = platform.kind == LeapPlatformKind.storm;
@@ -2156,6 +2175,35 @@ class LeapWorldPainter extends CustomPainter {
     for (var i = 0; i < 5; i++) {
       canvas.drawCircle(Offset(106 + i * 37.0, gateY + 8), 30, cloud);
     }
+  }
+
+  void _satellitePlatform(Canvas canvas, double width) {
+    final metal = Paint()..color = const Color(0xffd5dee9);
+    final seam = Paint()..color = const Color(0xff8eabc3)..strokeWidth = 1;
+    final half = width / 2;
+    // Solar arrays stay inside the platform width, with their top at the landing plane.
+    for (final side in [-1.0, 1.0]) {
+      final panel = Rect.fromLTWH(side < 0 ? -half : 17, 0, half-17, 22);
+      canvas.drawRect(panel.inflate(1), metal);
+      canvas.drawRect(panel, Paint()..color = const Color(0xff326fb5));
+      for (var i = 1; i < 4; i++) {
+        final x = panel.left + panel.width * i / 4;
+        canvas.drawLine(Offset(x,0), Offset(x,22), seam);
+      }
+      canvas.drawLine(Offset(panel.left,11),Offset(panel.right,11),seam);
+      canvas.drawLine(Offset(side*12,11),Offset(side*19,11),metal..strokeWidth=3);
+    }
+    final body = RRect.fromRectAndRadius(const Rect.fromLTWH(-13,0,26,23),const Radius.circular(5));
+    canvas.drawRRect(body,Paint()..shader = const LinearGradient(
+      colors:[Color(0xfff0f4f8),Color(0xffa1b4c9)], begin:Alignment.topLeft,end:Alignment.bottomRight
+    ).createShader(body.outerRect));
+    canvas.drawLine(const Offset(-9,7),const Offset(9,7),seam);
+    canvas.drawLine(const Offset(-9,17),const Offset(9,17),seam);
+    canvas.drawLine(const Offset(0,0),const Offset(0,-7),seam);
+    canvas.drawArc(const Rect.fromLTWH(-9,-15,18,12),0,math.pi,true,metal);
+    canvas.drawLine(const Offset(0,-9),const Offset(5,-19),seam);
+    canvas.drawCircle(const Offset(5,-19),1.8,Paint()..color=const Color(0xffedfaff));
+    canvas.drawCircle(const Offset(7,12),2,Paint()..color=const Color(0xff80efb9));
   }
 
   void _airplanePlatform(Canvas canvas, Offset at, double width) {
