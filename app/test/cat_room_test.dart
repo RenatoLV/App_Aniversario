@@ -10,9 +10,12 @@ void main() {
     await tester.binding.setSurfaceSize(const Size(393, 852));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(
-      const MaterialApp(
+      MaterialApp(
         home: Scaffold(
-          body: Padding(padding: EdgeInsets.all(16), child: CatRoom()),
+          body: Padding(
+            padding: const EdgeInsets.all(16),
+            child: CatRoom(clock: () => DateTime(2026, 10, 3, 12)),
+          ),
         ),
       ),
     );

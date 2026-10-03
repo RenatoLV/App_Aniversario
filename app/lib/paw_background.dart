@@ -21,21 +21,26 @@ class PawBackground extends StatelessWidget {
 }
 
 class PawPatternPainter extends CustomPainter {
-  const PawPatternPainter();
+  final double spacing, opacity, pawScale;
+  const PawPatternPainter({
+    this.spacing = 118,
+    this.opacity = .15,
+    this.pawScale = 1,
+  });
   @override
   void paint(Canvas canvas, Size size) {
-    for (var row = 0; row * 118 < size.height + 50; row++) {
-      for (var col = 0; col * 118 < size.width + 50; col++) {
-        final x = col * 118.0 + (row.isEven ? 28 : 87);
-        final y = row * 118.0 + 36;
+    for (var row = 0; row * spacing < size.height + 50; row++) {
+      for (var col = 0; col * spacing < size.width + 50; col++) {
+        final x = col * spacing + (row.isEven ? .237 : .737) * spacing;
+        final y = row * spacing + spacing * .305;
         final ink = Paint()
           ..color =
               (row.isEven ? const Color(0xff93b4a1) : const Color(0xffc7aa89))
-                  .withValues(alpha: .15);
+                  .withValues(alpha: opacity);
         canvas.save();
         canvas.translate(x, y);
         canvas.rotate((col + row).isEven ? -.38 : .32);
-        canvas.scale((col + row) % 3 == 0 ? 1.15 : .9);
+        canvas.scale(pawScale * ((col + row) % 3 == 0 ? 1.15 : .9));
         canvas.drawPath(
           Path()
             ..moveTo(-10, 9)
@@ -61,5 +66,8 @@ class PawPatternPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(PawPatternPainter oldDelegate) => false;
+  bool shouldRepaint(PawPatternPainter oldDelegate) =>
+      oldDelegate.spacing != spacing ||
+      oldDelegate.opacity != opacity ||
+      oldDelegate.pawScale != pawScale;
 }

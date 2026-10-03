@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'store.dart';
+import 'paw_background.dart';
 
 class BlocBoard extends StatefulWidget {
   final GameStore store;
@@ -215,7 +216,15 @@ class BlocBoardState extends State<BlocBoard> {
                     return Stack(
                       children: [
                         const Positioned.fill(
-                          child: ColoredBox(color: Color(0xfff6efdc)),
+                          child: ColoredBox(
+                            color: Color(0xfff6efdc),
+                            child: CustomPaint(
+                              painter: PawPatternPainter(
+                                spacing: 110,
+                                opacity: .17,
+                              ),
+                            ),
+                          ),
                         ),
                         InteractiveViewer(
                           key: const ValueKey('bloc-viewer'),
@@ -520,8 +529,13 @@ class BlocPaperPainter extends CustomPainter {
           end: Alignment.bottomRight,
         ).createShader(Offset.zero & s),
     );
+    const PawPatternPainter(
+      spacing: 140,
+      opacity: .23,
+      pawScale: 1.35,
+    ).paint(c, s);
     final dots = Paint()
-      ..color = const Color(0xffb5a78c).withValues(alpha: .25);
+      ..color = const Color(0xffb5a78c).withValues(alpha: .14);
     for (var y = 20.0; y < s.height; y += 24) {
       for (var x = 20.0; x < s.width; x += 24) {
         c.drawCircle(Offset(x, y), .8, dots);
