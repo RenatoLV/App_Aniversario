@@ -29,11 +29,11 @@ void main() {
       expect(GameStore(prefs).catCare.stock(CatFood.salmon), 0);
     },
   );
-  test('Wardrobe has ten unique garments per category and ten foods', () {
-    expect(catWardrobe.length, 40);
-    expect(catWardrobe.map((item) => item.id).toSet().length, 40);
+  test('Wardrobe has fifteen unique garments per category and ten foods', () {
+    expect(catWardrobe.length, 60);
+    expect(catWardrobe.map((item) => item.id).toSet().length, 60);
     for (final slot in ClothingSlot.values) {
-      expect(catWardrobe.where((item) => item.slot == slot).length, 10);
+      expect(catWardrobe.where((item) => item.slot == slot).length, 15);
     }
     expect(CatFood.values.length, 10);
   });
@@ -61,6 +61,7 @@ void main() {
     () async {
       final care = CatCare();
       for (final id in ['collar_heart', 'beanie', 'glasses', 'shirt_star']) {
+        await care.unlockClothing(clothingById(id)!);
         await care.equip(CatKind.maru, clothingById(id)!);
       }
       final outfit = care.outfit(CatKind.maru);
@@ -87,6 +88,7 @@ void main() {
       final prefs = await SharedPreferences.getInstance(),
           store = GameStore(await SharedPreferences.getInstance());
       store.coins = 987;
+      await store.catCare.unlockClothing(clothingById('explorer')!);
       await store.catCare.equip(CatKind.lady, clothingById('explorer')!);
       await store.catCare.feed(CatKind.lady, CatFood.kibble);
       final restored = GameStore(prefs);

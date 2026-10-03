@@ -97,7 +97,7 @@ void main() {
         }
         final picture = recorder.endRecording();
         await tester.runAsync(() async {
-          final image = await picture.toImage(680, 1550);
+          final image = await picture.toImage(680, items.length * 155);
           final data = await image.toByteData(format: ui.ImageByteFormat.png);
           await File(
             'build/qa/cat-clothing-${slot.name}.png',

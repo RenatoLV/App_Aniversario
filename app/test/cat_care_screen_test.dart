@@ -121,8 +121,12 @@ void main() {
         find.byKey(const ValueKey('wear-shirt_star')),
         160,
       );
+      store.coins = 1000;
       await tester.tap(find.byKey(const ValueKey('wear-shirt_star')));
-      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.tap(find.text('Comprar'));
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(store.coins, 850);
       final scroll = tester.state<ScrollableState>(
         find.byType(Scrollable).first,
       );
@@ -291,6 +295,7 @@ void main() {
       store.catCare.restore({
         'maru': {'food': 15, 'clean': 35, 'happy': 41},
       });
+      await store.catCare.unlockClothing(clothingById('explorer')!);
       await store.catCare.equip(CatKind.maru, clothingById('explorer')!);
       await store.catCare.equip(CatKind.maru, clothingById('shirt_stripes')!);
       final boundary = GlobalKey();

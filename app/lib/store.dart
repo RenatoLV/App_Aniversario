@@ -126,6 +126,7 @@ class GameStore extends ChangeNotifier {
   CardFinish lastOpenedFinish = CardFinish.normal;
   int packsSinceLegendary = 0;
   Map<String, int> cardVariants = {};
+  Map<String, dynamic> _tradeReceipts = {};
   List<String> variantsFor(int id) =>
       cardVariants.keys.where((key) => key.startsWith('$id:')).toList();
   List<PocketNote> notes = [];
@@ -161,6 +162,7 @@ class GameStore extends ChangeNotifier {
       _wordleRewards.addAll(List<String>.from(j['wordleRewards'] ?? []));
       best = j['best'] as int;
       packsSinceLegendary = (j['packsSinceLegendary'] as int?) ?? 0;
+      _tradeReceipts = Map<String, dynamic>.from(j['tradeReceipts'] ?? {});
       cardVariants = ((j['cardVariants'] as Map<String, dynamic>?) ?? {}).map(
         (k, v) => MapEntry(k, v as int),
       );
@@ -433,6 +435,7 @@ class GameStore extends ChangeNotifier {
     cardOpeners = restored.cardOpeners;
     cardCollections = restored.cardCollections;
     cardVariants = restored.cardVariants;
+    _tradeReceipts = restored._tradeReceipts;
     packsSinceLegendary = restored.packsSinceLegendary;
     game = restored.game;
     notes = restored.notes;
@@ -466,6 +469,17 @@ class GameStore extends ChangeNotifier {
     return true;
   }
 
+  Future<bool> buyCatClothing(CatClothing item) async {
+    final garment = clothingById(item.id);
+    if (garment == null) return false;
+    if (catCare.ownsClothing(garment)) return true;
+    if (coins < garment.price) return false;
+    coins -= garment.price;
+    await catCare.unlockClothing(garment);
+    notifyListeners();
+    return true;
+  }
+
   Future<void> save() {
     final snapshot = jsonEncode({
       'coins': coins,
@@ -474,6 +488,7 @@ class GameStore extends ChangeNotifier {
       'best': best,
       'packsSinceLegendary': packsSinceLegendary,
       'cardVariants': cardVariants,
+      'tradeReceipts': _tradeReceipts,
       'cards': cards.map((k, v) => MapEntry('$k', v)),
       'rarities': rarities.map((k, v) => MapEntry('$k', v.index)),
       'cardOpeners': cardOpeners.map((k, v) => MapEntry('$k', v)),
@@ -496,6 +511,13 @@ class GameStore extends ChangeNotifier {
     });
     notifyListeners();
     return _pending;
+  }
+
+  Future<bool> buyWordleHint() async {
+    if (coins < 50) return false;
+    coins -= 50;
+    await save();
+    return true;
   }
 
   Future<void> rewardWordle(String roundId) async {

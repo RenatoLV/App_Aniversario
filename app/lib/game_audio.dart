@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'audio_settings_panel.dart';
 
 enum GameSfx {
   kitten('kitten.mp3', .62, 1500),
@@ -31,6 +32,7 @@ enum GameSfx {
 class GameAudio with WidgetsBindingObserver {
   static final instance = GameAudio();
   final changes = ValueNotifier(0);
+  final meows = MeowRotation();
   SharedPreferences? _prefs;
   final Map<GameSfx, AudioPlayer> _effects = {};
   final Map<GameSfx, int> _lastEffect = {};
@@ -110,7 +112,9 @@ class GameAudio with WidgetsBindingObserver {
       _safe(() async {
         final player = _effects.putIfAbsent(effect, AudioPlayer.new);
         await player.play(
-          AssetSource('audio/${effect.file}'),
+          AssetSource(
+            'audio/${effect == GameSfx.kitten ? meows.next() : effect.file}',
+          ),
           volume: effectsVolume * effect.gain,
         );
       }),
@@ -320,68 +324,39 @@ class AudioSettingsButton extends StatelessWidget {
         onOpen?.call();
         await showDialog<void>(
           context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Sonido y música'),
-            content: SizedBox(
-              width: 300,
-              child: ValueListenableBuilder(
-                valueListenable: GameAudio.instance.changes,
-                builder: (context, _, child) {
-                  final audio = GameAudio.instance;
-                  return Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      SwitchListTile(
-                        contentPadding: EdgeInsets.zero,
-                        title: const Text('Gatitos y efectos'),
-                        value: audio.effectsEnabled,
-                        onChanged: (v) => audio.configure(effects: v),
-                      ),
-                      Slider(
-                        label: '${(audio.effectsVolume * 100).round()} %',
-                        value: audio.effectsVolume,
-                        onChanged: audio.effectsEnabled
-                            ? (v) => audio.configure(sfxGain: v)
-                            : null,
-                      ),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: TextButton.icon(
-                          onPressed: audio.musicEnabled
-                              ? audio.skipMusic
-                              : null,
-                          icon: const Icon(Icons.skip_next_rounded),
-                          label: const Text('Siguiente canción'),
-                        ),
-                      ),
-                      SwitchListTile(
-                        contentPadding: EdgeInsets.zero,
-                        title: const Text('Música de fondo'),
-                        value: audio.musicEnabled,
-                        onChanged: (v) => audio.configure(music: v),
-                      ),
-                      Slider(
-                        label: '${(audio.musicVolume * 100).round()} %',
-                        value: audio.musicVolume,
-                        onChanged: audio.musicEnabled
-                            ? (v) => audio.configure(musicGain: v)
-                            : null,
-                      ),
-                    ],
-                  );
-                },
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Listo'),
-              ),
-            ],
-          ),
+          builder: (context) => AudioSettingsPanel(audio: GameAudio.instance),
         );
         onClose?.call();
       },
     ),
   );
+}
+
+/// Shuffle bag: all recordings are heard before reusing one, without repeats
+/// at the boundary between two bags.
+class MeowRotation {
+  static const assets = [
+    'kitten.mp3',
+    'meow_tuber.mp3',
+    'meow_gurdy.mp3',
+    'meow_kitten_a.mp3',
+    'meow_kitten_b.mp3',
+    'meow_kitten_c.mp3',
+    'meow_kitten_d.mp3',
+  ];
+  final math.Random random;
+  final List<String> _bag = [];
+  String? _previous;
+  MeowRotation({math.Random? random}) : random = random ?? math.Random();
+  String next() {
+    if (_bag.isEmpty) {
+      _bag.addAll(assets);
+      _bag.shuffle(random);
+      if (_bag.last == _previous) {
+        final first = _bag.removeAt(0);
+        _bag.add(first);
+      }
+    }
+    return _previous = _bag.removeLast();
+  }
 }

@@ -16,6 +16,16 @@ jobs:
       RELEASE_BUILD: ${{ github.run_number }}
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: app/functions/package-lock.json
+      - name: Verify card exchange rules
+        working-directory: app/functions
+        run: |
+          npm ci
+          npm test
       - uses: actions/setup-java@v4
         with:
           distribution: temurin

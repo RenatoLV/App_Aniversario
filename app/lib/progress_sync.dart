@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'backend.dart';
 import 'highscore_outbox.dart';
+import 'trade_merge.dart';
 
 /// Local preferences remain the durable offline save. A revision check prevents
 /// two devices from silently replacing each other's progress.
@@ -136,6 +137,15 @@ class ProgressSync extends ChangeNotifier {
         _remoteChanged = true;
         return;
       }
+      if (remote != null) {
+        final merged = mergeTradeReceipts(local, remote['payload'] as String);
+        if (merged != local) {
+          await _restore(merged, expectedLocal: local);
+          await _write(merged, remote['revision'] as int);
+          status = 'Intercambio recibido y progreso sincronizado';
+          return;
+        }
+      }
       if (remote != null &&
           remote['payload'] != local &&
           remote['payload'] != base &&
@@ -169,6 +179,20 @@ class ProgressSync extends ChangeNotifier {
     }
   }
 
+  Future<void> flushForTrade() async {
+    if (Backend.uid == null) throw StateError('Inicia sesión con Google.');
+    await start();
+    await _idle?.future;
+    _remoteChanged = true;
+    await sync();
+    if (conflict != null ||
+        prefs.getString('firebase.base.$_user') != snapshot()) {
+      throw StateError(
+        'Sincroniza o recupera tu progreso antes de intercambiar.',
+      );
+    }
+  }
+
   Future<void> _write(String payload, int revision) async {
     if (utf8.encode(payload).length > 850000) {
       throw StateError('Guardado demasiado grande');
@@ -178,6 +202,9 @@ class ProgressSync extends ChangeNotifier {
         final current = (await tx.get(_ref)).data();
         if ((current?['revision'] ?? 0) != revision) {
           throw StateError('Nueva revisión remota');
+        }
+        if (current != null) {
+          payload = mergeTradeReceipts(payload, current['payload'] as String);
         }
         tx.set(_ref, {
           'payload': payload,
@@ -251,7 +278,10 @@ class ProgressSync extends ChangeNotifier {
         });
       }
       if (keepLocal) {
-        await _write(snapshot(), remote['revision'] as int);
+        final local = snapshot();
+        final merged = mergeTradeReceipts(local, remote['payload'] as String);
+        if (merged != local) await _restore(merged, expectedLocal: local);
+        await _write(merged, remote['revision'] as int);
       } else {
         await _restore(remote['payload'] as String);
       }

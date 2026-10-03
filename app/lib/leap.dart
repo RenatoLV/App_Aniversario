@@ -49,7 +49,8 @@ class LeapGame {
   static const gravity = 950.0, jumpSpeed = 480.0;
   static const abductionDuration = 3.2;
   static const springSpeed = 650.0, umbrellaDuration = 8.0;
-  static const stageStretch = 1.6;
+  static const stageStretch =
+      3.2; // Twice the former scenery duration; physics unchanged.
   static const meadowHeight = 1600.0 * stageStretch;
   static const neighborhoodHeight = 3200.0 * stageStretch;
   static const cityHeight = 5200.0 * stageStretch;

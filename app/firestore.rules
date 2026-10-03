@@ -28,6 +28,14 @@ service cloud.firestore {
         match /recovery/{backup} { allow read, create: if signedIn() && request.auth.uid == uid; }
       }
     }
+    match /card_collections/{uid} {
+      allow read: if signedIn();
+      allow write: if false; // Server publishes only the public card inventory.
+    }
+    match /card_trades/{id} {
+      allow read: if signedIn() && (resource.data.fromUid == request.auth.uid || resource.data.toUid == request.auth.uid);
+      allow write: if false; // Both private inventories move in one server transaction.
+    }
     match /user_directory/{uid} {
       allow read: if signedIn();
       allow create, update: if signedIn() && request.auth.uid == uid

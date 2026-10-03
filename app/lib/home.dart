@@ -17,6 +17,9 @@ import 'store.dart';
 import 'cat_character.dart';
 import 'backend.dart';
 import 'wordle.dart';
+import 'game_result.dart';
+import 'brand_title.dart';
+import 'card_trades.dart';
 import 'sweet_screen.dart';
 import 'cat_room.dart';
 import 'leap_screen.dart';
@@ -425,10 +428,7 @@ class _RinconHomeState extends State<RinconHome>
       onStep: (step) => setState(() => page = (page + step).clamp(0, 3)),
       child: Scaffold(
         appBar: AppBar(
-          title: const Tooltip(
-            message: 'Desliza la cabecera a los lados para cambiar de menú',
-            child: _MaruversarioTitle(),
-          ),
+          title: BrandTitle(prefs: s.prefs),
           actions: [
             const AudioSettingsButton(),
             const AppUpdateButton(),
@@ -1459,6 +1459,23 @@ class _RinconHomeState extends State<RinconHome>
           padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
           sliver: SliverList.list(
             children: [
+              Align(
+                alignment: Alignment.centerLeft,
+                child: OutlinedButton.icon(
+                  onPressed: () async {
+                    if (Backend.uid == null) await _activateCloud();
+                    if (Backend.uid == null || !mounted) return;
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute<void>(
+                        builder: (_) => CardTradeScreen(store: s),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.swap_horiz_rounded),
+                  label: const Text('Intercambiar cartas'),
+                ),
+              ),
               const Text(
                 'Nuestros tesoros',
                 style: TextStyle(
@@ -3109,151 +3126,17 @@ class _GameOverDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Dialog(
     backgroundColor: Colors.transparent,
-    insetPadding: const EdgeInsets.all(16),
-    child: TweenAnimationBuilder<double>(
-      tween: Tween(begin: .7, end: 1),
-      duration: const Duration(milliseconds: 550),
-      curve: Curves.elasticOut,
-      builder: (context, value, child) =>
-          Transform.scale(scale: value, child: child),
-      child: Container(
-        width: 350,
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xff4a267d), Color(0xff241344)],
-          ),
-          borderRadius: BorderRadius.circular(28),
-          border: Border.all(color: const Color(0xffffda76), width: 2),
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x997729c8),
-              blurRadius: 36,
-              spreadRadius: 4,
-            ),
-          ],
-        ),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'FIN DE PARTIDA',
-                style: TextStyle(
-                  color: Color(0xffffe78d),
-                  fontSize: 25,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 1.3,
-                ),
-              ),
-              const SizedBox(height: 5),
-              const Text(
-                'Maru y Lady están tristes… ¡quieren otra ronda!',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Color(0xffe1d5f7), fontSize: 12),
-              ),
-              const SizedBox(height: 5),
-              const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  CatActor(
-                    cat: CatKind.maru,
-                    size: 88,
-                    action: CatAction.blocks,
-                    active: true,
-                    crying: true,
-                    showLabel: false,
-                  ),
-                  SizedBox(width: 18),
-                  Text('💔', style: TextStyle(fontSize: 24)),
-                  SizedBox(width: 18),
-                  CatActor(
-                    cat: CatKind.lady,
-                    size: 88,
-                    action: CatAction.blocks,
-                    active: true,
-                    crying: true,
-                    showLabel: false,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 13),
-                decoration: BoxDecoration(
-                  color: const Color(0xff291853),
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: const Color(0xff8d72cd)),
-                ),
-                child: Column(
-                  children: [
-                    const Text(
-                      'TUS PUNTOS',
-                      style: TextStyle(
-                        color: Color(0xffd5c7f5),
-                        fontSize: 11,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 2,
-                      ),
-                    ),
-                    Text(
-                      '$score',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 53,
-                        fontWeight: FontWeight.w900,
-                        height: 1.05,
-                      ),
-                    ),
-                    Text(
-                      score >= best ? '✦ ¡NUEVO RÉCORD! ✦' : 'RÉCORD  $best',
-                      style: const TextStyle(
-                        color: Color(0xffffd56c),
-                        fontSize: 12,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                '🪙 $coins monedas guardadas',
-                style: const TextStyle(
-                  color: Color(0xffffe9ac),
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xffffd96b),
-                    foregroundColor: const Color(0xff3e225f),
-                  ),
-                  onPressed: onAgain,
-                  icon: const Icon(Icons.refresh_rounded),
-                  label: const Text(
-                    'OTRA PARTIDA',
-                    style: TextStyle(fontWeight: FontWeight.w900),
-                  ),
-                ),
-              ),
-              TextButton(
-                onPressed: onHome,
-                child: const Text(
-                  'Volver al rincón',
-                  style: TextStyle(color: Colors.white),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+    insetPadding: const EdgeInsets.all(18),
+    child: GameResultCard(
+      game: ResultTheme.blocks,
+      title: '¡Otra pieza, michi!',
+      detail: 'Block Blaster · No quedan espacios para estas piezas',
+      stat: '$score puntos',
+      caption:
+          '${score >= best ? '¡Nuevo récord!' : 'Récord: $best'}\n$coins monedas guardadas para tus premios.',
+      again: 'Otra partida',
+      onAgain: onAgain,
+      onHome: onHome,
     ),
   );
 }
@@ -5022,59 +4905,6 @@ class _CardRevealDialogState extends State<CardRevealDialog>
       ),
     );
   }
-}
-
-class _MaruversarioTitle extends StatefulWidget {
-  const _MaruversarioTitle();
-
-  @override
-  State<_MaruversarioTitle> createState() => _MaruversarioTitleState();
-}
-
-class _MaruversarioTitleState extends State<_MaruversarioTitle>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 1800),
-  )..repeat(reverse: true);
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => AnimatedBuilder(
-    animation: _controller,
-    builder: (context, child) {
-      final bob = math.sin(_controller.value * math.pi) * 4;
-      return Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Transform.translate(
-            offset: Offset(0, -bob),
-            child: const Text('🎈', style: TextStyle(fontSize: 22)),
-          ),
-          const SizedBox(width: 5),
-          const Flexible(
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Text(
-                'Anivermaru',
-                style: TextStyle(fontWeight: FontWeight.w900, fontSize: 20),
-              ),
-            ),
-          ),
-          const SizedBox(width: 5),
-          Transform.translate(
-            offset: Offset(0, bob - 4),
-            child: const Text('🎈', style: TextStyle(fontSize: 22)),
-          ),
-        ],
-      );
-    },
-  );
 }
 
 class _CatPair extends StatelessWidget {

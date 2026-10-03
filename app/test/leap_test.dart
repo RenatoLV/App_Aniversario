@@ -103,7 +103,7 @@ void main() {
     game.step(.02, 0, 640);
     expect(game.boosting, isFalse);
   });
-  test('Every finite landscape is extended by sixty percent', () {
+  test('All stages are twice as long as the previous extended journey', () {
     final boundaries = [
       LeapGame.meadowHeight,
       LeapGame.neighborhoodHeight,
@@ -115,7 +115,7 @@ void main() {
     ];
     const previous = [1600, 3200, 5200, 7600, 10000, 13200, 18000];
     for (var i = 0; i < boundaries.length; i++) {
-      expect(boundaries[i], previous[i] * 1.6);
+      expect(boundaries[i], previous[i] * 3.2);
     }
   });
   test('Umbrellas cap descent, preserve ascent and expire', () {

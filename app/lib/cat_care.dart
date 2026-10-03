@@ -10,6 +10,43 @@ class CatClothing {
   final IconData icon;
   final Color color;
   const CatClothing(this.id, this.name, this.slot, this.icon, this.color);
+  int get price => switch (id) {
+    'crown' ||
+    'wizard' ||
+    'astronaut' ||
+    'glasses_cyber' ||
+    'collar_cosmos' ||
+    'shirt_dragon' => 1000,
+    'halo' ||
+    'glasses_ski' ||
+    'collar_ribbon' ||
+    'shirt_galaxy' ||
+    'shirt_space' ||
+    'shirt_tux' ||
+    'glasses_rainbow' => 500,
+    'frog' ||
+    'glasses_flower' ||
+    'glasses_monocle' ||
+    'collar_pearl' ||
+    'shirt_denim' ||
+    'shirt_strawberry' ||
+    'explorer' ||
+    'shirt_hoodie' ||
+    'glasses_aviator' ||
+    'glasses_star' => 250,
+    'hood_winter' ||
+    'glasses_cloud' ||
+    'bandana_sakura' ||
+    'shirt_paw' ||
+    'shirt_star' ||
+    'shirt_honey' ||
+    'party' ||
+    'beret' ||
+    'glasses_heart' ||
+    'collar_moon' ||
+    'shirt_flower' => 150,
+    _ => 100,
+  };
 }
 
 const catWardrobe = [
@@ -293,6 +330,146 @@ const catWardrobe = [
     Icons.emoji_nature_rounded,
     Color(0xffe8bb50),
   ),
+  CatClothing(
+    'collar_fish',
+    'Collar pescadito',
+    ClothingSlot.neck,
+    Icons.set_meal_rounded,
+    Color(0xff6aafcb),
+  ),
+  CatClothing(
+    'bandana_sakura',
+    'Pañuelo sakura',
+    ClothingSlot.neck,
+    Icons.local_florist_rounded,
+    Color(0xffef95b5),
+  ),
+  CatClothing(
+    'collar_pearl',
+    'Collar de perlas',
+    ClothingSlot.neck,
+    Icons.bubble_chart_rounded,
+    Color(0xffd4badb),
+  ),
+  CatClothing(
+    'collar_ribbon',
+    'Collar gala',
+    ClothingSlot.neck,
+    Icons.redeem_rounded,
+    Color(0xffb26b96),
+  ),
+  CatClothing(
+    'collar_cosmos',
+    'Collar cósmico',
+    ClothingSlot.neck,
+    Icons.auto_awesome_rounded,
+    Color(0xff7767bf),
+  ),
+  CatClothing(
+    'bucket',
+    'Gorro pescador',
+    ClothingSlot.head,
+    Icons.beach_access_rounded,
+    Color(0xffe5bb7d),
+  ),
+  CatClothing(
+    'frog',
+    'Gorrito ranita',
+    ClothingSlot.head,
+    Icons.spa_rounded,
+    Color(0xff85b775),
+  ),
+  CatClothing(
+    'halo',
+    'Aureola brillante',
+    ClothingSlot.head,
+    Icons.light_mode_rounded,
+    Color(0xffe7c757),
+  ),
+  CatClothing(
+    'astronaut',
+    'Casco astronauta',
+    ClothingSlot.head,
+    Icons.rocket_launch_rounded,
+    Color(0xff89b2d3),
+  ),
+  CatClothing(
+    'hood_winter',
+    'Gorro orejitas',
+    ClothingSlot.head,
+    Icons.ac_unit_rounded,
+    Color(0xffcfa2ba),
+  ),
+  CatClothing(
+    'glasses_flower',
+    'Lentes margarita',
+    ClothingSlot.eyes,
+    Icons.local_florist_rounded,
+    Color(0xffe8ac5d),
+  ),
+  CatClothing(
+    'glasses_ski',
+    'Antiparras nieve',
+    ClothingSlot.eyes,
+    Icons.downhill_skiing_rounded,
+    Color(0xff79acca),
+  ),
+  CatClothing(
+    'glasses_monocle',
+    'Monóculo elegante',
+    ClothingSlot.eyes,
+    Icons.visibility_rounded,
+    Color(0xffbda162),
+  ),
+  CatClothing(
+    'glasses_cyber',
+    'Visor neón',
+    ClothingSlot.eyes,
+    Icons.bolt_rounded,
+    Color(0xff8d7de1),
+  ),
+  CatClothing(
+    'glasses_cloud',
+    'Lentes nubecita',
+    ClothingSlot.eyes,
+    Icons.cloud_rounded,
+    Color(0xff8dbfcb),
+  ),
+  CatClothing(
+    'shirt_denim',
+    'Chaqueta de mezclilla',
+    ClothingSlot.body,
+    Icons.checkroom_rounded,
+    Color(0xff648aae),
+  ),
+  CatClothing(
+    'shirt_paw',
+    'Polera patita',
+    ClothingSlot.body,
+    Icons.pets_rounded,
+    Color(0xffc886a8),
+  ),
+  CatClothing(
+    'shirt_strawberry',
+    'Polera frutilla',
+    ClothingSlot.body,
+    Icons.favorite_rounded,
+    Color(0xffeb92a0),
+  ),
+  CatClothing(
+    'shirt_dragon',
+    'Polerón dragón',
+    ClothingSlot.body,
+    Icons.whatshot_rounded,
+    Color(0xff74a993),
+  ),
+  CatClothing(
+    'shirt_galaxy',
+    'Polera galaxia',
+    ClothingSlot.body,
+    Icons.auto_awesome_rounded,
+    Color(0xff69679d),
+  ),
 ];
 
 CatClothing? clothingById(String? id) {
@@ -447,6 +624,20 @@ class _CatProfile {
 }
 
 class CatCare extends ChangeNotifier {
+  static const starterClothes = {
+    'collar_heart',
+    'beanie',
+    'glasses',
+    'shirt_stripes',
+  };
+  final Set<String> _ownedClothes = {...starterClothes};
+  bool ownsClothing(CatClothing item) => _ownedClothes.contains(item.id);
+  int get clothesOwned => _ownedClothes.length;
+  Future<void> unlockClothing(CatClothing item) async {
+    if (clothingById(item.id) == null || !_ownedClothes.add(item.id)) return;
+    await _changed();
+  }
+
   // One welcome portion per food, shared by both cats; subsequently purchased.
   final Map<CatFood, int> _stock = {for (final food in CatFood.values) food: 1};
   int stock(CatFood food) => _stock[food] ?? 0;
@@ -519,6 +710,7 @@ class CatCare extends ChangeNotifier {
   }
 
   Future<void> equip(CatKind cat, CatClothing item) async {
+    if (!ownsClothing(item)) return;
     final p = _profiles[cat]!;
     p.outfit = p.outfit.withItem(
       item.slot,
@@ -533,6 +725,7 @@ class CatCare extends ChangeNotifier {
   }
 
   Map<String, dynamic> toJson() => {
+    'ownedClothes': _ownedClothes.toList()..sort(),
     'foodInventory': {
       for (final food in CatFood.values) food.name: stock(food),
     },
@@ -546,6 +739,15 @@ class CatCare extends ChangeNotifier {
       },
   };
   void restore(dynamic data, {bool notify = false}) {
+    final owned = data is Map ? data['ownedClothes'] : null;
+    _ownedClothes
+      ..clear()
+      ..addAll(starterClothes);
+    if (owned is List) {
+      _ownedClothes.addAll(
+        owned.whereType<String>().where((id) => clothingById(id) != null),
+      );
+    }
     final inventory = data is Map ? data['foodInventory'] : null;
     for (final food in CatFood.values) {
       final value = inventory is Map ? inventory[food.name] : null;
@@ -567,6 +769,17 @@ class CatCare extends ChangeNotifier {
         p.updated =
             DateTime.tryParse(entry['updated']?.toString() ?? '') ?? now();
         p.outfit = CatOutfit.fromJson(entry['outfit']);
+        for (final slot in ClothingSlot.values) {
+          final id = p.outfit.at(slot);
+          if (id == null) continue;
+          if (owned is! List) {
+            _ownedClothes.add(
+              id,
+            ); // Keep garments equipped before the shop existed.
+          } else if (!_ownedClothes.contains(id)) {
+            p.outfit = p.outfit.withItem(slot, null);
+          }
+        }
       }
       _profiles[cat] = p;
     }

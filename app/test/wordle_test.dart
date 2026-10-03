@@ -80,10 +80,17 @@ void main() {
       expect(find.text('Pista (2/2 hoy)'), findsOneWidget);
       await tester.tap(find.text('Pista (2/2 hoy)'));
       await tester.pump(const Duration(seconds: 2));
+      await tester.pump(const Duration(seconds: 2));
       await tester.tap(find.text('Pista (1/2 hoy)'));
       await tester.pump(const Duration(seconds: 2));
+      await tester.pump(const Duration(seconds: 2));
       expect(prefs.getInt('wordle.hintsUsed'), 2);
-      for (final letter in 'PALTA'.split('')) {
+      final hints = List<int>.from(
+        jsonDecode(prefs.getString('wordle.v1')!)['hints'],
+      );
+      for (var i = 0; i < 5; i++) {
+        if (hints.contains(i)) continue;
+        final letter = 'PALTA'[i];
         await tester.tap(find.widgetWithText(InkWell, letter));
         await tester.pump();
       }

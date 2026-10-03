@@ -213,149 +213,153 @@ class _CatCareScreenState extends State<CatCareScreen>
             title: const Text('La casita'),
             actions: const [AudioSettingsButton()],
           ),
-          body: PawBackground(child: SafeArea(
-            child: SingleChildScrollView(
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 720),
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(18, 8, 18, 28),
-                    child: Column(
-                      children: [
-                        const Text(
-                          'Comida, cuidados y un estilo propio',
-                          style: TextStyle(color: Color(0xff63796d)),
-                        ),
-                        const SizedBox(height: 16),
-                        SegmentedButton<CatKind>(
-                          segments: const [
-                            ButtonSegment(
-                              value: CatKind.maru,
-                              label: Text('Maru'),
-                              icon: Icon(Icons.pets),
-                            ),
-                            ButtonSegment(
-                              value: CatKind.lady,
-                              label: Text('Lady'),
-                              icon: Icon(Icons.pets),
-                            ),
-                          ],
-                          selected: {_cat},
-                          onSelectionChanged: _busy
-                              ? null
-                              : (values) => setState(() {
-                                  _cat = values.first;
-                                  _scrub = 0;
-                                  _foam.clear();
-                                  _rinse = 0;
-                                  _hand = null;
-                                  _message = 'Ahora cuidamos a $name';
-                                }),
-                        ),
-                        const SizedBox(height: 16),
-                        Row(
-                          children: [
-                            _Need(
-                              label: 'Comida',
-                              value: needs.food,
-                              icon: Icons.restaurant_rounded,
-                              color: const Color(0xffdba855),
-                            ),
-                            const SizedBox(width: 8),
-                            _Need(
-                              label: 'Limpieza',
-                              value: needs.clean,
-                              icon: Icons.water_drop_rounded,
-                              color: const Color(0xff63aebf),
-                            ),
-                            const SizedBox(width: 8),
-                            _Need(
-                              label: 'Cariño',
-                              value: needs.happy,
-                              icon: Icons.favorite_rounded,
-                              color: const Color(0xffce839e),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        _stage(),
-                        const SizedBox(height: 12),
-                        AnimatedSize(
-                          duration: const Duration(milliseconds: 250),
-                          child: Text(
-                            _message,
-                            key: ValueKey(_message),
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              color: Color(0xff4c6457),
-                              height: 1.4,
+          body: PawBackground(
+            child: SafeArea(
+              child: SingleChildScrollView(
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 720),
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(18, 8, 18, 28),
+                      child: Column(
+                        children: [
+                          const Text(
+                            'Comida, cuidados y un estilo propio',
+                            style: TextStyle(color: Color(0xff63796d)),
+                          ),
+                          const SizedBox(height: 16),
+                          SegmentedButton<CatKind>(
+                            segments: const [
+                              ButtonSegment(
+                                value: CatKind.maru,
+                                label: Text('Maru'),
+                                icon: Icon(Icons.pets),
+                              ),
+                              ButtonSegment(
+                                value: CatKind.lady,
+                                label: Text('Lady'),
+                                icon: Icon(Icons.pets),
+                              ),
+                            ],
+                            selected: {_cat},
+                            onSelectionChanged: _busy
+                                ? null
+                                : (values) => setState(() {
+                                    _cat = values.first;
+                                    _scrub = 0;
+                                    _foam.clear();
+                                    _rinse = 0;
+                                    _hand = null;
+                                    _message = 'Ahora cuidamos a $name';
+                                  }),
+                          ),
+                          const SizedBox(height: 16),
+                          Row(
+                            children: [
+                              _Need(
+                                label: 'Comida',
+                                value: needs.food,
+                                icon: Icons.restaurant_rounded,
+                                color: const Color(0xffdba855),
+                              ),
+                              const SizedBox(width: 8),
+                              _Need(
+                                label: 'Limpieza',
+                                value: needs.clean,
+                                icon: Icons.water_drop_rounded,
+                                color: const Color(0xff63aebf),
+                              ),
+                              const SizedBox(width: 8),
+                              _Need(
+                                label: 'Cariño',
+                                value: needs.happy,
+                                icon: Icons.favorite_rounded,
+                                color: const Color(0xffce839e),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          _stage(),
+                          const SizedBox(height: 12),
+                          AnimatedSize(
+                            duration: const Duration(milliseconds: 250),
+                            child: Text(
+                              _message,
+                              key: ValueKey(_message),
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                color: Color(0xff4c6457),
+                                height: 1.4,
+                              ),
                             ),
                           ),
-                        ),
-                        const SizedBox(height: 18),
-                        SegmentedButton<_CareRoom>(
-                          style: SegmentedButton.styleFrom(
-                            textStyle: Theme.of(
-                              context,
-                            ).textTheme.labelLarge!.copyWith(fontSize: 12),
-                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                          const SizedBox(height: 18),
+                          SegmentedButton<_CareRoom>(
+                            style: SegmentedButton.styleFrom(
+                              textStyle: Theme.of(
+                                context,
+                              ).textTheme.labelLarge!.copyWith(fontSize: 12),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                              ),
+                            ),
+                            segments: const [
+                              ButtonSegment(
+                                value: _CareRoom.food,
+                                label: Text('Comida'),
+                                icon: Icon(Icons.restaurant_rounded),
+                              ),
+                              ButtonSegment(
+                                value: _CareRoom.bath,
+                                label: Text('Baño'),
+                                icon: Icon(Icons.bathtub_rounded),
+                              ),
+                              ButtonSegment(
+                                value: _CareRoom.wardrobe,
+                                label: Text('Ropa'),
+                                icon: Icon(Icons.checkroom_rounded),
+                              ),
+                            ],
+                            selected: {_room},
+                            onSelectionChanged: _busy
+                                ? null
+                                : (values) => setState(() {
+                                    _room = values.first;
+                                    _hand = null;
+                                    if (_room == _CareRoom.bath) {
+                                      _action.repeat();
+                                    } else {
+                                      _action.stop();
+                                    }
+                                    _message = switch (_room) {
+                                      _CareRoom.food =>
+                                        'Elige su comida o arrástrala hasta $name',
+                                      _CareRoom.bath =>
+                                        'Jabón para hacer espuma, regadera para enjuagar',
+                                      _CareRoom.wardrobe =>
+                                        'Combina accesorios. Se verán también en todos los juegos.',
+                                    };
+                                  }),
                           ),
-                          segments: const [
-                            ButtonSegment(
-                              value: _CareRoom.food,
-                              label: Text('Comida'),
-                              icon: Icon(Icons.restaurant_rounded),
+                          const SizedBox(height: 20),
+                          switch (_room) {
+                            _CareRoom.food => _foodTray(),
+                            _CareRoom.bath => _bathControls(),
+                            _CareRoom.wardrobe => _wardrobe(),
+                          },
+                          if (widget.store.saveError != null)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 12),
+                              child: Text(widget.store.saveError!),
                             ),
-                            ButtonSegment(
-                              value: _CareRoom.bath,
-                              label: Text('Baño'),
-                              icon: Icon(Icons.bathtub_rounded),
-                            ),
-                            ButtonSegment(
-                              value: _CareRoom.wardrobe,
-                              label: Text('Ropa'),
-                              icon: Icon(Icons.checkroom_rounded),
-                            ),
-                          ],
-                          selected: {_room},
-                          onSelectionChanged: _busy
-                              ? null
-                              : (values) => setState(() {
-                                  _room = values.first;
-                                  _hand = null;
-                                  if (_room == _CareRoom.bath) {
-                                    _action.repeat();
-                                  } else {
-                                    _action.stop();
-                                  }
-                                  _message = switch (_room) {
-                                    _CareRoom.food =>
-                                      'Elige su comida o arrástrala hasta $name',
-                                    _CareRoom.bath =>
-                                      'Jabón para hacer espuma, regadera para enjuagar',
-                                    _CareRoom.wardrobe =>
-                                      'Combina accesorios. Se verán también en todos los juegos.',
-                                  };
-                                }),
-                        ),
-                        const SizedBox(height: 20),
-                        switch (_room) {
-                          _CareRoom.food => _foodTray(),
-                          _CareRoom.bath => _bathControls(),
-                          _CareRoom.wardrobe => _wardrobe(),
-                        },
-                        if (widget.store.saveError != null)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 12),
-                            child: Text(widget.store.saveError!),
-                          ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
               ),
             ),
-          )),
+          ),
         );
       },
     ),
@@ -820,8 +824,8 @@ class _CatCareScreenState extends State<CatCareScreen>
         style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
       ),
       const SizedBox(height: 6),
-      const Text(
-        '40 prendas · 10 de cada categoría · toca de nuevo para quitar',
+      Text(
+        '${catWardrobe.length} prendas · ${care.clothesOwned} tuyas · ${widget.store.coins} monedas',
         style: TextStyle(fontSize: 12, color: Color(0xff6b8075)),
       ),
       const SizedBox(height: 12),
@@ -849,11 +853,46 @@ class _CatCareScreenState extends State<CatCareScreen>
                       : item.color,
                   size: 20,
                 ),
-                label: Text(item.name),
+                label: Text(
+                  care.ownsClothing(item)
+                      ? item.name
+                      : '${item.name} · ${item.price} 🪙',
+                ),
                 backgroundColor: care.outfit(_cat).at(slot) == item.id
                     ? const Color(0xffdcefe5)
                     : Colors.white,
                 onPressed: () async {
+                  if (!care.ownsClothing(item)) {
+                    final confirmed = await showDialog<bool>(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: Text(item.name),
+                        content: Text(
+                          'Comprar por ${item.price} monedas. La prenda queda para Maru y Lady.',
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context, false),
+                            child: const Text('Cancelar'),
+                          ),
+                          FilledButton(
+                            onPressed: () => Navigator.pop(context, true),
+                            child: const Text('Comprar'),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (confirmed != true) return;
+                    if (!await widget.store.buyCatClothing(item)) {
+                      if (mounted) {
+                        setState(
+                          () => _message =
+                              'Necesitas ${item.price} monedas para esta prenda.',
+                        );
+                      }
+                      return;
+                    }
+                  }
                   await care.equip(_cat, item);
                   if (mounted) {
                     setState(

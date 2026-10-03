@@ -82,16 +82,29 @@ void paintCatBodyClothing(Canvas canvas, CatOutfit outfit) {
   final item = clothingById(outfit.body);
   if (item != null) {
     final shirt = Path()
-      ..moveTo(35, 62)
-      ..quadraticBezierTo(50, 69, 65, 62)
-      ..lineTo(78, 69)
-      ..lineTo(71, 78)
-      ..lineTo(69, 87)
-      ..quadraticBezierTo(50, 94, 31, 87)
-      ..lineTo(29, 78)
-      ..lineTo(22, 69)
+      ..moveTo(35, 61)
+      ..quadraticBezierTo(50, 68, 65, 61)
+      ..quadraticBezierTo(74, 63, 78, 71)
+      ..quadraticBezierTo(77, 75, 72, 77)
+      ..quadraticBezierTo(75, 85, 69, 92)
+      ..quadraticBezierTo(50, 98, 31, 92)
+      ..quadraticBezierTo(25, 85, 28, 77)
+      ..quadraticBezierTo(23, 75, 22, 71)
+      ..quadraticBezierTo(26, 63, 35, 61)
       ..close();
-    canvas.drawPath(shirt, _ink(item.color));
+    canvas.drawPath(
+      shirt,
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color.lerp(item.color, Colors.white, .18)!,
+            item.color,
+            Color.lerp(item.color, Colors.black, .16)!,
+          ],
+        ).createShader(const Rect.fromLTWH(22, 62, 56, 35)),
+    );
     canvas.save();
     canvas.clipPath(shirt);
     const cream = Color(0xfffff0d6), gold = Color(0xffffd677);
@@ -209,6 +222,103 @@ void paintCatBodyClothing(Canvas canvas, CatOutfit outfit) {
           _ink(cream, 3),
         );
         _anchor(canvas, 50, 81, gold);
+      case 'shirt_denim':
+        canvas.drawLine(
+          const Offset(50, 68),
+          const Offset(50, 94),
+          _ink(cream, 1),
+        );
+        for (final x in [37.0, 58.0]) {
+          canvas.drawRRect(
+            RRect.fromRectAndRadius(
+              Rect.fromLTWH(x, 73, 9, 9),
+              const Radius.circular(2),
+            ),
+            _ink(const Color(0xff637b94)),
+          );
+          canvas.drawLine(Offset(x + 1, 75), Offset(x + 8, 75), _ink(gold, .8));
+        }
+        for (final y in [72.0, 80.0, 88.0]) {
+          canvas.drawCircle(Offset(50, y), 1, _ink(gold));
+        }
+      case 'shirt_paw':
+        canvas.drawOval(const Rect.fromLTWH(45, 78, 10, 8), _ink(cream));
+        for (final x in [43.0, 47.0, 53.0, 57.0]) {
+          canvas.drawOval(
+            Rect.fromCenter(
+              center: Offset(x, x == 43 || x == 57 ? 77 : 73),
+              width: 4,
+              height: 5,
+            ),
+            _ink(cream),
+          );
+        }
+      case 'shirt_strawberry':
+        for (final at in [
+          const Offset(37, 74),
+          const Offset(60, 75),
+          const Offset(50, 87),
+        ]) {
+          canvas.drawPath(
+            _heart(at.dx, at.dy, 3.5),
+            _ink(const Color(0xffd2536f)),
+          );
+          canvas.drawLine(
+            at + const Offset(-2, -2),
+            at + const Offset(2, -2),
+            _ink(const Color(0xff5b9b72), 2),
+          );
+          canvas.drawCircle(at, .6, _ink(cream));
+        }
+      case 'shirt_dragon':
+        canvas.drawPath(
+          Path()
+            ..moveTo(44, 86)
+            ..quadraticBezierTo(60, 87, 59, 77)
+            ..lineTo(65, 73)
+            ..lineTo(57, 72)
+            ..lineTo(58, 68)
+            ..lineTo(50, 75)
+            ..quadraticBezierTo(42, 78, 44, 86)
+            ..close(),
+          _ink(gold),
+        );
+        canvas.drawPath(
+          Path()
+            ..moveTo(47, 80)
+            ..lineTo(38, 70)
+            ..lineTo(36, 80)
+            ..lineTo(41, 79)
+            ..close(),
+          _ink(const Color(0xffe76b64)),
+        );
+        canvas.drawCircle(
+          const Offset(59, 75),
+          1,
+          _ink(const Color(0xff424750)),
+        );
+      case 'shirt_galaxy':
+        for (var i = 0; i < 14; i++) {
+          final angle = i * .8, r = 1.0 + i * .5;
+          canvas.drawCircle(
+            Offset(50 + math.cos(angle) * r, 80 + math.sin(angle) * r),
+            1.6,
+            _ink(
+              Color.lerp(
+                const Color(0xff7de0dd),
+                const Color(0xffd987d5),
+                i / 14,
+              )!,
+            ),
+          );
+        }
+        for (final at in [
+          const Offset(34, 72),
+          const Offset(65, 84),
+          const Offset(38, 91),
+        ]) {
+          canvas.drawPath(_star(at.dx, at.dy, 2), _ink(cream));
+        }
       case 'shirt_honey':
         for (var y = 70.0; y < 93; y += 8) {
           canvas.drawLine(
@@ -218,14 +328,48 @@ void paintCatBodyClothing(Canvas canvas, CatOutfit outfit) {
           );
         }
         canvas.drawOval(
-          const Rect.fromLTWH(39, 70, 8, 6),
+          const Rect.fromLTWH(44, 74, 5, 4),
           _ink(const Color(0xbbffffff)),
         );
         canvas.drawOval(
-          const Rect.fromLTWH(51, 70, 8, 6),
+          const Rect.fromLTWH(51, 74, 5, 4),
           _ink(const Color(0xbbffffff)),
         );
+        canvas.drawOval(const Rect.fromLTWH(46, 77, 8, 6), _ink(gold));
+        canvas.drawLine(
+          const Offset(50, 78),
+          const Offset(50, 82),
+          _ink(const Color(0xff635349), 1.6),
+        );
     }
+    canvas.drawPath(
+      Path()
+        ..moveTo(31, 88)
+        ..quadraticBezierTo(50, 96, 69, 88),
+      _ink(const Color(0x55ffffff), 1.2),
+    );
+    canvas.drawPath(
+      Path()
+        ..moveTo(28, 70)
+        ..lineTo(33, 74)
+        ..moveTo(72, 70)
+        ..lineTo(67, 74),
+      _ink(const Color(0x66000000), 1),
+    );
+    canvas.drawPath(
+      Path()
+        ..moveTo(36, 63)
+        ..quadraticBezierTo(50, 72, 64, 63),
+      _ink(const Color(0x77ffffff), 2),
+    );
+    canvas.drawPath(
+      Path()
+        ..moveTo(31, 79)
+        ..quadraticBezierTo(34, 85, 33, 89)
+        ..moveTo(69, 79)
+        ..quadraticBezierTo(66, 85, 67, 89),
+      _ink(const Color(0x22000000), 1),
+    );
     canvas.restore();
     canvas.drawPath(shirt, _ink(const Color(0x33000000), 1));
   }
@@ -240,7 +384,10 @@ void paintCatBodyClothing(Canvas canvas, CatOutfit outfit) {
     canvas.drawPath(scarf, _ink(neck.color));
     canvas.save();
     canvas.clipPath(scarf);
-    if (neck.id == 'bandana_blue') {
+    if (neck.id == 'bandana_sakura') {
+      _flower(canvas, 43, 71, 3);
+      _flower(canvas, 56, 73, 2.5);
+    } else if (neck.id == 'bandana_blue') {
       for (final x in [42.0, 50.0, 58.0]) {
         canvas.drawPath(_star(x, 70, 2), _ink(const Color(0xffe9ecdc)));
       }
@@ -294,6 +441,42 @@ void paintCatBodyClothing(Canvas canvas, CatOutfit outfit) {
   );
   const gold = Color(0xffffd46a);
   switch (neck.id) {
+    case 'collar_fish':
+      canvas.drawOval(const Rect.fromLTWH(44, 70, 10, 6), _ink(gold));
+      canvas.drawPath(
+        Path()
+          ..moveTo(52, 73)
+          ..lineTo(58, 69)
+          ..lineTo(58, 77)
+          ..close(),
+        _ink(gold),
+      );
+      canvas.drawCircle(const Offset(46, 72), .7, _ink(neck.color));
+    case 'collar_pearl':
+      for (var i = 0; i < 9; i++) {
+        final a = i * math.pi / 8;
+        canvas.drawCircle(
+          Offset(50 + 18 * math.cos(a), 63 + 6 * math.sin(a)),
+          2.2,
+          _ink(const Color(0xfffff3e3)),
+        );
+      }
+      canvas.drawCircle(const Offset(50, 73), 3, _ink(gold));
+    case 'collar_ribbon':
+      _bow(canvas, 50, 71, 8, neck.color);
+      canvas.drawPath(
+        Path()
+          ..moveTo(47, 72)
+          ..lineTo(44, 82)
+          ..lineTo(49, 79)
+          ..lineTo(52, 82)
+          ..lineTo(53, 72)
+          ..close(),
+        _ink(neck.color),
+      );
+    case 'collar_cosmos':
+      canvas.drawCircle(const Offset(50, 73), 5, _ink(const Color(0xffa88bdd)));
+      canvas.drawOval(const Rect.fromLTWH(42, 71, 16, 4), _ink(gold, 1.4));
     case 'collar_heart':
       canvas.drawPath(_heart(50, 72, 4), _ink(gold));
     case 'collar_bell':
@@ -336,6 +519,92 @@ void paintCatHeadClothing(
     }
     final fill = _ink(hat.color);
     switch (hat.id) {
+      case 'bucket':
+        canvas.drawPath(
+          Path()
+            ..moveTo(35, 12)
+            ..quadraticBezierTo(50, 8, 65, 12)
+            ..lineTo(70, 29)
+            ..lineTo(30, 29)
+            ..close(),
+          fill,
+        );
+        canvas.drawOval(const Rect.fromLTWH(24, 25, 52, 9), fill);
+        canvas.drawLine(
+          const Offset(34, 23),
+          const Offset(66, 23),
+          _ink(const Color(0x66ffffff), 2),
+        );
+      case 'frog':
+        canvas.drawOval(const Rect.fromLTWH(28, 15, 44, 19), fill);
+        for (final x in [37.0, 63.0]) {
+          canvas.drawCircle(Offset(x, 15), 6, fill);
+          canvas.drawCircle(Offset(x, 14), 3.5, _ink(Colors.white));
+          canvas.drawCircle(Offset(x, 14), 1.8, _ink(const Color(0xff37453c)));
+        }
+        canvas.drawArc(
+          const Rect.fromLTWH(43, 22, 14, 6),
+          0,
+          math.pi,
+          false,
+          _ink(const Color(0xff4a7557), 1.2),
+        );
+      case 'halo':
+        canvas.drawOval(
+          const Rect.fromLTWH(30, 6, 40, 9),
+          _ink(const Color(0x55fff0b8), 8),
+        );
+        canvas.drawOval(
+          const Rect.fromLTWH(30, 6, 40, 9),
+          _ink(hat.color, 2.5),
+        );
+        canvas.drawPath(_star(74, 16, 3), _ink(hat.color));
+      case 'astronaut':
+        canvas.drawPath(
+          Path()..addOval(const Rect.fromLTWH(19, 9, 62, 61)),
+          _ink(const Color(0x227addeb)),
+        );
+        canvas.drawOval(const Rect.fromLTWH(19, 9, 62, 61), _ink(hat.color, 3));
+        canvas.drawLine(
+          const Offset(30, 21),
+          const Offset(39, 15),
+          _ink(const Color(0xbbffffff), 2),
+        );
+        for (final x in [17.0, 77.0]) {
+          canvas.drawRRect(
+            RRect.fromRectAndRadius(
+              Rect.fromLTWH(x, 37, 6, 14),
+              const Radius.circular(2),
+            ),
+            fill,
+          );
+        }
+        canvas.drawArc(
+          const Rect.fromLTWH(27, 48, 46, 23),
+          0,
+          math.pi,
+          false,
+          _ink(hat.color, 5),
+        );
+      case 'hood_winter':
+        canvas.drawArc(
+          const Rect.fromLTWH(23, 14, 54, 53),
+          math.pi,
+          math.pi,
+          false,
+          _ink(hat.color, 9),
+        );
+        for (final x in [29.0, 71.0]) {
+          canvas.drawCircle(Offset(x, 34), 8, fill);
+          canvas.drawCircle(Offset(x, 34), 5.5, _ink(const Color(0xffffefdb)));
+        }
+        canvas.drawArc(
+          const Rect.fromLTWH(28, 51, 44, 16),
+          0,
+          math.pi,
+          false,
+          _ink(hat.color, 5),
+        );
       case 'beanie':
         canvas.drawPath(
           Path()
@@ -530,7 +799,28 @@ void paintCatHeadClothing(
     ).createShader(Rect.fromLTWH(22, y - 10, 56, 20));
   }
   for (final x in [38.0, 62.0]) {
+    if (glasses.id == 'glasses_monocle' && x == 38) continue;
     final lens = switch (glasses.id) {
+      'glasses_flower' => _flowerLens(x, y),
+      'glasses_cloud' =>
+        Path()
+          ..addOval(Rect.fromLTWH(x - 11, y - 4, 22, 12))
+          ..addOval(Rect.fromLTWH(x - 7, y - 9, 11, 12))
+          ..addOval(Rect.fromLTWH(x + 1, y - 8, 9, 11)),
+      'glasses_ski' =>
+        Path()..addRRect(
+          RRect.fromRectAndRadius(
+            Rect.fromLTWH(x - 12, y - 8, 24, 16),
+            const Radius.circular(5),
+          ),
+        ),
+      'glasses_cyber' =>
+        Path()
+          ..moveTo(x - 11, y - 6)
+          ..lineTo(x + 10, y - 6)
+          ..lineTo(x + 6, y + 7)
+          ..lineTo(x - 7, y + 7)
+          ..close(),
       'glasses_heart' => _heart(x, y - 1, 8),
       'glasses_star' => _star(x, y, 11),
       'glasses_cat' =>
@@ -582,6 +872,15 @@ void paintCatHeadClothing(
       _ink(const Color(0x99ffffff), 1.3),
     );
   }
+  if (glasses.id == 'glasses_monocle') {
+    canvas.drawPath(
+      Path()
+        ..moveTo(71, y + 5)
+        ..quadraticBezierTo(79, y + 24, 70, y + 29),
+      _ink(glasses.color, 1.2),
+    );
+    return;
+  }
   canvas.drawLine(Offset(48, y), Offset(52, y), frame);
   canvas.drawLine(Offset(28, y - 1), Offset(22, y - 4), frame);
   canvas.drawLine(Offset(72, y - 1), Offset(78, y - 4), frame);
@@ -628,4 +927,18 @@ void paintCatDirt(Canvas canvas, double cleanliness, {bool head = false}) {
       _ink(const Color(0xff805d40).withValues(alpha: alpha)),
     );
   }
+}
+
+Path _flowerLens(double x, double y) {
+  final path = Path();
+  for (var i = 0; i <= 48; i++) {
+    final a = i * math.pi / 24, r = 10 + math.cos(a * 6) * 1.8;
+    final at = Offset(x + math.cos(a) * r, y + math.sin(a) * r);
+    if (i == 0) {
+      path.moveTo(at.dx, at.dy);
+    } else {
+      path.lineTo(at.dx, at.dy);
+    }
+  }
+  return path..close();
 }

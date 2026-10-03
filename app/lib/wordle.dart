@@ -8,6 +8,8 @@ import 'package:flutter/services.dart';
 import 'cat_character.dart';
 import 'store.dart';
 import 'game_audio.dart';
+import 'wordle_entry.dart';
+import 'game_result.dart';
 
 // Accents are omitted for typing; Ñ remains a separate letter.
 const _words = <String>[
@@ -274,7 +276,7 @@ class WordleScreen extends StatefulWidget {
 }
 
 class _WordleScreenState extends State<WordleScreen>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   final _focus = FocusNode();
   late final AnimationController _reaction;
   String _mood = 'idle';
@@ -292,7 +294,14 @@ class _WordleScreenState extends State<WordleScreen>
   int get _remainingHints => _hintDay == _today ? 2 - _hintsUsed : 2;
   late String _answer;
   List<String> _guesses = [];
-  String _input = '';
+  WordleEntry _entry = WordleEntry();
+  bool _hintBusy = false, _resultShown = false;
+  late final AnimationController _flight;
+  final _stageKey = GlobalKey();
+  final _ladyKey = GlobalKey();
+  final _tiles = List.generate(30, (_) => GlobalKey());
+  Offset? _from, _to;
+  int? _flyingIndex;
   String _message = 'Maru y Lady te acompañan: ¡encuentra la palabra!';
   int _wins = 0;
   bool get _won => _guesses.contains(_answer);
@@ -305,12 +314,20 @@ class _WordleScreenState extends State<WordleScreen>
       vsync: this,
       duration: const Duration(milliseconds: 1600),
     );
+    _flight = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1300),
+    );
     _loadDictionary();
   }
 
   Future<void> _loadDictionary() async {
     try {
-      for (final asset in ['assets/wordle_es.dic', 'assets/wordle_cl.dic']) {
+      for (final asset in [
+        'assets/wordle_es.dic',
+        'assets/wordle_cl.dic',
+        'assets/wordle_expanded.txt',
+      ]) {
         final raw = await rootBundle.loadString(asset);
         for (final line in const LineSplitter().convert(raw)) {
           final word = normalizeWordle(line.split('/').first);
@@ -343,6 +360,9 @@ class _WordleScreenState extends State<WordleScreen>
     } catch (_) {
       /* A damaged save starts a fresh puzzle. */
     }
+    for (final i in _hints) {
+      _entry.reveal(i, _answer[i]);
+    }
     if (_finished) _message = _result;
     _hintDay = widget.store.prefs.getString('wordle.hintDay') ?? '';
     _hintsUsed = (widget.store.prefs.getInt('wordle.hintsUsed') ?? 0).clamp(
@@ -352,6 +372,7 @@ class _WordleScreenState extends State<WordleScreen>
     await _save();
     if (!mounted) return;
     setState(() => _loading = false);
+    if (_finished) _showResult();
   }
 
   String get _result => _won
@@ -376,23 +397,23 @@ class _WordleScreenState extends State<WordleScreen>
 
   void _key(String key) {
     _focus.requestFocus();
-    if (_finished || _loading) return;
+    if (_finished || _loading || _hintBusy) return;
     setState(() {
       if (key == '⌫') {
-        if (_input.isNotEmpty) _input = _input.substring(0, _input.length - 1);
+        _entry.delete();
       } else if (key == 'ENVIAR') {
-        if (_input.length != 5) {
+        if (!_entry.complete) {
           _message = 'Completa las cinco letras.';
           return;
         }
-        if (!_dictionary.contains(_input)) {
+        if (!_dictionary.contains(_entry.word)) {
           _message = 'Esa palabra no está en nuestro vocabulario todavía.';
           _react('wrong');
           return;
         }
-        final marks = wordleMarks(_input, _answer);
-        _guesses.add(_input);
-        _input = '';
+        final marks = wordleMarks(_entry.word, _answer);
+        _guesses.add(_entry.word);
+        _entry.clear();
         if (_won) {
           _wins++;
           widget.store.rewardWordle(_roundId);
@@ -409,8 +430,9 @@ class _WordleScreenState extends State<WordleScreen>
         if (_won) GameAudio.instance.play(GameSfx.kitten);
         HapticFeedback.lightImpact();
         _save();
-      } else if (_input.length < 5 && RegExp(r'^[A-ZÑ]$').hasMatch(key)) {
-        _input += key;
+        if (_finished) _showResult();
+      } else if (!_entry.complete && RegExp(r'^[A-ZÑ]$').hasMatch(key)) {
+        _entry.type(key);
       }
     });
   }
@@ -422,7 +444,8 @@ class _WordleScreenState extends State<WordleScreen>
       _roundId = DateTime.now().microsecondsSinceEpoch.toString();
       _hints = [];
       _mood = 'idle';
-      _input = '';
+      _entry = WordleEntry();
+      _resultShown = false;
       _message = '¡Otra palabra para nuestros bigotes!';
     });
     _save();
@@ -434,8 +457,40 @@ class _WordleScreenState extends State<WordleScreen>
     _reaction.forward(from: 0);
   }
 
-  Future<void> _hint() async {
-    if (_loading || _finished || _remainingHints <= 0) return;
+  Future<void> _showResult() async {
+    if (_resultShown) return;
+    _resultShown = true;
+    await Future<void>.delayed(const Duration(milliseconds: 650));
+    if (!mounted) return;
+    final next = await showGameResult(
+      context,
+      game: ResultTheme.wordle,
+      victory: _won,
+      title: _won ? '¡Palabra encontrada!' : '¡Otra palabra, michi!',
+      detail: _won
+          ? 'Los bigotes descifraron el misterio'
+          : 'Esta vez se escondió entre las letras',
+      stat: _won
+          ? '${_guesses.length} de 6 intentos · +100 monedas'
+          : 'La palabra era $_answer',
+      caption: _won
+          ? 'Tu recompensa está guardada. ¿Buscamos otra?'
+          : 'Maru y Lady te acompañan en la próxima ronda.',
+      again: 'Otra palabra',
+      word: _answer,
+    );
+    if (!mounted) return;
+    if (next == true) {
+      _newGame();
+    } else {
+      Navigator.pop(context);
+    }
+  }
+
+  Future<void> _hint({bool paid = false}) async {
+    if (_loading || _finished || _hintBusy || (!paid && _remainingHints <= 0)) {
+      return;
+    }
     final candidates = List.generate(5, (i) => i)
         .where(
           (i) =>
@@ -446,21 +501,118 @@ class _WordleScreenState extends State<WordleScreen>
       setState(() => _message = '¡Ya conoces todas las posiciones!');
       return;
     }
+    setState(() => _hintBusy = true);
+    if (paid && !await widget.store.buyWordleHint()) {
+      if (mounted) {
+        setState(() {
+          _hintBusy = false;
+          _message = 'Necesitas 50 monedas para comprar una pista.';
+        });
+      }
+      return;
+    }
+    if (!mounted) return;
     final index = candidates[Random().nextInt(candidates.length)];
-    setState(() {
+    if (!paid) {
       if (_hintDay != _today) {
         _hintDay = _today;
         _hintsUsed = 0;
       }
       _hintsUsed++;
-      _hints.add(index);
-      _message = 'Lady dice: la letra ${index + 1} es ${_answer[index]}.';
-      _react('close');
-    });
+    }
+    // Save the purchase and revealed position before the visual flight.
+    _hints.add(index);
     await widget.store.prefs.setString('wordle.hintDay', _hintDay);
     await widget.store.prefs.setInt('wordle.hintsUsed', _hintsUsed);
     await _save();
+    if (!mounted) return;
+    final stage = _stageKey.currentContext?.findRenderObject() as RenderBox?;
+    final tile =
+        _tiles[_guesses.length * 5 + index].currentContext?.findRenderObject()
+            as RenderBox?;
+    final lady = _ladyKey.currentContext?.findRenderObject() as RenderBox?;
+    if (stage != null && tile != null && lady != null) {
+      setState(() {
+        _from = stage.globalToLocal(lady.localToGlobal(Offset.zero));
+        _to =
+            stage.globalToLocal(
+              tile.localToGlobal(tile.size.center(Offset.zero)),
+            ) -
+            const Offset(35, 74);
+        _flyingIndex = index;
+      });
+      GameAudio.instance.play(GameSfx.kitten);
+      try {
+        await _flight.forward(from: 0).orCancel;
+      } on TickerCanceled {
+        return;
+      }
+    }
+    if (!mounted) return;
+    setState(() {
+      _entry.reveal(index, _answer[index]);
+      _hintBusy = false;
+      _flyingIndex = null;
+      _message =
+          '¡Letra fijada! Lady encontró la ${index + 1}: ${_answer[index]}.';
+      _react('close');
+    });
+    HapticFeedback.lightImpact();
   }
+
+  Widget _hintTraveler() => IgnorePointer(
+    child: AnimatedBuilder(
+      animation: _flight,
+      builder: (context, _) {
+        final t = Curves.easeInOutCubic.transform(_flight.value);
+        final at = Offset.lerp(_from!, _to!, t)! - Offset(0, sin(t * pi) * 38);
+        return Stack(
+          children: [
+            Positioned(
+              left: at.dx,
+              top: at.dy,
+              child: SizedBox(
+                width: 70,
+                height: 92,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    const CatActor(
+                      cat: CatKind.lady,
+                      size: 70,
+                      showLabel: false,
+                      active: true,
+                    ),
+                    Positioned(
+                      bottom: 0,
+                      child: Container(
+                        width: 33,
+                        height: 36,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: const Color(0xff348767),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.white, width: 2),
+                        ),
+                        child: Text(
+                          _answer[_flyingIndex!],
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 25,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    ),
+  );
 
   Widget _animatedCat(CatKind cat) => AnimatedBuilder(
     animation: _reaction,
@@ -507,6 +659,7 @@ class _WordleScreenState extends State<WordleScreen>
   @override
   void dispose() {
     _reaction.dispose();
+    _flight.dispose();
     _focus.dispose();
     super.dispose();
   }
@@ -535,231 +688,273 @@ class _WordleScreenState extends State<WordleScreen>
         title: const Text('Wordlady'),
         actions: const [AudioSettingsButton()],
       ),
-      body: PawBackground(child: Focus(
-        focusNode: _focus,
-        autofocus: true,
-        onKeyEvent: (_, event) {
-          if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
-            return KeyEventResult.ignored;
-          }
-          if (event.logicalKey == LogicalKeyboardKey.enter) {
-            _key('ENVIAR');
-          } else if (event.logicalKey == LogicalKeyboardKey.backspace) {
-            _key('⌫');
-          } else {
-            final letter = (event.character ?? '')
-                .toUpperCase()
-                .replaceAll('Á', 'A')
-                .replaceAll('É', 'E')
-                .replaceAll('Í', 'I')
-                .replaceAll('Ó', 'O')
-                .replaceAll('Ú', 'U')
-                .replaceAll('Ü', 'U');
-            if (!RegExp(r'^[A-ZÑ]$').hasMatch(letter)) {
-              return KeyEventResult.ignored;
-            }
-            _key(letter);
-          }
-          return KeyEventResult.handled;
-        },
-        child: SafeArea(
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 520),
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final tileSize = ((constraints.maxHeight - 355) / 6).clamp(
-                    32.0,
-                    58.0,
-                  );
-                  return ListView(
-                    padding: const EdgeInsets.all(8),
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          _animatedCat(CatKind.maru),
-                          Expanded(
-                            child: Text(
-                              '5 letras · 6 intentos\n$_wins victorias · ${widget.store.coins} 🪙',
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                          _animatedCat(CatKind.lady),
-                        ],
-                      ),
-                      const Text(
-                        'Sin tildes; la Ñ sí cuenta. Verde: posición correcta.\nAmarillo: otra posición. Gris: no aparece.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 12),
-                      ),
-                      const SizedBox(height: 12),
-                      if (_dictionaryError != null)
-                        Text(_dictionaryError!, textAlign: TextAlign.center),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          TextButton.icon(
-                            onPressed: _finished || _remainingHints <= 0
-                                ? null
-                                : _hint,
-                            icon: const Icon(Icons.lightbulb_outline, size: 18),
-                            label: Text('Pista ($_remainingHints/2 hoy)'),
-                          ),
-                          if (_hints.isNotEmpty)
-                            Flexible(
-                              child: Text(
-                                _hints
-                                    .map((i) => '${i + 1}: ${_answer[i]}')
-                                    .join(' · '),
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                      for (var row = 0; row < 6; row++)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 6),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              for (var col = 0; col < 5; col++)
-                                Flexible(
-                                  child: AnimatedContainer(
-                                    duration: Duration(
-                                      milliseconds: 250 + col * 75,
-                                    ),
-                                    margin: const EdgeInsets.symmetric(
-                                      horizontal: 3,
-                                    ),
-                                    constraints: BoxConstraints(
-                                      maxWidth: tileSize,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: row < _guesses.length
-                                          ? colors[wordleMarks(
-                                              _guesses[row],
-                                              _answer,
-                                            )[col]]
-                                          : Theme.of(
-                                              context,
-                                            ).colorScheme.surface,
-                                      borderRadius: BorderRadius.circular(10),
-                                      border: Border.all(
-                                        color: const Color(0xffb5bdb6),
-                                      ),
-                                    ),
-                                    child: AspectRatio(
-                                      aspectRatio: 1,
-                                      child: Center(
-                                        child: Text(
-                                          row < _guesses.length
-                                              ? _guesses[row][col]
-                                              : row == _guesses.length &&
-                                                    col < _input.length
-                                              ? _input[col]
-                                              : '',
-                                          style: TextStyle(
-                                            fontSize: 24,
-                                            fontWeight: FontWeight.w900,
-                                            color: row < _guesses.length
-                                                ? Colors.white
-                                                : null,
-                                          ),
-                                        ),
-                                      ),
+      body: Stack(
+        key: _stageKey,
+        children: [
+          PawBackground(
+            child: Focus(
+              focusNode: _focus,
+              autofocus: true,
+              onKeyEvent: (_, event) {
+                if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
+                  return KeyEventResult.ignored;
+                }
+                if (event.logicalKey == LogicalKeyboardKey.enter) {
+                  _key('ENVIAR');
+                } else if (event.logicalKey == LogicalKeyboardKey.backspace) {
+                  _key('⌫');
+                } else {
+                  final letter = (event.character ?? '')
+                      .toUpperCase()
+                      .replaceAll('Á', 'A')
+                      .replaceAll('É', 'E')
+                      .replaceAll('Í', 'I')
+                      .replaceAll('Ó', 'O')
+                      .replaceAll('Ú', 'U')
+                      .replaceAll('Ü', 'U');
+                  if (!RegExp(r'^[A-ZÑ]$').hasMatch(letter)) {
+                    return KeyEventResult.ignored;
+                  }
+                  _key(letter);
+                }
+                return KeyEventResult.handled;
+              },
+              child: SafeArea(
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 520),
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final tileSize = ((constraints.maxHeight - 500) / 6)
+                            .clamp(32.0, 58.0);
+                        return ListView(
+                          padding: const EdgeInsets.all(8),
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                _animatedCat(CatKind.maru),
+                                Expanded(
+                                  child: Text(
+                                    '5 letras · 6 intentos\n$_wins victorias · ${widget.store.coins} 🪙',
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
                                     ),
                                   ),
                                 ),
-                            ],
-                          ),
-                        ),
-                      SizedBox(
-                        height: 44,
-                        child: Center(
-                          child: Text(
-                            _message,
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(fontWeight: FontWeight.w600),
-                          ),
-                        ),
-                      ),
-                      if (_finished)
-                        FilledButton.icon(
-                          onPressed: _newGame,
-                          icon: const Icon(Icons.refresh),
-                          label: const Text('Otra palabra'),
-                        ),
-                      for (final keys in [
-                        'QWERTYUIOP'.split(''),
-                        'ASDFGHJKLÑ'.split(''),
-                        ['ENVIAR', ...'ZXCVBNM'.split(''), '⌫'],
-                      ])
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 3),
-                          child: Row(
-                            children: [
-                              for (final key in keys)
-                                Expanded(
-                                  flex: key.length > 1 ? 2 : 1,
-                                  child: Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 2,
-                                    ),
-                                    child: Semantics(
-                                      button: true,
-                                      label: key == '⌫' ? 'Borrar letra' : key,
-                                      child: Material(
-                                        color: keyboard.containsKey(key)
-                                            ? colors[keyboard[key]!]
-                                            : const Color(0xffe3e8e1),
-                                        borderRadius: BorderRadius.circular(7),
-                                        child: InkWell(
-                                          onTap: _finished
-                                              ? null
-                                              : () => _key(key),
-                                          borderRadius: BorderRadius.circular(
-                                            7,
+                                KeyedSubtree(
+                                  key: _ladyKey,
+                                  child: _animatedCat(CatKind.lady),
+                                ),
+                              ],
+                            ),
+                            const Text(
+                              'Sin tildes; la Ñ sí cuenta. Verde: posición correcta.\nAmarillo: otra posición. Gris: no aparece.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(fontSize: 12),
+                            ),
+                            const SizedBox(height: 12),
+                            if (_dictionaryError != null)
+                              Text(
+                                _dictionaryError!,
+                                textAlign: TextAlign.center,
+                              ),
+                            Wrap(
+                              alignment: WrapAlignment.center,
+                              spacing: 8,
+                              children: [
+                                TextButton.icon(
+                                  onPressed:
+                                      _finished ||
+                                          _hintBusy ||
+                                          _remainingHints <= 0
+                                      ? null
+                                      : () => _hint(),
+                                  icon: const Icon(
+                                    Icons.lightbulb_outline,
+                                    size: 18,
+                                  ),
+                                  label: Text('Pista ($_remainingHints/2 hoy)'),
+                                ),
+                                OutlinedButton.icon(
+                                  key: const ValueKey('buy-wordle-hint'),
+                                  onPressed: _finished || _hintBusy
+                                      ? null
+                                      : () => _hint(paid: true),
+                                  icon: const Icon(Icons.pets, size: 18),
+                                  label: const Text('Pista · 50 🪙'),
+                                ),
+                              ],
+                            ),
+                            for (var row = 0; row < 6; row++)
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 6),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    for (var col = 0; col < 5; col++)
+                                      Flexible(
+                                        child: AnimatedContainer(
+                                          key: _tiles[row * 5 + col],
+                                          duration: Duration(
+                                            milliseconds: 250 + col * 75,
                                           ),
-                                          child: SizedBox(
-                                            height: 48,
+                                          margin: const EdgeInsets.symmetric(
+                                            horizontal: 3,
+                                          ),
+                                          constraints: BoxConstraints(
+                                            maxWidth: tileSize,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: row < _guesses.length
+                                                ? colors[wordleMarks(
+                                                    _guesses[row],
+                                                    _answer,
+                                                  )[col]]
+                                                : row == _guesses.length &&
+                                                      _entry.locked.contains(
+                                                        col,
+                                                      )
+                                                ? colors[2]
+                                                : Theme.of(
+                                                    context,
+                                                  ).colorScheme.surface,
+                                            borderRadius: BorderRadius.circular(
+                                              10,
+                                            ),
+                                            border: Border.all(
+                                              color: const Color(0xffb5bdb6),
+                                            ),
+                                          ),
+                                          child: AspectRatio(
+                                            aspectRatio: 1,
                                             child: Center(
                                               child: Text(
-                                                key,
+                                                row < _guesses.length
+                                                    ? _guesses[row][col]
+                                                    : row == _guesses.length
+                                                    ? _entry.cells[col]
+                                                    : '',
                                                 style: TextStyle(
-                                                  fontSize: key.length > 1
-                                                      ? 10
-                                                      : 15,
-                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 24,
+                                                  fontWeight: FontWeight.w900,
                                                   color:
-                                                      keyboard.containsKey(key)
+                                                      row < _guesses.length ||
+                                                          row ==
+                                                                  _guesses
+                                                                      .length &&
+                                                              _entry.locked
+                                                                  .contains(col)
                                                       ? Colors.white
-                                                      : const Color(0xff293f39),
+                                                      : null,
                                                 ),
                                               ),
                                             ),
                                           ),
                                         ),
                                       ),
-                                    ),
+                                  ],
+                                ),
+                              ),
+                            SizedBox(
+                              height: 44,
+                              child: Center(
+                                child: Text(
+                                  _message,
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
                                   ),
                                 ),
-                            ],
-                          ),
-                        ),
-                    ],
-                  );
-                },
+                              ),
+                            ),
+                            if (_finished)
+                              FilledButton.icon(
+                                onPressed: _newGame,
+                                icon: const Icon(Icons.refresh),
+                                label: const Text('Otra palabra'),
+                              ),
+                            for (final keys in [
+                              'QWERTYUIOP'.split(''),
+                              'ASDFGHJKLÑ'.split(''),
+                              ['ENVIAR', ...'ZXCVBNM'.split(''), '⌫'],
+                            ])
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 3,
+                                ),
+                                child: Row(
+                                  children: [
+                                    for (final key in keys)
+                                      Expanded(
+                                        flex: key.length > 1 ? 2 : 1,
+                                        child: Padding(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 2,
+                                          ),
+                                          child: Semantics(
+                                            button: true,
+                                            label: key == '⌫'
+                                                ? 'Borrar letra'
+                                                : key,
+                                            child: Material(
+                                              color: keyboard.containsKey(key)
+                                                  ? colors[keyboard[key]!]
+                                                  : const Color(0xffe3e8e1),
+                                              borderRadius:
+                                                  BorderRadius.circular(7),
+                                              child: InkWell(
+                                                onTap: _finished
+                                                    ? null
+                                                    : () => _key(key),
+                                                borderRadius:
+                                                    BorderRadius.circular(7),
+                                                child: SizedBox(
+                                                  height: 48,
+                                                  child: Center(
+                                                    child: Text(
+                                                      key,
+                                                      style: TextStyle(
+                                                        fontSize: key.length > 1
+                                                            ? 10
+                                                            : 15,
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                        color:
+                                                            keyboard
+                                                                .containsKey(
+                                                                  key,
+                                                                )
+                                                            ? Colors.white
+                                                            : const Color(
+                                                                0xff293f39,
+                                                              ),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                          ],
+                        );
+                      },
+                    ),
+                  ),
+                ),
               ),
             ),
           ),
-        ),
-      )),
+          if (_flyingIndex != null && _from != null && _to != null)
+            Positioned.fill(child: _hintTraveler()),
+        ],
+      ),
     );
   }
 }

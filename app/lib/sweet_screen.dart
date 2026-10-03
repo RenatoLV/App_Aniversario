@@ -7,6 +7,7 @@ import 'cat_character.dart';
 import 'match3.dart';
 import 'store.dart';
 import 'game_audio.dart';
+import 'game_result.dart';
 
 const _sweetColors = [
   Color(0xffff749d),
@@ -30,6 +31,7 @@ class _SweetScreenState extends State<SweetScreen>
   late SweetFrame _frame;
   late AnimationController _cats;
   bool _busy = false;
+  bool _resultShown = false;
   int? _selected;
   String _booster = '';
   Offset? _dragStart;
@@ -51,6 +53,9 @@ class _SweetScreenState extends State<SweetScreen>
     } catch (_) {
       /* Keep the new board if a saved board is damaged. */
     }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_game.won || _game.lost) _showResult();
+    });
     _frame = SweetFrame(
       _game,
       _game.won
@@ -163,9 +168,38 @@ class _SweetScreenState extends State<SweetScreen>
             : caption ?? 'Desliza una ficha hacia su vecina para combinar 3.',
       );
     });
+    if (_game.won || _game.lost) _showResult();
     if (mounted && _powerAction != null) {
       await Future<void>.delayed(const Duration(milliseconds: 180));
-      if (mounted) setState(() { _powerAction = null; _powerTarget = null; });
+      if (mounted) {
+        setState(() {
+          _powerAction = null;
+          _powerTarget = null;
+        });
+      }
+    }
+  }
+
+  Future<void> _showResult() async {
+    if (_resultShown || !mounted) return;
+    _resultShown = true;
+    final next = await showGameResult(
+      context,
+      game: ResultTheme.sweet,
+      victory: _game.won,
+      title: _game.won ? '¡Dulce victoria!' : '¡Una combinación más!',
+      detail: 'Candy Churu Cat · Nivel ${_game.level}',
+      stat: '${_game.score} puntos',
+      caption: _game.won
+          ? '¡Gelatinas despejadas! Recuperas un poder de cada tipo para el siguiente nivel.'
+          : 'Quedan ${_game.jellyLeft} gelatinas. Tus poderes restantes se conservan al reintentar.',
+      again: _game.won ? 'Siguiente nivel' : 'Reintentar',
+    );
+    if (!mounted) return;
+    if (next == true) {
+      await _restart(next: _game.won);
+    } else {
+      Navigator.pop(context);
     }
   }
 
@@ -246,6 +280,7 @@ class _SweetScreenState extends State<SweetScreen>
         switches: _game.switches + (next ? 1 : 0),
         extraMoves: _game.extraMoves + (next ? 1 : 0),
       );
+      _resultShown = false;
       _selected = null;
       _booster = '';
       _powerAction = null;
@@ -386,9 +421,7 @@ class _SweetScreenState extends State<SweetScreen>
                         children: [
                           Expanded(child: _stat('🍮', '$jelly', 'gelatinas')),
                           const SizedBox(width: 8),
-                          Expanded(
-                            child: _movementStat(),
-                          ),
+                          Expanded(child: _movementStat()),
                         ],
                       ),
                       const SizedBox(height: 12),
@@ -506,7 +539,8 @@ class _SweetScreenState extends State<SweetScreen>
                                                   // Move by the real grid step so the
                                                   // candy tracks the neighbouring cell
                                                   // even when the board has spacing.
-                                                  final step = (boardSize - 8) / 9;
+                                                  final step =
+                                                      (boardSize - 8) / 9;
                                                   return Transform.translate(
                                                     offset: Offset(
                                                       t.dx * step,
@@ -533,7 +567,9 @@ class _SweetScreenState extends State<SweetScreen>
                                     child: AnimatedBuilder(
                                       animation: _cats,
                                       builder: (context, _) {
-                                        final t = Curves.easeOutCubic.transform(_cats.value);
+                                        final t = Curves.easeOutCubic.transform(
+                                          _cats.value,
+                                        );
                                         final target = _powerTarget!;
                                         final cell = boardSize / 9;
                                         final center = Offset(
@@ -542,11 +578,23 @@ class _SweetScreenState extends State<SweetScreen>
                                         );
                                         final hammer = _powerAction == 'hammer';
                                         final start = hammer
-                                            ? Offset(center.dx - cell * 1.7, center.dy - cell * 1.5)
-                                            : Offset(center.dx - cell * 2.2, center.dy);
+                                            ? Offset(
+                                                center.dx - cell * 1.7,
+                                                center.dy - cell * 1.5,
+                                              )
+                                            : Offset(
+                                                center.dx - cell * 2.2,
+                                                center.dy,
+                                              );
                                         final end = hammer
-                                            ? Offset(center.dx - cell * .25, center.dy - cell * .85)
-                                            : Offset(center.dx + cell * .8, center.dy);
+                                            ? Offset(
+                                                center.dx - cell * .25,
+                                                center.dy - cell * .85,
+                                              )
+                                            : Offset(
+                                                center.dx + cell * .8,
+                                                center.dy,
+                                              );
                                         final pos = Offset.lerp(start, end, t)!;
                                         return Stack(
                                           children: [
@@ -555,10 +603,19 @@ class _SweetScreenState extends State<SweetScreen>
                                               top: pos.dy - 29,
                                               child: Transform.rotate(
                                                 angle: hammer
-                                                    ? -.55 + math.sin(t * math.pi * 4) * .65
-                                                    : math.sin(t * math.pi * 2) * .12,
+                                                    ? -.55 +
+                                                          math.sin(
+                                                                t * math.pi * 4,
+                                                              ) *
+                                                              .65
+                                                    : math.sin(
+                                                            t * math.pi * 2,
+                                                          ) *
+                                                          .12,
                                                 child: CatActor(
-                                                  cat: hammer ? CatKind.maru : CatKind.lady,
+                                                  cat: hammer
+                                                      ? CatKind.maru
+                                                      : CatKind.lady,
                                                   size: 58,
                                                   action: CatAction.blocks,
                                                   active: true,
@@ -572,7 +629,19 @@ class _SweetScreenState extends State<SweetScreen>
                                                 top: center.dy - 18,
                                                 child: Transform.scale(
                                                   scale: (t - .58) / .42,
-                                                  child: const Text('✦', style: TextStyle(fontSize: 38, color: Color(0xffffe36f), shadows: [Shadow(color: Colors.white, blurRadius: 12)])),
+                                                  child: const Text(
+                                                    '✦',
+                                                    style: TextStyle(
+                                                      fontSize: 38,
+                                                      color: Color(0xffffe36f),
+                                                      shadows: [
+                                                        Shadow(
+                                                          color: Colors.white,
+                                                          blurRadius: 12,
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
                                                 ),
                                               ),
                                           ],
@@ -807,16 +876,16 @@ class _SweetScreenState extends State<SweetScreen>
     child: FittedBox(
       fit: BoxFit.scaleDown,
       child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 360),
-          transitionBuilder: (child, animation) => ScaleTransition(
-            scale: CurvedAnimation(parent: animation, curve: Curves.easeOutBack),
-            child: child,
-          ),
-          child: Text(
-            '🐾 ${_frame.moves} movimientos',
-            key: ValueKey(_frame.moves),
-            style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14),
-          ),
+        duration: const Duration(milliseconds: 360),
+        transitionBuilder: (child, animation) => ScaleTransition(
+          scale: CurvedAnimation(parent: animation, curve: Curves.easeOutBack),
+          child: child,
+        ),
+        child: Text(
+          '🐾 ${_frame.moves} movimientos',
+          key: ValueKey(_frame.moves),
+          style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14),
+        ),
       ),
     ),
   );

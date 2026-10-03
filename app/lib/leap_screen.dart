@@ -9,6 +9,7 @@ import 'package:flutter/services.dart';
 import 'cat_character.dart';
 import 'alien_cat.dart';
 import 'leap.dart';
+import 'game_result.dart';
 import 'store.dart';
 import 'game_audio.dart';
 
@@ -123,7 +124,9 @@ class _LeapScreenState extends State<LeapScreen>
     WidgetsBinding.instance.addObserver(this);
     _best = widget.store.prefs.getInt('leap.best') ?? 0;
     _trail = widget.store.prefs.getString('leap.trail') ?? 'rainbow';
-    _ownedTrails.addAll(widget.store.prefs.getStringList('leap.trails') ?? const []);
+    _ownedTrails.addAll(
+      widget.store.prefs.getStringList('leap.trails') ?? const [],
+    );
     _breath = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 4),
@@ -286,15 +289,69 @@ class _LeapScreenState extends State<LeapScreen>
 
   Future<void> _openTrailShop() async {
     const trails = [
-      ('none', 'Sin estela', 'El salto limpio, sin rastro detrás del gato', 0, Icons.block_rounded),
-      ('rainbow', 'Arcoíris', 'La estela clásica de Lady', 0, Icons.auto_awesome),
-      ('starlight', 'Polvo estelar', 'Destellos violetas y azules', 600, Icons.star_rounded),
-      ('bubble', 'Burbujas', 'Pompas turquesa con brillo', 1200, Icons.bubble_chart_rounded),
-      ('flame', 'Llamas dulces', 'Chispas cálidas al saltar', 2000, Icons.local_fire_department_rounded),
-      ('aurora', 'Aurora boreal', 'Cintas luminosas verdes y violetas', 3500, Icons.waves_rounded),
-      ('hearts', 'Corazones cósmicos', 'Corazones rosas que flotan al saltar', 5000, Icons.favorite_rounded),
-      ('comet', 'Cometa dorado', 'Una cola dorada con estrellas fugaces', 7500, Icons.bolt_rounded),
-      ('galaxy', 'Galaxia', 'Una espiral de estrellas y polvo cósmico', 10000, Icons.nights_stay_rounded),
+      (
+        'none',
+        'Sin estela',
+        'El salto limpio, sin rastro detrás del gato',
+        0,
+        Icons.block_rounded,
+      ),
+      (
+        'rainbow',
+        'Arcoíris',
+        'La estela clásica de Lady',
+        0,
+        Icons.auto_awesome,
+      ),
+      (
+        'starlight',
+        'Polvo estelar',
+        'Destellos violetas y azules',
+        600,
+        Icons.star_rounded,
+      ),
+      (
+        'bubble',
+        'Burbujas',
+        'Pompas turquesa con brillo',
+        1200,
+        Icons.bubble_chart_rounded,
+      ),
+      (
+        'flame',
+        'Llamas dulces',
+        'Chispas cálidas al saltar',
+        2000,
+        Icons.local_fire_department_rounded,
+      ),
+      (
+        'aurora',
+        'Aurora boreal',
+        'Cintas luminosas verdes y violetas',
+        3500,
+        Icons.waves_rounded,
+      ),
+      (
+        'hearts',
+        'Corazones cósmicos',
+        'Corazones rosas que flotan al saltar',
+        5000,
+        Icons.favorite_rounded,
+      ),
+      (
+        'comet',
+        'Cometa dorado',
+        'Una cola dorada con estrellas fugaces',
+        7500,
+        Icons.bolt_rounded,
+      ),
+      (
+        'galaxy',
+        'Galaxia',
+        'Una espiral de estrellas y polvo cósmico',
+        10000,
+        Icons.nights_stay_rounded,
+      ),
     ];
     await showModalBottomSheet<void>(
       context: context,
@@ -304,7 +361,10 @@ class _LeapScreenState extends State<LeapScreen>
           shrinkWrap: true,
           padding: const EdgeInsets.fromLTRB(16, 4, 16, 18),
           children: [
-            const Text('Tienda de estelas', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
+            const Text(
+              'Tienda de estelas',
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
+            ),
             const Text('Equipa una estela para verla detrás de Maru o Lady.'),
             const SizedBox(height: 10),
             for (final trail in trails)
@@ -317,7 +377,10 @@ class _LeapScreenState extends State<LeapScreen>
                     : _ownedTrails.contains(trail.$1)
                     ? OutlinedButton(
                         onPressed: () async {
-                          await widget.store.prefs.setString('leap.trail', trail.$1);
+                          await widget.store.prefs.setString(
+                            'leap.trail',
+                            trail.$1,
+                          );
                           if (mounted) setState(() => _trail = trail.$1);
                           if (context.mounted) Navigator.pop(context);
                         },
@@ -332,12 +395,20 @@ class _LeapScreenState extends State<LeapScreen>
                                   await widget.store.save();
                                 }
                                 _ownedTrails.add(trail.$1);
-                                await widget.store.prefs.setStringList('leap.trails', _ownedTrails.toList());
-                                await widget.store.prefs.setString('leap.trail', trail.$1);
+                                await widget.store.prefs.setStringList(
+                                  'leap.trails',
+                                  _ownedTrails.toList(),
+                                );
+                                await widget.store.prefs.setString(
+                                  'leap.trail',
+                                  trail.$1,
+                                );
                                 if (mounted) setState(() => _trail = trail.$1);
                                 if (context.mounted) Navigator.pop(context);
                               },
-                        child: Text(trail.$4 == 0 ? 'Equipar' : '${trail.$4} 🪙'),
+                        child: Text(
+                          trail.$4 == 0 ? 'Equipar' : '${trail.$4} 🪙',
+                        ),
                       ),
               ),
           ],
@@ -502,11 +573,21 @@ class _LeapScreenState extends State<LeapScreen>
                         CustomPaint(
                           size: const Size(76, 76),
                           painter: _cat == CatKind.maru
-                              ? MaruPainter(outfit: widget.store.catCare.outfit(_cat), cleanliness: widget.store.catCare.needs(_cat).clean.toDouble(),
+                              ? MaruPainter(
+                                  outfit: widget.store.catCare.outfit(_cat),
+                                  cleanliness: widget.store.catCare
+                                      .needs(_cat)
+                                      .clean
+                                      .toDouble(),
                                   phase: _tail.value,
                                   blink: _blink.value,
                                 )
-                              : LadyPainter(outfit: widget.store.catCare.outfit(_cat), cleanliness: widget.store.catCare.needs(_cat).clean.toDouble(),
+                              : LadyPainter(
+                                  outfit: widget.store.catCare.outfit(_cat),
+                                  cleanliness: widget.store.catCare
+                                      .needs(_cat)
+                                      .clean
+                                      .toDouble(),
                                   phase: _tail.value,
                                   blink: _blink.value,
                                 ),
@@ -611,7 +692,11 @@ class _LeapScreenState extends State<LeapScreen>
                                 _dragOrigins.remove(e.pointer);
                               }),
                               child: CustomPaint(
-                                painter: LeapWorldPainter(_game, _cat, trail: _trail),
+                                painter: LeapWorldPainter(
+                                  _game,
+                                  _cat,
+                                  trail: _trail,
+                                ),
                               ),
                             ),
                           ),
@@ -675,18 +760,42 @@ class _LeapScreenState extends State<LeapScreen>
                                         child: CustomPaint(
                                           size: Size.square(catSize),
                                           painter: _game.alien
-                                              ? AlienCatPainter(outfit: widget.store.catCare.outfit(_cat), cleanliness: widget.store.catCare.needs(_cat).clean.toDouble(),
+                                              ? AlienCatPainter(
+                                                  outfit: widget.store.catCare
+                                                      .outfit(_cat),
+                                                  cleanliness: widget
+                                                      .store
+                                                      .catCare
+                                                      .needs(_cat)
+                                                      .clean
+                                                      .toDouble(),
                                                   cat: _cat,
                                                   phase: _tail.value,
                                                   blink: _blink.value,
                                                 )
                                               : _cat == CatKind.maru
-                                              ? MaruPainter(outfit: widget.store.catCare.outfit(_cat), cleanliness: widget.store.catCare.needs(_cat).clean.toDouble(),
+                                              ? MaruPainter(
+                                                  outfit: widget.store.catCare
+                                                      .outfit(_cat),
+                                                  cleanliness: widget
+                                                      .store
+                                                      .catCare
+                                                      .needs(_cat)
+                                                      .clean
+                                                      .toDouble(),
                                                   phase: _tail.value,
                                                   blink: _blink.value,
                                                   joy: _joy.value,
                                                 )
-                                              : LadyPainter(outfit: widget.store.catCare.outfit(_cat), cleanliness: widget.store.catCare.needs(_cat).clean.toDouble(),
+                                              : LadyPainter(
+                                                  outfit: widget.store.catCare
+                                                      .outfit(_cat),
+                                                  cleanliness: widget
+                                                      .store
+                                                      .catCare
+                                                      .needs(_cat)
+                                                      .clean
+                                                      .toDouble(),
                                                   phase: _tail.value,
                                                   blink: _blink.value,
                                                   joy: _joy.value,
@@ -1014,188 +1123,253 @@ class _LeapScreenState extends State<LeapScreen>
                                 child: Center(
                                   child: SingleChildScrollView(
                                     padding: const EdgeInsets.all(20),
-                                    child: Container(
-                                      padding: const EdgeInsets.all(22),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xfffaf5ec),
-                                        borderRadius: BorderRadius.circular(28),
-                                        border: Border.all(
-                                          color: Colors.white,
-                                          width: 2,
-                                        ),
-                                      ),
-                                      child: Column(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Text(
-                                            !_started
-                                                ? 'ASCENSO MARUZON'
-                                                : _game.over
-                                                ? '¡Un salto más!'
-                                                : 'Un descansito',
-                                            textAlign: TextAlign.center,
-                                            style: const TextStyle(
-                                              fontSize: 24,
-                                              fontWeight: FontWeight.w900,
-                                              color: Color(0xff253c61),
+                                    child: _game.over
+                                        ? GameResultCard(
+                                            game: ResultTheme.leap,
+                                            title: '¡Un salto más!',
+                                            detail:
+                                                'Ascenso Maruzon · Aventura vertical',
+                                            stat:
+                                                '${_game.points} puntos · ${_game.coins} monedas',
+                                            caption:
+                                                '${_game.endReason}\nTus monedas ya están guardadas.',
+                                            again: 'Otra subida',
+                                            onAgain: _start,
+                                            onHome: () {
+                                              _record();
+                                              Navigator.pop(context);
+                                            },
+                                          )
+                                        : Container(
+                                            padding: const EdgeInsets.all(22),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xfffaf5ec),
+                                              borderRadius:
+                                                  BorderRadius.circular(28),
+                                              border: Border.all(
+                                                color: Colors.white,
+                                                width: 2,
+                                              ),
                                             ),
-                                          ),
-                                          const Text(
-                                            'AVENTURA VERTICAL',
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              letterSpacing: 2,
-                                              color: Color(0xff896787),
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 16),
-                                          if (!_started) ...[
-                                            Row(
-                                              mainAxisAlignment:
-                                                  MainAxisAlignment.spaceEvenly,
+                                            child: Column(
+                                              mainAxisSize: MainAxisSize.min,
                                               children: [
-                                                for (final cat
-                                                    in CatKind.values)
-                                                  InkWell(
-                                                    onTap: () => setState(
-                                                      () => _cat = cat,
-                                                    ),
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                          16,
-                                                        ),
-                                                    child: Container(
-                                                      padding:
-                                                          const EdgeInsets.all(
-                                                            8,
+                                                Text(
+                                                  !_started
+                                                      ? 'ASCENSO MARUZON'
+                                                      : _game.over
+                                                      ? '¡Un salto más!'
+                                                      : 'Un descansito',
+                                                  textAlign: TextAlign.center,
+                                                  style: const TextStyle(
+                                                    fontSize: 24,
+                                                    fontWeight: FontWeight.w900,
+                                                    color: Color(0xff253c61),
+                                                  ),
+                                                ),
+                                                const Text(
+                                                  'AVENTURA VERTICAL',
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                    letterSpacing: 2,
+                                                    color: Color(0xff896787),
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 16),
+                                                if (!_started) ...[
+                                                  Row(
+                                                    mainAxisAlignment:
+                                                        MainAxisAlignment
+                                                            .spaceEvenly,
+                                                    children: [
+                                                      for (final cat
+                                                          in CatKind.values)
+                                                        InkWell(
+                                                          onTap: () => setState(
+                                                            () => _cat = cat,
                                                           ),
-                                                      decoration: BoxDecoration(
-                                                        color: _cat == cat
-                                                            ? const Color(
-                                                                0xffe6d9f5,
-                                                              )
-                                                            : Colors
-                                                                  .transparent,
-                                                        borderRadius:
-                                                            BorderRadius.circular(
-                                                              16,
-                                                            ),
-                                                      ),
-                                                      child: Column(
-                                                        children: [
-                                                          CustomPaint(
-                                                            size: const Size(
-                                                              76,
-                                                              76,
-                                                            ),
-                                                            painter:
-                                                                cat ==
-                                                                    CatKind.maru
-                                                                ? MaruPainter(outfit: widget.store.catCare.outfit(cat), cleanliness: widget.store.catCare.needs(cat).clean.toDouble())
-                                                                : LadyPainter(outfit: widget.store.catCare.outfit(cat), cleanliness: widget.store.catCare.needs(cat).clean.toDouble()),
-                                                          ),
-                                                          Text(
-                                                            cat == CatKind.maru
-                                                                ? 'Maru'
-                                                                : 'Lady',
-                                                            style:
-                                                                const TextStyle(
-                                                                  fontWeight:
-                                                                      FontWeight
-                                                                          .bold,
+                                                          borderRadius:
+                                                              BorderRadius.circular(
+                                                                16,
+                                                              ),
+                                                          child: Container(
+                                                            padding:
+                                                                const EdgeInsets.all(
+                                                                  8,
                                                                 ),
+                                                            decoration: BoxDecoration(
+                                                              color: _cat == cat
+                                                                  ? const Color(
+                                                                      0xffe6d9f5,
+                                                                    )
+                                                                  : Colors
+                                                                        .transparent,
+                                                              borderRadius:
+                                                                  BorderRadius.circular(
+                                                                    16,
+                                                                  ),
+                                                            ),
+                                                            child: Column(
+                                                              children: [
+                                                                CustomPaint(
+                                                                  size:
+                                                                      const Size(
+                                                                        76,
+                                                                        76,
+                                                                      ),
+                                                                  painter:
+                                                                      cat ==
+                                                                          CatKind
+                                                                              .maru
+                                                                      ? MaruPainter(
+                                                                          outfit: widget
+                                                                              .store
+                                                                              .catCare
+                                                                              .outfit(
+                                                                                cat,
+                                                                              ),
+                                                                          cleanliness: widget
+                                                                              .store
+                                                                              .catCare
+                                                                              .needs(
+                                                                                cat,
+                                                                              )
+                                                                              .clean
+                                                                              .toDouble(),
+                                                                        )
+                                                                      : LadyPainter(
+                                                                          outfit: widget
+                                                                              .store
+                                                                              .catCare
+                                                                              .outfit(
+                                                                                cat,
+                                                                              ),
+                                                                          cleanliness: widget
+                                                                              .store
+                                                                              .catCare
+                                                                              .needs(
+                                                                                cat,
+                                                                              )
+                                                                              .clean
+                                                                              .toDouble(),
+                                                                        ),
+                                                                ),
+                                                                Text(
+                                                                  cat ==
+                                                                          CatKind
+                                                                              .maru
+                                                                      ? 'Maru'
+                                                                      : 'Lady',
+                                                                  style: const TextStyle(
+                                                                    fontWeight:
+                                                                        FontWeight
+                                                                            .bold,
+                                                                  ),
+                                                                ),
+                                                              ],
+                                                            ),
                                                           ),
-                                                        ],
+                                                        ),
+                                                    ],
+                                                  ),
+                                                  const SizedBox(height: 12),
+                                                  OutlinedButton.icon(
+                                                    onPressed: _openTrailShop,
+                                                    icon: const Icon(
+                                                      Icons.storefront_rounded,
+                                                    ),
+                                                    label: Text(
+                                                      'Tienda de estelas · ${widget.store.coins} 🪙',
+                                                    ),
+                                                  ),
+                                                  const SizedBox(height: 8),
+                                                  const Text(
+                                                    'Arrastra el dedo a izquierda o derecha para dirigir el salto. También puedes mantener un lado o usar las flechas.\n\n🚀 Cohete: impulso de 2,4 s.\n🛸 OVNI: la nave te recoge y te lleva arriba.\n☂️ Paraguas: caída lenta durante 8 s.\nLos trampolines dorados te impulsan más alto.\nEvita las nubes eléctricas.',
+                                                    textAlign: TextAlign.center,
+                                                    style: TextStyle(
+                                                      fontSize: 13,
+                                                      height: 1.4,
+                                                      color: Color(0xff59657a),
+                                                    ),
+                                                  ),
+                                                ] else if (_game.over) ...[
+                                                  _fallingCat(),
+                                                  Text(
+                                                    _game.endReason,
+                                                    textAlign: TextAlign.center,
+                                                  ),
+                                                  Text(
+                                                    '${_game.points} puntos · ${_game.coins} monedas',
+                                                    style: const TextStyle(
+                                                      fontSize: 18,
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                    ),
+                                                  ),
+                                                  const Text(
+                                                    'Las monedas ya están guardadas para tus sobres.',
+                                                    textAlign: TextAlign.center,
+                                                    style: TextStyle(
+                                                      fontSize: 12,
+                                                    ),
+                                                  ),
+                                                ] else
+                                                  const Text(
+                                                    'Maru y Lady te esperan.\nEl juego también se pausa al salir de la app.',
+                                                    textAlign: TextAlign.center,
+                                                  ),
+                                                const SizedBox(height: 18),
+                                                if (_game.over)
+                                                  Wrap(
+                                                    alignment:
+                                                        WrapAlignment.center,
+                                                    spacing: 10,
+                                                    runSpacing: 8,
+                                                    children: [
+                                                      OutlinedButton.icon(
+                                                        onPressed: () {
+                                                          _record();
+                                                          Navigator.pop(
+                                                            context,
+                                                          );
+                                                        },
+                                                        icon: const Icon(
+                                                          Icons
+                                                              .arrow_back_rounded,
+                                                        ),
+                                                        label: const Text(
+                                                          'Volver',
+                                                        ),
                                                       ),
+                                                      FilledButton.icon(
+                                                        onPressed: _start,
+                                                        icon: const Icon(
+                                                          Icons.rocket_launch,
+                                                        ),
+                                                        label: const Text(
+                                                          'Otra subida',
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  )
+                                                else
+                                                  FilledButton.icon(
+                                                    onPressed: !_started
+                                                        ? _start
+                                                        : () => _pause(false),
+                                                    icon: const Icon(
+                                                      Icons.rocket_launch,
+                                                    ),
+                                                    label: Text(
+                                                      !_started
+                                                          ? '¡A saltar!'
+                                                          : 'Continuar',
                                                     ),
                                                   ),
                                               ],
                                             ),
-                                            const SizedBox(height: 12),
-                                            OutlinedButton.icon(
-                                              onPressed: _openTrailShop,
-                                              icon: const Icon(Icons.storefront_rounded),
-                                              label: Text('Tienda de estelas · ${widget.store.coins} 🪙'),
-                                            ),
-                                            const SizedBox(height: 8),
-                                            const Text(
-                                              'Arrastra el dedo a izquierda o derecha para dirigir el salto. También puedes mantener un lado o usar las flechas.\n\n🚀 Cohete: impulso de 2,4 s.\n🛸 OVNI: la nave te recoge y te lleva arriba.\n☂️ Paraguas: caída lenta durante 8 s.\nLos trampolines dorados te impulsan más alto.\nEvita las nubes eléctricas.',
-                                              textAlign: TextAlign.center,
-                                              style: TextStyle(
-                                                fontSize: 13,
-                                                height: 1.4,
-                                                color: Color(0xff59657a),
-                                              ),
-                                            ),
-                                          ] else if (_game.over) ...[
-                                            _fallingCat(),
-                                            Text(
-                                              _game.endReason,
-                                              textAlign: TextAlign.center,
-                                            ),
-                                            Text(
-                                              '${_game.points} puntos · ${_game.coins} monedas',
-                                              style: const TextStyle(
-                                                fontSize: 18,
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                            const Text(
-                                              'Las monedas ya están guardadas para tus sobres.',
-                                              textAlign: TextAlign.center,
-                                              style: TextStyle(fontSize: 12),
-                                            ),
-                                          ] else
-                                            const Text(
-                                              'Maru y Lady te esperan.\nEl juego también se pausa al salir de la app.',
-                                              textAlign: TextAlign.center,
-                                            ),
-                                          const SizedBox(height: 18),
-                                          if (_game.over)
-                                            Wrap(
-                                              alignment: WrapAlignment.center,
-                                              spacing: 10,
-                                              runSpacing: 8,
-                                              children: [
-                                                OutlinedButton.icon(
-                                                  onPressed: () {
-                                                    _record();
-                                                    Navigator.pop(context);
-                                                  },
-                                                  icon: const Icon(
-                                                    Icons.arrow_back_rounded,
-                                                  ),
-                                                  label: const Text('Volver'),
-                                                ),
-                                                FilledButton.icon(
-                                                  onPressed: _start,
-                                                  icon: const Icon(
-                                                    Icons.rocket_launch,
-                                                  ),
-                                                  label: const Text(
-                                                    'Otra subida',
-                                                  ),
-                                                ),
-                                              ],
-                                            )
-                                          else
-                                            FilledButton.icon(
-                                              onPressed: !_started
-                                                  ? _start
-                                                  : () => _pause(false),
-                                              icon: const Icon(
-                                                Icons.rocket_launch,
-                                              ),
-                                              label: Text(
-                                                !_started
-                                                    ? '¡A saltar!'
-                                                    : 'Continuar',
-                                              ),
-                                            ),
-                                        ],
-                                      ),
-                                    ),
+                                          ),
                                   ),
                                 ),
                               ),
@@ -1220,63 +1394,160 @@ class LeapWorldPainter extends CustomPainter {
   final String trail;
   LeapWorldPainter(this.game, this.cat, {this.trail = 'rainbow'});
 
-  void _zoneHazard(Canvas canvas, Offset at, double width, LeapWorldZone zone, int seed) {
+  void _zoneHazard(
+    Canvas canvas,
+    Offset at,
+    double width,
+    LeapWorldZone zone,
+    int seed,
+  ) {
     final space = zone == LeapWorldZone.space;
-    final portal = zone == LeapWorldZone.upperSky || zone == LeapWorldZone.heaven;
-    final color = space ? const Color(0xffff5368) : portal ? const Color(0xffff793d) : zone == LeapWorldZone.underground ? const Color(0xffbd83ff) : const Color(0xfff59b57);
+    final portal =
+        zone == LeapWorldZone.upperSky || zone == LeapWorldZone.heaven;
+    final color = space
+        ? const Color(0xffff5368)
+        : portal
+        ? const Color(0xffff793d)
+        : zone == LeapWorldZone.underground
+        ? const Color(0xffbd83ff)
+        : const Color(0xfff59b57);
     canvas.save();
     canvas.translate(at.dx, at.dy);
     final bounds = Rect.fromLTWH(-width / 2, -23, width, 30);
-    canvas.drawOval(bounds.inflate(5), Paint()..color = color.withValues(alpha: .18 + math.sin(game.clock * 6 + seed) * .06)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6));
+    canvas.drawOval(
+      bounds.inflate(5),
+      Paint()
+        ..color = color.withValues(
+          alpha: .18 + math.sin(game.clock * 6 + seed) * .06,
+        )
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6),
+    );
     if (space) {
-      canvas.drawPath(Path()..moveTo(-width / 2, 5)..lineTo(-width * .22, -10)..quadraticBezierTo(0, -25, width * .22, -10)..lineTo(width / 2, 5)..quadraticBezierTo(0, 17, -width / 2, 5)..close(), Paint()..color = const Color(0xffa72d46));
-      canvas.drawOval(Rect.fromLTWH(-16, -20, 32, 19), Paint()..color = const Color(0xff99ffcf));
+      canvas.drawPath(
+        Path()
+          ..moveTo(-width / 2, 5)
+          ..lineTo(-width * .22, -10)
+          ..quadraticBezierTo(0, -25, width * .22, -10)
+          ..lineTo(width / 2, 5)
+          ..quadraticBezierTo(0, 17, -width / 2, 5)
+          ..close(),
+        Paint()..color = const Color(0xffa72d46),
+      );
+      canvas.drawOval(
+        Rect.fromLTWH(-16, -20, 32, 19),
+        Paint()..color = const Color(0xff99ffcf),
+      );
       for (var i = 0; i < 5; i++) {
-        canvas.drawCircle(Offset(-width * .35 + i * width * .175, 3), 2.5, Paint()..color = color.withValues(alpha: .6 + math.sin(game.clock * 9 + i) * .35));
+        canvas.drawCircle(
+          Offset(-width * .35 + i * width * .175, 3),
+          2.5,
+          Paint()
+            ..color = color.withValues(
+              alpha: .6 + math.sin(game.clock * 9 + i) * .35,
+            ),
+        );
       }
     } else if (portal) {
       canvas.drawOval(bounds, Paint()..color = const Color(0xff270e3e));
       for (var i = 0; i < 3; i++) {
-        canvas.drawOval(bounds.deflate(i * 3), Paint()..color = color.withValues(alpha: .8 - i * .2)..style = PaintingStyle.stroke..strokeWidth = 2);
+        canvas.drawOval(
+          bounds.deflate(i * 3),
+          Paint()
+            ..color = color.withValues(alpha: .8 - i * .2)
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 2,
+        );
       }
-    } else if (zone == LeapWorldZone.city || zone == LeapWorldZone.neighborhood) {
-      canvas.drawRRect(RRect.fromRectAndRadius(bounds, const Radius.circular(4)), Paint()..color = const Color(0xff3c465b));
+    } else if (zone == LeapWorldZone.city ||
+        zone == LeapWorldZone.neighborhood) {
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(bounds, const Radius.circular(4)),
+        Paint()..color = const Color(0xff3c465b),
+      );
       final sparks = Path()..moveTo(-width / 2, -8);
       for (var i = 1; i <= 10; i++) {
-        sparks.lineTo(-width / 2 + width * i / 10, -8 + math.sin(game.clock * 15 + i * 3) * 8);
+        sparks.lineTo(
+          -width / 2 + width * i / 10,
+          -8 + math.sin(game.clock * 15 + i * 3) * 8,
+        );
       }
-      canvas.drawPath(sparks, Paint()..color = const Color(0xffffdd75)..style = PaintingStyle.stroke..strokeWidth = 2);
+      canvas.drawPath(
+        sparks,
+        Paint()
+          ..color = const Color(0xffffdd75)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2,
+      );
     } else {
       // Jagged stone ledge supports the crystals; no cloud beneath the spikes.
       final rock = Path()
-        ..moveTo(-width / 2, 4)..lineTo(width / 2, 4)
-        ..lineTo(width / 2 - 4, 13)..lineTo(width * .23, 18)
-        ..lineTo(-width * .17, 20)..lineTo(-width / 2 + 6, 14)..close();
-      canvas.drawPath(rock, Paint()..shader = LinearGradient(
-        colors: zone == LeapWorldZone.underground
-          ? const [Color(0xff716184),Color(0xff3e354b)]
-          : const [Color(0xffb18a64),Color(0xff655345)],
-        begin: Alignment.topCenter, end: Alignment.bottomCenter,
-      ).createShader(Rect.fromLTWH(-width/2,4,width,16)));
-      canvas.drawPath(Path()..moveTo(-width*.32,8)..lineTo(-width*.12,12)
-        ..lineTo(-width*.05,19)..moveTo(width*.29,6)..lineTo(width*.17,13)
-        ..lineTo(width*.3,16), Paint()..color=const Color(0xff302b3d).withValues(alpha:.45)
-        ..style=PaintingStyle.stroke..strokeWidth=1.2);
+        ..moveTo(-width / 2, 4)
+        ..lineTo(width / 2, 4)
+        ..lineTo(width / 2 - 4, 13)
+        ..lineTo(width * .23, 18)
+        ..lineTo(-width * .17, 20)
+        ..lineTo(-width / 2 + 6, 14)
+        ..close();
+      canvas.drawPath(
+        rock,
+        Paint()
+          ..shader = LinearGradient(
+            colors: zone == LeapWorldZone.underground
+                ? const [Color(0xff716184), Color(0xff3e354b)]
+                : const [Color(0xffb18a64), Color(0xff655345)],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ).createShader(Rect.fromLTWH(-width / 2, 4, width, 16)),
+      );
+      canvas.drawPath(
+        Path()
+          ..moveTo(-width * .32, 8)
+          ..lineTo(-width * .12, 12)
+          ..lineTo(-width * .05, 19)
+          ..moveTo(width * .29, 6)
+          ..lineTo(width * .17, 13)
+          ..lineTo(width * .3, 16),
+        Paint()
+          ..color = const Color(0xff302b3d).withValues(alpha: .45)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.2,
+      );
       for (var i = 0; i < 5; i++) {
         final x = -width / 2 + i * width / 5;
         final peak = -15.0 - (i % 2) * 9;
-        canvas.drawPath(Path()..moveTo(x, 6)..lineTo(x + width / 10, peak)..lineTo(x + width / 5, 6)..close(), Paint()..color = Color.lerp(color, const Color(0xff422c55), i / 7)!);
-        canvas.drawLine(Offset(x + width / 10, peak + 4), Offset(x + width / 10, 3), Paint()..color = Colors.white.withValues(alpha: .4)..strokeWidth = 1);
+        canvas.drawPath(
+          Path()
+            ..moveTo(x, 6)
+            ..lineTo(x + width / 10, peak)
+            ..lineTo(x + width / 5, 6)
+            ..close(),
+          Paint()..color = Color.lerp(color, const Color(0xff422c55), i / 7)!,
+        );
+        canvas.drawLine(
+          Offset(x + width / 10, peak + 4),
+          Offset(x + width / 10, 3),
+          Paint()
+            ..color = Colors.white.withValues(alpha: .4)
+            ..strokeWidth = 1,
+        );
       }
     }
     for (var i = 0; i < 8; i++) {
       final t = (game.clock * .9 + i / 8) % 1;
       final angle = i * math.pi / 4 + game.clock * .5;
-      final point = Offset(math.cos(angle) * width * (.25 + t * .3), -5 + math.sin(angle) * (10 + t * 14));
-      canvas.drawCircle(point, 1.5 * (1 - t), Paint()..color = color.withValues(alpha: 1 - t));
+      final point = Offset(
+        math.cos(angle) * width * (.25 + t * .3),
+        -5 + math.sin(angle) * (10 + t * 14),
+      );
+      canvas.drawCircle(
+        point,
+        1.5 * (1 - t),
+        Paint()..color = color.withValues(alpha: 1 - t),
+      );
     }
     canvas.restore();
   }
+
   @override
   void paint(Canvas canvas, Size size) {
     canvas.save();
@@ -1424,27 +1695,55 @@ class LeapWorldPainter extends CustomPainter {
     }
     if (trail != 'none' && game.vy > 0 && !game.boosting) {
       final colors = trail == 'aurora'
-          ? [const Color(0xff5affca), const Color(0xff77baff), const Color(0xffcd83ff)]
+          ? [
+              const Color(0xff5affca),
+              const Color(0xff77baff),
+              const Color(0xffcd83ff),
+            ]
           : trail == 'hearts'
-          ? [const Color(0xffff6baf), const Color(0xffffb4da), const Color(0xffff86bb)]
+          ? [
+              const Color(0xffff6baf),
+              const Color(0xffffb4da),
+              const Color(0xffff86bb),
+            ]
           : trail == 'comet'
-          ? [const Color(0xffffd354), const Color(0xffffefae), const Color(0xffffa64d)]
+          ? [
+              const Color(0xffffd354),
+              const Color(0xffffefae),
+              const Color(0xffffa64d),
+            ]
           : trail == 'galaxy'
-          ? [const Color(0xff926bff), const Color(0xff5ddfff), const Color(0xffff8cdd)]
+          ? [
+              const Color(0xff926bff),
+              const Color(0xff5ddfff),
+              const Color(0xffff8cdd),
+            ]
           : trail == 'starlight'
-          ? [const Color(0xffa98cff), const Color(0xff55d7ff), const Color(0xffd4b4ff)]
+          ? [
+              const Color(0xffa98cff),
+              const Color(0xff55d7ff),
+              const Color(0xffd4b4ff),
+            ]
           : trail == 'bubble'
-          ? [const Color(0xff72f4e4), const Color(0xff8ce7ff), const Color(0xffb7fff1)]
+          ? [
+              const Color(0xff72f4e4),
+              const Color(0xff8ce7ff),
+              const Color(0xffb7fff1),
+            ]
           : trail == 'flame'
-          ? [const Color(0xffff6b61), const Color(0xffffb347), const Color(0xffffe07a)]
+          ? [
+              const Color(0xffff6b61),
+              const Color(0xffffb347),
+              const Color(0xffffe07a),
+            ]
           : [
-        Color(0xffef86a1),
-        Color(0xffffc078),
-        Color(0xffffe98c),
-        Color(0xff89dfb1),
-        Color(0xff90d6ff),
-        Color(0xffb7a0e9),
-      ];
+              Color(0xffef86a1),
+              Color(0xffffc078),
+              Color(0xffffe98c),
+              Color(0xff89dfb1),
+              Color(0xff90d6ff),
+              Color(0xffb7a0e9),
+            ];
       final count = trail == 'rainbow' ? 6 : 3;
       final trailOffset = game.vx.abs() < 1
           ? 0.0
@@ -1462,21 +1761,27 @@ class LeapWorldPainter extends CustomPainter {
           );
         if (trail == 'rainbow' || trail == 'aurora' || trail == 'comet') {
           canvas.drawPath(
-          path,
-          Paint()
-            ..shader = LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [colors[n % colors.length].withValues(alpha: .7), colors[n % colors.length].withValues(alpha: 0)],
-            ).createShader(Rect.fromLTWH(game.x - 40, foot - 8, 80, 72))
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = trail == 'bubble' ? 7 : 5
-            ..strokeCap = StrokeCap.round,
-        );
+            path,
+            Paint()
+              ..shader = LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  colors[n % colors.length].withValues(alpha: .7),
+                  colors[n % colors.length].withValues(alpha: 0),
+                ],
+              ).createShader(Rect.fromLTWH(game.x - 40, foot - 8, 80, 72))
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = trail == 'bubble' ? 7 : 5
+              ..strokeCap = StrokeCap.round,
+          );
         }
         if (trail == 'bubble') {
           canvas.drawCircle(
-            Offset(game.x - game.vx * .18 + n * 7, foot + 35 + math.sin(game.clock * 3 + n) * 8),
+            Offset(
+              game.x - game.vx * .18 + n * 7,
+              foot + 35 + math.sin(game.clock * 3 + n) * 8,
+            ),
             4 + (n % 2) * 3,
             Paint()..color = colors[n % colors.length].withValues(alpha: .42),
           );
@@ -1485,27 +1790,58 @@ class LeapWorldPainter extends CustomPainter {
       for (var n = 0; n < 14 && trail != 'rainbow'; n++) {
         final age = (game.clock * 1.4 + n / 14) % 1;
         final spread = math.sin(n * 2.4 + game.clock * 2) * (4 + age * 17);
-        final at = Offset(game.x + trailOffset * age + spread, foot - 6 + age * 78);
+        final at = Offset(
+          game.x + trailOffset * age + spread,
+          foot - 6 + age * 78,
+        );
         final radius = (1 - age) * 4 + .5;
-        final ink = Paint()..color = colors[n % colors.length].withValues(alpha: (1 - age) * .8);
+        final ink = Paint()
+          ..color = colors[n % colors.length].withValues(alpha: (1 - age) * .8);
         if (trail == 'bubble') {
-          ink..style = PaintingStyle.stroke..strokeWidth = 1.2;
+          ink
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1.2;
           canvas.drawCircle(at, radius + 2, ink);
         } else if (trail == 'hearts') {
-          canvas.drawPath(Path()
-            ..moveTo(at.dx, at.dy + radius)
-            ..cubicTo(at.dx - radius * 2, at.dy, at.dx - radius, at.dy - radius * 2, at.dx, at.dy - radius * .5)
-            ..cubicTo(at.dx + radius, at.dy - radius * 2, at.dx + radius * 2, at.dy, at.dx, at.dy + radius)
-            ..close(), ink);
+          canvas.drawPath(
+            Path()
+              ..moveTo(at.dx, at.dy + radius)
+              ..cubicTo(
+                at.dx - radius * 2,
+                at.dy,
+                at.dx - radius,
+                at.dy - radius * 2,
+                at.dx,
+                at.dy - radius * .5,
+              )
+              ..cubicTo(
+                at.dx + radius,
+                at.dy - radius * 2,
+                at.dx + radius * 2,
+                at.dy,
+                at.dx,
+                at.dy + radius,
+              )
+              ..close(),
+            ink,
+          );
         } else if (trail == 'flame') {
-          canvas.drawOval(Rect.fromCenter(center: at, width: radius * 2, height: radius * 4), ink);
+          canvas.drawOval(
+            Rect.fromCenter(center: at, width: radius * 2, height: radius * 4),
+            ink,
+          );
         } else {
           final star = Path();
           for (var point = 0; point < 8; point++) {
             final angle = point * math.pi / 4;
             final r = point.isEven ? radius * 1.6 : radius * .4;
-            final x = at.dx + math.cos(angle) * r, y = at.dy + math.sin(angle) * r;
-            if (point == 0) { star.moveTo(x, y); } else { star.lineTo(x, y); }
+            final x = at.dx + math.cos(angle) * r,
+                y = at.dy + math.sin(angle) * r;
+            if (point == 0) {
+              star.moveTo(x, y);
+            } else {
+              star.lineTo(x, y);
+            }
           }
           canvas.drawPath(star..close(), ink);
         }
@@ -1521,8 +1857,15 @@ class LeapWorldPainter extends CustomPainter {
       final opacity = 1 - vanish;
       final y = height - (platform.y - game.camera) + vanish * 14;
       if (y < -40 || y > height + 40) continue;
-      if (platform.kind == LeapPlatformKind.storm && game.zoneAt(platform.y) != LeapWorldZone.skyscrapers) {
-        _zoneHazard(canvas, Offset(platform.x, y), platform.width, game.zoneAt(platform.y), platform.id);
+      if (platform.kind == LeapPlatformKind.storm &&
+          game.zoneAt(platform.y) != LeapWorldZone.skyscrapers) {
+        _zoneHazard(
+          canvas,
+          Offset(platform.x, y),
+          platform.width,
+          game.zoneAt(platform.y),
+          platform.id,
+        );
       } else if (platform.kind == LeapPlatformKind.rock) {
         final subterranean = platform.y < LeapGame.meadowHeight;
         final left = platform.x - platform.width / 2,
@@ -1808,10 +2151,11 @@ class LeapWorldPainter extends CustomPainter {
   }
 
   double _bandAlpha(double altitude, double start, double end) {
-    const feather = 700.0;
+    const feather = 1000.0;
     final fadeIn = ((altitude - start) / feather).clamp(0.0, 1.0);
     final fadeOut = ((end - altitude) / feather).clamp(0.0, 1.0);
-    return math.min(fadeIn, fadeOut);
+    final t = math.min(fadeIn, fadeOut);
+    return t * t * (3 - 2 * t);
   }
 
   void _journeyBackdrop(Canvas canvas, double height, double altitude) {
@@ -2000,7 +2344,33 @@ class LeapWorldPainter extends CustomPainter {
 
   // A bounded set of vector details: no image loading or random work per frame.
   void _landscapeDetails(Canvas canvas, double height, double altitude) {
+    final boundary = <double>[
+      0,
+      LeapGame.meadowHeight,
+      LeapGame.neighborhoodHeight,
+      LeapGame.cityHeight,
+      LeapGame.skyscraperHeight,
+      LeapGame.upperSkyHeight,
+      LeapGame.spaceHeight,
+      LeapGame.heavenHeight,
+    ];
     final zone = game.zoneAt(altitude);
+    final zoneStart = boundary[zone.index];
+    final zoneEnd = zone.index == 7
+        ? double.infinity
+        : boundary[zone.index + 1];
+    final blendIn = zone.index == 0
+        ? 1.0
+        : ((altitude - zoneStart) / 700).clamp(0.0, 1.0);
+    final blendOut = ((zoneEnd - altitude) / 700).clamp(0.0, 1.0);
+    final alpha = math.min(blendIn, blendOut);
+    canvas.saveLayer(
+      Rect.fromLTWH(0, 0, 360, height),
+      Paint()
+        ..color = Colors.white.withValues(
+          alpha: alpha * alpha * (3 - 2 * alpha),
+        ),
+    );
     final paint = Paint()..strokeWidth = 1.5;
     for (var i = 0; i < 12; i++) {
       final x = 18.0 + (i * 83.0) % 324;
@@ -2087,6 +2457,7 @@ class LeapWorldPainter extends CustomPainter {
           );
       }
     }
+    canvas.restore();
   }
 
   void _caveSkeleton(Canvas canvas, Offset at, double alpha, bool flipped) {
@@ -2179,31 +2550,60 @@ class LeapWorldPainter extends CustomPainter {
 
   void _satellitePlatform(Canvas canvas, double width) {
     final metal = Paint()..color = const Color(0xffd5dee9);
-    final seam = Paint()..color = const Color(0xff8eabc3)..strokeWidth = 1;
+    final seam = Paint()
+      ..color = const Color(0xff8eabc3)
+      ..strokeWidth = 1;
     final half = width / 2;
     // Solar arrays stay inside the platform width, with their top at the landing plane.
     for (final side in [-1.0, 1.0]) {
-      final panel = Rect.fromLTWH(side < 0 ? -half : 17, 0, half-17, 22);
+      final panel = Rect.fromLTWH(side < 0 ? -half : 17, 0, half - 17, 22);
       canvas.drawRect(panel.inflate(1), metal);
       canvas.drawRect(panel, Paint()..color = const Color(0xff326fb5));
       for (var i = 1; i < 4; i++) {
         final x = panel.left + panel.width * i / 4;
-        canvas.drawLine(Offset(x,0), Offset(x,22), seam);
+        canvas.drawLine(Offset(x, 0), Offset(x, 22), seam);
       }
-      canvas.drawLine(Offset(panel.left,11),Offset(panel.right,11),seam);
-      canvas.drawLine(Offset(side*12,11),Offset(side*19,11),metal..strokeWidth=3);
+      canvas.drawLine(Offset(panel.left, 11), Offset(panel.right, 11), seam);
+      canvas.drawLine(
+        Offset(side * 12, 11),
+        Offset(side * 19, 11),
+        metal..strokeWidth = 3,
+      );
     }
-    final body = RRect.fromRectAndRadius(const Rect.fromLTWH(-13,0,26,23),const Radius.circular(5));
-    canvas.drawRRect(body,Paint()..shader = const LinearGradient(
-      colors:[Color(0xfff0f4f8),Color(0xffa1b4c9)], begin:Alignment.topLeft,end:Alignment.bottomRight
-    ).createShader(body.outerRect));
-    canvas.drawLine(const Offset(-9,7),const Offset(9,7),seam);
-    canvas.drawLine(const Offset(-9,17),const Offset(9,17),seam);
-    canvas.drawLine(const Offset(0,0),const Offset(0,-7),seam);
-    canvas.drawArc(const Rect.fromLTWH(-9,-15,18,12),0,math.pi,true,metal);
-    canvas.drawLine(const Offset(0,-9),const Offset(5,-19),seam);
-    canvas.drawCircle(const Offset(5,-19),1.8,Paint()..color=const Color(0xffedfaff));
-    canvas.drawCircle(const Offset(7,12),2,Paint()..color=const Color(0xff80efb9));
+    final body = RRect.fromRectAndRadius(
+      const Rect.fromLTWH(-13, 0, 26, 23),
+      const Radius.circular(5),
+    );
+    canvas.drawRRect(
+      body,
+      Paint()
+        ..shader = const LinearGradient(
+          colors: [Color(0xfff0f4f8), Color(0xffa1b4c9)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ).createShader(body.outerRect),
+    );
+    canvas.drawLine(const Offset(-9, 7), const Offset(9, 7), seam);
+    canvas.drawLine(const Offset(-9, 17), const Offset(9, 17), seam);
+    canvas.drawLine(const Offset(0, 0), const Offset(0, -7), seam);
+    canvas.drawArc(
+      const Rect.fromLTWH(-9, -15, 18, 12),
+      0,
+      math.pi,
+      true,
+      metal,
+    );
+    canvas.drawLine(const Offset(0, -9), const Offset(5, -19), seam);
+    canvas.drawCircle(
+      const Offset(5, -19),
+      1.8,
+      Paint()..color = const Color(0xffedfaff),
+    );
+    canvas.drawCircle(
+      const Offset(7, 12),
+      2,
+      Paint()..color = const Color(0xff80efb9),
+    );
   }
 
   void _airplanePlatform(Canvas canvas, Offset at, double width) {
