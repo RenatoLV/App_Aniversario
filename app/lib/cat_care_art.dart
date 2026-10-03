@@ -516,12 +516,14 @@ class BathScenePainter extends CustomPainter {
   final double foam, rinse, phase;
   final BathTool tool;
   final Offset? hand;
+  final double soapAngle;
   const BathScenePainter({
     required this.foam,
     required this.rinse,
     required this.phase,
     required this.tool,
     this.hand,
+    this.soapAngle = 0,
   });
   @override
   void paint(Canvas c, Size size) {
@@ -547,20 +549,71 @@ class BathScenePainter extends CustomPainter {
       );
     }
     if (hand != null) {
-      c.save();
-      c.translate(hand!.dx - 23, hand!.dy - 23);
-      BathPropPainter(tool).paint(c, const Size.square(46));
-      c.restore();
-      if (tool == BathTool.shower) {
-        final ink = _p(const Color(0xff5ebfd7).withValues(alpha: .8), 2);
-        for (var i = 0; i < 6; i++) {
-          final x = hand!.dx - 21 + i * 7,
-              y =
-                  hand!.dy +
-                  12 +
-                  ((phase * 2 + i * .13) % 1) * size.height * .25;
-          c.drawLine(Offset(x, y), Offset(x - 4, y + 13), ink);
+      if (tool == BathTool.soap) {
+        // Turn the soap with the rubbing gesture and emit bubbles at contact.
+        for (var i = 0; i < 9; i++) {
+          final age = (phase * 2 + i / 9) % 1;
+          final angle = i * 2.4 + soapAngle * .3;
+          final at =
+              hand! +
+              Offset(
+                math.cos(angle) * size.width * .1 * age,
+                math.sin(angle) * size.height * .04 - age * size.height * .16,
+              );
+          final r = size.width * (.012 + age * .018);
+          c.drawCircle(
+            at,
+            r,
+            _p(const Color(0xffe6fbff).withValues(alpha: (1 - age) * .65)),
+          );
+          c.drawCircle(
+            at - Offset(r * .3, r * .3),
+            r * .22,
+            _p(Colors.white.withValues(alpha: 1 - age)),
+          );
         }
+        c.save();
+        c.translate(hand!.dx, hand!.dy);
+        c.rotate(math.sin(soapAngle) * .45);
+        c.translate(-size.width * .11, -size.width * .11);
+        BathPropPainter(tool).paint(c, Size.square(size.width * .22));
+        c.restore();
+      } else {
+        // The finger steers the shower horizontally; the nozzle stays above the ears.
+        final x = hand!.dx.clamp(size.width * .22, size.width * .78);
+        final top = size.height * .16;
+        final span = size.width * .24;
+        final ink = _p(
+          const Color(0xff76cfe5).withValues(alpha: .8),
+          size.width * .007,
+        );
+        for (var i = 0; i < 18; i++) {
+          final age = (phase * 4 + i * .137) % 1;
+          final dx = (i % 6 - 2.5) * size.width * .017;
+          final y = top + span * .4 + age * size.height * .67;
+          c.drawLine(
+            Offset(x + dx, y),
+            Offset(x + dx, y + size.height * .035),
+            ink,
+          );
+          if (age > .85) {
+            c.drawArc(
+              Rect.fromCenter(
+                center: Offset(x + dx, size.height * .88),
+                width: size.width * .04,
+                height: size.height * .014,
+              ),
+              0,
+              math.pi,
+              false,
+              _p(const Color(0xffa2dcea).withValues(alpha: (1 - age) * 4), 1),
+            );
+          }
+        }
+        c.save();
+        c.translate(x - span * .32, top - span * .29);
+        BathPropPainter(tool).paint(c, Size.square(span));
+        c.restore();
       }
     }
   }
@@ -571,5 +624,6 @@ class BathScenePainter extends CustomPainter {
       rinse != old.rinse ||
       phase != old.phase ||
       tool != old.tool ||
+      soapAngle != old.soapAngle ||
       hand != old.hand;
 }

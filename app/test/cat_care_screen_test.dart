@@ -328,7 +328,16 @@ void main() {
       expect(actor.cleanliness, lessThan(100));
       expect(store.catCare.needs(CatKind.maru).clean, 35);
       await capture(tester, boundary, 'cat-care-rinse');
-      await rub(tester);
+      final fur = find.byKey(const ValueKey('care-pelaje'));
+      final center = tester.getCenter(fur);
+      final showerFinger = await tester.startGesture(center);
+      await showerFinger.moveTo(center + const Offset(24, 0));
+      // Water keeps rinsing while the shower is held still, without rubbing.
+      for (var i = 0; i < 40; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+        if (i == 5) await capture(tester, boundary, 'cat-care-shower-running');
+      }
+      await showerFinger.up();
       await tester.pump();
       expect(store.catCare.needs(CatKind.maru).clean, 100);
       await capture(tester, boundary, 'cat-care-washed');

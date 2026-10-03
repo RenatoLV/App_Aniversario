@@ -27,6 +27,8 @@ class _CatCareScreenState extends State<CatCareScreen>
   double _rinse = 0;
   BathTool _tool = BathTool.soap;
   Offset? _hand;
+  double _soapAngle = 0;
+  Duration? _lastWaterTick;
   bool _fridgeOpen = false;
   bool _bathFinishedDuringDrag = false;
   late final Timer _needsRefresh;
@@ -41,6 +43,20 @@ class _CatCareScreenState extends State<CatCareScreen>
       vsync: this,
       duration: const Duration(milliseconds: 2800),
     );
+    _action.addListener(() {
+      final stamp = _action.lastElapsedDuration ?? Duration.zero;
+      final previous = _lastWaterTick;
+      _lastWaterTick = stamp;
+      if (_room == _CareRoom.bath &&
+          !_busy &&
+          _tool == BathTool.shower &&
+          _hand != null &&
+          _scrub >= .8 &&
+          previous != null) {
+        final seconds = (stamp - previous).inMicroseconds / 1000000;
+        _applyTool(seconds.clamp(0.0, .1) / 3.5);
+      }
+    });
     _needsRefresh = Timer.periodic(const Duration(minutes: 1), (_) {
       if (mounted) setState(() {});
     });
@@ -116,6 +132,7 @@ class _CatCareScreenState extends State<CatCareScreen>
         ? 0.0
         : (details.localPosition - _lastScrub!).distance;
     _lastScrub = details.localPosition;
+    _soapAngle += distance / catSize * 7;
     _hand = Offset(
       details.localPosition.dx.clamp(0, catSize),
       details.localPosition.dy.clamp(0, catSize),
@@ -148,7 +165,7 @@ class _CatCareScreenState extends State<CatCareScreen>
       _hand = null;
       _message = tool == BathTool.soap
           ? 'Frota el jabón sobre el gato. También puedes tocar su pelaje.'
-          : 'Pasa la regadera por el pelaje enjabonado para enjuagar';
+          : 'Mantén la regadera sobre el gato: el agua quitará la espuma';
     });
   }
 
@@ -470,6 +487,7 @@ class _CatCareScreenState extends State<CatCareScreen>
                                   phase: _action.value,
                                   tool: _tool,
                                   hand: _hand,
+                                  soapAngle: _soapAngle,
                                 ),
                               ),
                             ),
@@ -760,7 +778,7 @@ class _CatCareScreenState extends State<CatCareScreen>
       ),
       const SizedBox(height: 12),
       const Text(
-        'Elige o arrastra la herramienta. Desliza sobre el pelaje, o tócalo varias veces: primero jabón y después agua.',
+        'Gira y frota el jabón sobre el pelaje. Después mantén la regadera sobre el gato para enjuagarlo.',
         textAlign: TextAlign.center,
         style: TextStyle(color: Color(0xff657f75)),
       ),
