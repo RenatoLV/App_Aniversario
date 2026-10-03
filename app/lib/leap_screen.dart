@@ -392,7 +392,6 @@ class _LeapScreenState extends State<LeapScreen>
                             : () async {
                                 if (trail.$4 > 0) {
                                   widget.store.coins -= trail.$4;
-                                  await widget.store.save();
                                 }
                                 _ownedTrails.add(trail.$1);
                                 await widget.store.prefs.setStringList(
@@ -403,6 +402,7 @@ class _LeapScreenState extends State<LeapScreen>
                                   'leap.trail',
                                   trail.$1,
                                 );
+                                await widget.store.save();
                                 if (mounted) setState(() => _trail = trail.$1);
                                 if (context.mounted) Navigator.pop(context);
                               },

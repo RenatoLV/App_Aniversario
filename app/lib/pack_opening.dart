@@ -417,7 +417,7 @@ class _PackFace extends StatelessWidget {
                   ),
                   const SizedBox(height: 6),
                   const Text(
-                    '1 CARTA · 6 RAREZAS',
+                    '1 CARTA · 7 RAREZAS',
                     style: TextStyle(
                       fontSize: 8,
                       letterSpacing: 1.3,

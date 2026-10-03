@@ -4,9 +4,15 @@ Estado actualizado (30/09/2026): el backend activo es **Firebase**, no Supabase.
 
 Aplicación Flutter de aniversario con juegos, Maru y Lady animados, sobres holográficos y una colección local de memes convertidos en cartas. El mismo proyecto funciona en web y Android.
 
-El repositorio incluye **334 memes** de Momazos vol. 1 y vol. 2 y sus imágenes WebP, además de seis cartas de ejemplo dibujadas con código (340 entradas en el álbum). No hace falta descargar los memes por separado para ejecutar la aplicación.
+El repositorio incluye **334 memes**, **27 cartas celestiales animadas** y seis cartas de ejemplo (367 entradas en el álbum). Las celestiales aparecen en los sobres Momazos vol. 1 y vol. 2 con probabilidad de 1% por apertura. Se reproducen en la apertura, colección y AR Android. Los sobres cuestan 50 monedas; el primero de cada día local cuesta 20. Para añadir GIF: [app/CELESTIAL_CARDS.md](app/CELESTIAL_CARDS.md).
 
 ## Qué incluye
+
+- Bomber Miau: cuatro arenas con relieve y colores diferentes, Maru, Lady, Milo y
+  Nube, seis poderes, IA sin conexión y duelos en línea. Permite buscar usuarios
+  e invitarlos, o encontrar un rival en la arena. Firebase controla bombas,
+  poderes y resultados; la ropa de Maru y Lady se conserva. Controles táctiles
+  simultáneos y teclado. Detalles: [app/BOMBER_MIAU.md](app/BOMBER_MIAU.md).
 
 - Ascenso Maruzon: saltos verticales infinitos con selección de mascota,
   nubes, rocas, plataformas móviles, tormentas, monedas y cohetes. El cielo

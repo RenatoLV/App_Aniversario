@@ -34,6 +34,9 @@ jobs:
         with:
           flutter-version: '3.35.6'
           cache: true
+      - name: Verify Firebase access and multiplayer with disposable users
+        working-directory: app
+        run: npx --yes firebase-tools@15.28.2 emulators:exec --project demo-cumplemes --only auth,firestore,database,storage,functions "node tool/firebase_tests/run_all.cjs"
       - name: Assign increasing Android build number
         run: |
           VERSION=$(sed -n 's/^version: \([^+]*\)+.*/\1/p' app/pubspec.yaml)

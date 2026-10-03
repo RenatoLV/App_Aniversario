@@ -30,7 +30,8 @@ class BlocBoardState extends State<BlocBoard> {
   bool moving = false;
   bool framedNotes = false;
   Size viewport = Size.zero;
-  double startScale = 1;
+  double lastGestureScale = 1;
+  int gesturePointers = 0;
   double get zoom => view.value.getMaxScaleOnAxis();
   @override
   void dispose() {
@@ -105,6 +106,7 @@ class BlocBoardState extends State<BlocBoard> {
   Future<void> _delete() async {
     final n = selected;
     if (n == null) return;
+    widget.store.beginNoteEdit(n);
     await widget.store.deleteNote(n);
     if (!mounted) return;
     setState(() => selected = null);
@@ -409,7 +411,8 @@ class BlocBoardState extends State<BlocBoard> {
         onScaleStart: moving
             ? (d) {
                 selected = n;
-                startScale = n.scale;
+                lastGestureScale = 1;
+                gesturePointers = d.pointerCount;
                 widget.store.beginNoteEdit(n);
               }
             : null,
@@ -417,8 +420,16 @@ class BlocBoardState extends State<BlocBoard> {
             ? (d) {
                 setState(() {
                   if (d.pointerCount > 1) {
-                    n.scale = (startScale * d.scale).clamp(.46, 2.4);
+                    if (gesturePointers == d.pointerCount &&
+                        lastGestureScale > 0) {
+                      n.scale = (n.scale * d.scale / lastGestureScale).clamp(
+                        .46,
+                        2.4,
+                      );
+                    }
                   }
+                  gesturePointers = d.pointerCount;
+                  lastGestureScale = d.scale;
                   n.x = (n.x + d.focalPointDelta.dx / zoom / (world.width - w))
                       .clamp(0, 1);
                   n.y = (n.y + d.focalPointDelta.dy / zoom / (world.height - h))

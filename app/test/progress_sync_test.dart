@@ -20,6 +20,12 @@ void main() {
           },
           'cardVariants': {'6:legendary:gold': 2},
           'packsSinceLegendary': 24,
+          'catCare': {
+            'ownedClothes': ['shirt_navy', 'hat_party'],
+            'maru': {
+              'outfit': {'hat': 'hat_party'},
+            },
+          },
           'notes': [
             {'imageBase64': 'large-image'},
           ],
@@ -32,6 +38,8 @@ void main() {
         'sweet.best': 500,
         'leap.best': 10000,
         'leap.last': '{"points":9000,"finished":true}',
+        'leap.trail': 'galaxy',
+        'leap.trails': ['rainbow', 'galaxy', 'comet'],
       });
       final prefs = await SharedPreferences.getInstance();
       final sync = ProgressSync(prefs, () {});
@@ -45,6 +53,9 @@ void main() {
       expect(backup['sweet.v1'], 'candy-board');
       expect(backup['sweet.best'], 500);
       expect(backup['leap.best'], 10000);
+      expect(backup['leap.trail'], 'galaxy');
+      expect(backup['leap.trails'], ['rainbow', 'galaxy', 'comet']);
+      expect(core['catCare']['ownedClothes'], ['shirt_navy', 'hat_party']);
       expect(core['cardVariants']['6:legendary:gold'], 2);
       expect(core['packsSinceLegendary'], 24);
       expect(core.containsKey('notes'), false);
@@ -69,6 +80,8 @@ void main() {
         'firebase.owner': 'alice',
         'rincon.v1': aliceSave,
         'leap.best': 1234,
+        'leap.trail': 'comet',
+        'leap.trails': ['rainbow', 'comet'],
         'firebase.noteSpace': 'alice-space',
       });
       final prefs = await SharedPreferences.getInstance();
@@ -79,6 +92,7 @@ void main() {
       await sync.prepareLocalAccount('bob');
       expect(prefs.getString('rincon.v1'), null);
       expect(prefs.getInt('leap.best'), null);
+      expect(prefs.getStringList('leap.trails'), null);
       expect(prefs.getString('firebase.noteSpace'), null);
       await prefs.setString(
         'rincon.v1',
@@ -87,6 +101,8 @@ void main() {
       await sync.prepareLocalAccount('alice');
       expect(prefs.getString('rincon.v1'), aliceSave);
       expect(prefs.getInt('leap.best'), 1234);
+      expect(prefs.getStringList('leap.trails'), ['rainbow', 'comet']);
+      expect(prefs.getString('leap.trail'), 'comet');
       expect(prefs.getString('firebase.noteSpace'), 'alice-space');
       await sync.prepareLocalAccount('bob');
       expect(jsonDecode(prefs.getString('rincon.v1')!)['coins'], 40);

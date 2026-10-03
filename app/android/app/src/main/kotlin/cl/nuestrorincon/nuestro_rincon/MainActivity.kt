@@ -51,6 +51,7 @@ class MainActivity : FlutterActivity() {
     private var pendingAr: MethodChannel.Result? = null
     private var textureFile: File? = null
     private var backTextureFile: File? = null
+    private var animatedTextureFile: File? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -111,6 +112,14 @@ class MainActivity : FlutterActivity() {
                 if (pendingAr != null) { result.error("busy", "Ya hay una sesión AR abierta.", null); return@setMethodCallHandler }
                 val bytes = call.argument<ByteArray>("texture")
                 val backBytes = call.argument<ByteArray>("backTexture")
+                val animation = call.argument<ByteArray>("animatedTexture")
+                val bounds = call.argument<List<Number>>("animatedRect")?.map { it.toFloat() }?.toFloatArray()
+                if ((animation == null) != (bounds == null) ||
+                    (animation?.size ?: 0) > 20_000_000 ||
+                    (bounds != null && !ArtworkGeometry.validBounds(bounds))) {
+                    result.error("animation", "No pudimos preparar la animación de la carta.", null)
+                    return@setMethodCallHandler
+                }
                 if (bytes == null || bytes.size > 6_000_000 || (backBytes?.size ?: 0) > 6_000_000) {
                     result.error("texture", "No pudimos preparar la carta.", null)
                     return@setMethodCallHandler
@@ -120,14 +129,20 @@ class MainActivity : FlutterActivity() {
                     backTextureFile = backBytes?.let { content ->
                         File.createTempFile("ar-back-", ".png", cacheDir).apply { writeBytes(content) }
                     }
+                    animatedTextureFile = animation?.let { content ->
+                        File.createTempFile("ar-animation-", ".gif", cacheDir).apply { writeBytes(content) }
+                    }
                     pendingAr = result
                     startActivityForResult(Intent(this, CameraCardActivity::class.java)
                         .putExtra("texturePath", textureFile!!.absolutePath)
-                        .putExtra("backTexturePath", backTextureFile?.absolutePath), 8421)
+                        .putExtra("backTexturePath", backTextureFile?.absolutePath)
+                        .putExtra("animationPath", animatedTextureFile?.absolutePath)
+                        .putExtra("animationBounds", bounds), 8421)
                 } catch (e: Exception) {
                     pendingAr = null
                     textureFile?.delete()
                     backTextureFile?.delete()
+                    animatedTextureFile?.delete()
                     result.error("ar", "No se pudo abrir la cámara AR.", null)
                 }
             }
@@ -143,6 +158,8 @@ class MainActivity : FlutterActivity() {
         textureFile = null
         backTextureFile?.delete()
         backTextureFile = null
+        animatedTextureFile?.delete()
+        animatedTextureFile = null
         val error = data?.getStringExtra("error")
         val path = data?.getStringExtra("photoPath")
         if (error != null) result?.error("ar", error, null)

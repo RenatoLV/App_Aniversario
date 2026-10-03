@@ -2,6 +2,64 @@
   "rules": {
     ".read": false,
     ".write": false,
+    "bomberUsers": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid"
+      }
+    },
+    "bomberRooms": {
+      "$room": {
+        ".read": "auth != null && data.child('members').child(auth.uid).exists()",
+        "presence": {
+          "$uid": {
+            ".write": "auth != null && auth.uid === $uid && root.child('bomberRooms').child($room).child('members').child($uid).exists() && newData.exists()",
+            ".validate": "newData.hasChildren(['online','at'])",
+            "online": {
+              ".validate": "newData.isBoolean()"
+            },
+            "at": {
+              ".validate": "newData.isNumber() && newData.val() === now"
+            },
+            "$other": {
+              ".validate": false
+            }
+          }
+        },
+        "motion": {
+          "$uid": {
+            ".write": "auth != null && auth.uid === $uid && root.child('bomberRooms').child($room).child('members').child($uid).exists() && root.child('bomberRooms').child($room).child('state/status').val() === 'playing' && root.child('bomberRooms').child($room).child('state/players').child($uid).child('alive').val() === true && now >= root.child('bomberRooms').child($room).child('state/startsAt').val() && newData.exists()",
+            ".validate": "newData.hasChildren(['x','y','vx','vy','gx','gy','cell','at']) && newData.child('x').val() >= newData.child('gx').val() && newData.child('x').val() < newData.child('gx').val()+1 && newData.child('y').val() >= newData.child('gy').val() && newData.child('y').val() < newData.child('gy').val()+1 && newData.child('cell').val() === newData.child('gx').val()+'_'+newData.child('gy').val() && !root.child('bomberRooms').child($room).child('state/board/walls').child(newData.child('cell').val()).exists() && (!root.child('bomberRooms').child($room).child('state/board/crates').child(newData.child('cell').val()).exists() || root.child('bomberRooms').child($room).child('state/players').child($uid).child('boxUntil').val() > now || (newData.child('cell').val() === data.child('cell').val() && root.child('bomberRooms').child($room).child('state/board/crates').child(data.child('cell').val()).exists())) && newData.child('x').val()-data.child('x').val() < 4.5*((now-data.child('at').val() > 1000 ? 1000 : now-data.child('at').val())/1000)+0.2 && data.child('x').val()-newData.child('x').val() < 4.5*((now-data.child('at').val() > 1000 ? 1000 : now-data.child('at').val())/1000)+0.2 && newData.child('y').val()-data.child('y').val() < 4.5*((now-data.child('at').val() > 1000 ? 1000 : now-data.child('at').val())/1000)+0.2 && data.child('y').val()-newData.child('y').val() < 4.5*((now-data.child('at').val() > 1000 ? 1000 : now-data.child('at').val())/1000)+0.2",
+            "x": {
+              ".validate": "newData.isNumber() && newData.val() > 0 && newData.val() < 11"
+            },
+            "y": {
+              ".validate": "newData.isNumber() && newData.val() > 0 && newData.val() < 13"
+            },
+            "gx": {
+              ".validate": "newData.isNumber() && newData.val()%1 === 0 && newData.val() >= 0 && newData.val() < 11"
+            },
+            "gy": {
+              ".validate": "newData.isNumber() && newData.val()%1 === 0 && newData.val() >= 0 && newData.val() < 13"
+            },
+            "cell": {
+              ".validate": "newData.isString() && newData.val().length <= 5"
+            },
+            "vx": {
+              ".validate": "newData.isNumber() && newData.val() >= -4.5 && newData.val() <= 4.5"
+            },
+            "vy": {
+              ".validate": "newData.isNumber() && newData.val() >= -4.5 && newData.val() <= 4.5"
+            },
+            "at": {
+              ".validate": "newData.isNumber() && newData.val() === now"
+            },
+            "$other": {
+              ".validate": false
+            }
+          }
+        }
+      }
+    },
     "spaces": {
       "$space": {
         "members": {
@@ -16,12 +74,23 @@
             "$connection": {
               ".write": "auth != null && auth.uid === $uid && root.child('spaces').child($space).child('members').child(auth.uid).val() === true",
               ".validate": "newData.hasChildren(['name','since'])",
-              "name": {".validate": "newData.isString() && newData.val().length <= 200"},
-              "since": {".validate": "newData.isNumber()"},
-              "$other": {".validate": false}
+              "name": {
+                ".validate": "newData.isString() && newData.val().length <= 200"
+              },
+              "since": {
+                ".validate": "newData.isNumber()"
+              },
+              "$other": {
+                ".validate": false
+              }
             }
           }
         }
+      }
+    },
+    "bomberInvites": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid"
       }
     }
   }

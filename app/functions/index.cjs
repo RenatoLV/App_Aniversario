@@ -5,6 +5,7 @@ const {getAuth} = require('firebase-admin/auth');
 const {getFirestore, FieldValue} = require('firebase-admin/firestore');
 const {unpack, owns, transfer, variant} = require('./inventory.cjs');
 initializeApp();
+Object.assign(exports, require('./bomber_server.cjs'));
 const db = getFirestore();
 const progress = uid => db.doc(`players/${uid}/progress/current`);
 const listing = (core, name) => ({name, variants: core.cardVariants,

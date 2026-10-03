@@ -7,6 +7,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.*
 import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.Drawable
 import android.content.res.ColorStateList
 import android.hardware.camera2.*
 import android.os.*
@@ -51,7 +52,13 @@ class CameraCardActivity : Activity(), TextureView.SurfaceTextureListener {
         root.addView(stage, FrameLayout.LayoutParams(-1, -1).apply { topMargin = dp(62); bottomMargin = dp(94) })
         preview = TextureView(this).apply { surfaceTextureListener = this@CameraCardActivity }
         stage.addView(preview, FrameLayout.LayoutParams(-1, -1))
-        card = CardView(this, front, back)
+        try {
+            card = CardView(this, front, back, intent.getStringExtra("animationPath"),
+                intent.getFloatArrayExtra("animationBounds"))
+        } catch (_: Exception) {
+            front.recycle(); if (back !== front) back.recycle()
+            fail("No pudimos reproducir el GIF de esta carta."); return
+        }
         stage.addView(card, FrameLayout.LayoutParams(-1, -1))
         instructions = TextView(this).apply {
             text = "Tu carta en cámara\nDesliza para girar · pellizca para acercar"
@@ -120,6 +127,7 @@ class CameraCardActivity : Activity(), TextureView.SurfaceTextureListener {
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
     override fun onResume() {
         super.onResume(); active = true
+        if (::card.isInitialized) card.resumeAnimation()
         if (!::preview.isInitialized) return
         if (checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED)
             requestPermissions(arrayOf(Manifest.permission.CAMERA), 74)
@@ -208,7 +216,7 @@ class CameraCardActivity : Activity(), TextureView.SurfaceTextureListener {
         if (::shutter.isInitialized) shutter.isEnabled = false
         session?.close(); session = null; device?.close(); device = null; target?.release(); target = null
     }
-    override fun onPause() { active = false; closeCamera(); super.onPause() }
+    override fun onPause() { active = false; if (::card.isInitialized) card.pauseAnimation(); closeCamera(); super.onPause() }
     override fun onDestroy() { if (::card.isInitialized) card.release(); super.onDestroy() }
     private fun fail(message: String) {
         if (isFinishing || isDestroyed) return
@@ -250,7 +258,9 @@ class CameraCardActivity : Activity(), TextureView.SurfaceTextureListener {
         @Deprecated("Legacy drawable API") override fun getOpacity() = PixelFormat.TRANSLUCENT
     }
 
-    private class CardView(context: Context, private val front: Bitmap, private val back: Bitmap) : View(context) {
+    private class CardView(context: Context, private val front: Bitmap, private val back: Bitmap,
+        animationPath: String?, animationBounds: FloatArray?) : View(context) {
+        private val artwork = animationPath?.let { AnimatedCardArtwork(it, animationBounds!!, this) }
         var zoom = 1f
         var moveMode = false
         var autoSpin = true
@@ -270,7 +280,12 @@ class CameraCardActivity : Activity(), TextureView.SurfaceTextureListener {
             override fun onScale(d: ScaleGestureDetector): Boolean { zoom = (zoom * d.scaleFactor).coerceIn(.25f, 3f); return true }
         })
         fun reset() { zoom = 1f; turn = 0f; tilt = -5f; offsetX = 0f; offsetY = 0f }
-        fun release() { front.recycle(); if (back !== front) back.recycle() }
+        fun pauseAnimation() { artwork?.stop() }
+        fun resumeAnimation() { artwork?.start(); invalidate() }
+        override fun onAttachedToWindow() { super.onAttachedToWindow(); resumeAnimation() }
+        override fun onDetachedFromWindow() { pauseAnimation(); super.onDetachedFromWindow() }
+        override fun verifyDrawable(who: Drawable) = artwork?.owns(who) == true || super.verifyDrawable(who)
+        fun release() { artwork?.release(); front.recycle(); if (back !== front) back.recycle() }
         override fun onDraw(canvas: Canvas) {
             super.onDraw(canvas)
             val now = SystemClock.uptimeMillis()
@@ -293,6 +308,7 @@ class CameraCardActivity : Activity(), TextureView.SurfaceTextureListener {
             }
             paint.style = Paint.Style.FILL; paint.alpha = 255
             canvas.drawBitmap(if (isFront) front else back, null, rect, paint)
+            if (isFront) artwork?.draw(canvas, w, h)
             canvas.save(); canvas.clipPath(Path().apply { addRoundRect(rect, radius, radius, Path.Direction.CW) })
             val sweep = ((now % 6500L) / 6500f * 2.4f - .7f) * w
             paint.shader = LinearGradient(sweep - w * .2f, 0f, sweep + w * .2f, h,

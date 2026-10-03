@@ -23,6 +23,8 @@ class ProgressSync extends ChangeNotifier {
     'sweet.best',
     'leap.best',
     'leap.last',
+    'leap.trail',
+    'leap.trails',
   ];
   Timer? _timer;
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _subscription;
@@ -77,6 +79,8 @@ class ProgressSync extends ChangeNotifier {
           await prefs.setString(key, value);
         } else if (value is int) {
           await prefs.setInt(key, value);
+        } else if (value is List && value.every((item) => item is String)) {
+          await prefs.setStringList(key, value.cast<String>());
         } else {
           await prefs.remove(key);
         }
@@ -255,6 +259,8 @@ class ProgressSync extends ChangeNotifier {
         await prefs.setString(key, value);
       } else if (value is int) {
         await prefs.setInt(key, value);
+      } else if (value is List && value.every((item) => item is String)) {
+        await prefs.setStringList(key, value.cast<String>());
       } else if (value == null) {
         await prefs.remove(key);
       }

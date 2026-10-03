@@ -484,7 +484,7 @@ class _TradeCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final parts = variant.split(':');
     final id = int.tryParse(parts.first) ?? -1;
-    if (parts.length != 3 || id < 0 || id >= cardNames.length) {
+    if (parts.length != 3 || !cardNames.containsKey(id)) {
       return const Text('Carta desconocida');
     }
     if (!CardRarity.values.any((v) => v.name == parts[1]) ||
@@ -531,7 +531,7 @@ class _TradeCard extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            cardNames[id],
+            cardName(id),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             textAlign: TextAlign.center,

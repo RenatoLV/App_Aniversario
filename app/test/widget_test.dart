@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -21,12 +22,12 @@ void main() {
       await tester.tap(find.text('Colección'));
       await tester.pump(const Duration(milliseconds: 400));
       await tester.scrollUntilVisible(
-        find.text(cardNames[6]),
+        find.text(cardName(6)),
         180,
         scrollable: find.byType(Scrollable).first,
       );
       await Scrollable.ensureVisible(
-        tester.element(find.text(cardNames[6])),
+        tester.element(find.text(cardName(6))),
         alignment: .4,
       );
       await tester.pump();
@@ -53,11 +54,11 @@ void main() {
       }
       expect(sawBoth, isTrue);
       await Scrollable.ensureVisible(
-        tester.element(find.text(cardNames[6])),
+        tester.element(find.text(cardName(6))),
         alignment: .5,
       );
       await tester.pump();
-      await tester.tap(find.text(cardNames[6]));
+      await tester.tap(find.text(cardName(6)));
       await tester.pump(const Duration(milliseconds: 400));
       checkCats();
       expect(find.text('AR · Cámara 3D'), findsOneWidget);
@@ -74,7 +75,7 @@ void main() {
     final store = GameStore(prefs)
       ..coins = 1000
       ..packsSinceLegendary = 24;
-    store.openPack(opener: CatKind.maru);
+    store.openPack(opener: CatKind.maru, random: Random(1));
     expect(store.lastOpenedRarity, CardRarity.legendary);
     expect(store.packsSinceLegendary, 0);
     for (var i = 0; i < 12; i++) {
@@ -91,8 +92,11 @@ void main() {
     () async {
       SharedPreferences.setMockInitialValues({});
       final prefs = await SharedPreferences.getInstance();
-      final store = GameStore(prefs)..coins = 400;
-      expect(anniversaryCollectionV2Cards.length, 90);
+      final store = GameStore(prefs)..coins = 600;
+      expect(
+        anniversaryCollectionV2Cards.where((id) => !isCelestialCard(id)).length,
+        90,
+      );
       expect(
         anniversaryCollectionCards.toSet().intersection(
           anniversaryCollectionV2Cards.toSet(),
@@ -174,8 +178,8 @@ void main() {
     expect(find.text('1 resultados'), findsOneWidget);
     await tester.drag(find.byType(CustomScrollView), const Offset(0, -700));
     await tester.pump();
-    expect(find.text(cardNames[6]), findsOneWidget);
-    await tester.tap(find.text(cardNames[6]));
+    expect(find.text(cardName(6)), findsOneWidget);
+    await tester.tap(find.text(cardName(6)));
     await tester.pump(const Duration(milliseconds: 400));
     expect(find.text('Legendaria · ${cardNames[6]}'), findsOneWidget);
     expect(find.text('La abrió Maru'), findsWidgets);

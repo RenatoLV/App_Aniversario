@@ -27,3 +27,12 @@ test('Missing copies, invalid variants and self swaps are rejected without mutat
   assert.throws(() => transfer(a,b,'1:rare:foil','2:epic:normal','x'), /válida/);
   assert.equal(JSON.stringify([a,b]), saved);
 });
+test('Celestial GIF cards swap exact copies and retain the appended rarity index', () => {
+  const [a, b] = transfer(doc({'10000:celestial:gold': 2}),
+    doc({'10001:celestial:normal': 1}), '10000:celestial:gold', '10001:celestial:normal', 'celestial');
+  const ac = unpack({payload:a}).core, bc = unpack({payload:b}).core;
+  assert.deepEqual(ac.cardVariants, {'10000:celestial:gold': 1, '10001:celestial:normal': 1});
+  assert.deepEqual(bc.cardVariants, {'10000:celestial:gold': 1});
+  assert.deepEqual(ac.rarities, {'10000': 6, '10001': 6});
+  assert.equal(ac.coins, 500);
+});

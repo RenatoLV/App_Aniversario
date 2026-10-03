@@ -38,7 +38,7 @@ void main() {
         await tester.tap(find.text('Momazos Vol. $volume'));
         await tester.pump(const Duration(seconds: 1));
         expect(find.byType(CollectionAlbum), findsOneWidget);
-        expect(find.text(cardNames[ids.first]), findsOneWidget);
+        expect(find.text(cardName(ids.first)), findsOneWidget);
         await tester.pump(const Duration(seconds: 4));
         final cats = tester
             .widgetList<CatActor>(find.byType(CatActor))
@@ -54,11 +54,11 @@ void main() {
         );
         await tester.pump(const Duration(seconds: 1));
         expect(find.text('Carta 3'), findsOneWidget);
-        expect(find.text(cardNames[ids[2]]), findsNothing);
+        expect(find.text(cardName(ids[2])), findsNothing);
         expect(find.text('Por descubrir'), findsWidgets);
         await tester.tap(find.text('Mis cartas'));
         await tester.pump(const Duration(seconds: 1));
-        expect(find.text(cardNames[ids.first]), findsOneWidget);
+        expect(find.text(cardName(ids.first)), findsOneWidget);
         expect(tester.takeException(), isNull);
         await tester.tap(find.byTooltip('Cerrar álbum'));
         await tester.pump(const Duration(seconds: 1));

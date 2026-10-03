@@ -32,6 +32,56 @@ void main() {
       debugDefaultTargetPlatformOverride = null;
     }
   });
+  test(
+    'Animated AR sends original GIF bytes and a bounded art region with both faces',
+    () async {
+      final gif = Uint8List.fromList([71, 73, 70, 56, 57, 97]);
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(CardAr.channel, (call) async {
+            expect(call.arguments['animatedTexture'], gif);
+            final rect = call.arguments['animatedRect'] as List;
+            for (var i = 0; i < 4; i++) {
+              expect(rect[i], closeTo([.1, .2, .8, .5][i], 1e-8));
+            }
+            expect(call.arguments['backTexture'], png);
+            return png;
+          });
+      try {
+        expect(
+          await CardAr.capture(
+            png,
+            backTexture: png,
+            animatedTexture: gif,
+            animatedRect: const Rect.fromLTWH(.1, .2, .8, .5),
+          ),
+          png,
+        );
+      } finally {
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(CardAr.channel, null);
+      }
+    },
+  );
+  test(
+    'Animation requires matching bytes and valid normalized bounds',
+    () async {
+      for (final rect in [
+        null,
+        const Rect.fromLTWH(-.1, 0, 1, 1),
+        const Rect.fromLTWH(0, .5, 1, 1),
+        const Rect.fromLTWH(0, 0, 0, 1),
+      ]) {
+        await expectLater(
+          CardAr.capture(png, animatedTexture: png, animatedRect: rect),
+          throwsArgumentError,
+        );
+      }
+      await expectLater(
+        CardAr.capture(png, animatedRect: const Rect.fromLTWH(0, 0, 1, 1)),
+        throwsArgumentError,
+      );
+    },
+  );
 
   test(
     'Camera viewer receives both faces for a full 360-degree turn',

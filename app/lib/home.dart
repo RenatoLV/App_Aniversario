@@ -33,6 +33,9 @@ import 'pack_opening.dart';
 import 'game_audio.dart';
 import 'app_updates.dart';
 import 'cat_care_screen.dart';
+import 'card_media.dart';
+import 'celestial_reveal.dart';
+import 'bomber/bomber_screen.dart';
 
 const ink = Color(0xff293f39),
     cream = Color(0xfffaf6ee),
@@ -55,6 +58,7 @@ Color rarityColor(CardRarity rarity) => switch (rarity) {
   CardRarity.uncommon => const Color(0xff83e4ae),
   CardRarity.rare => const Color(0xff5fafff),
   CardRarity.mythic => const Color(0xffff83be),
+  CardRarity.celestial => const Color(0xffa0fff2),
 };
 
 enum _CollectionSort { rarity, name, copies }
@@ -398,6 +402,8 @@ class _RinconHomeState extends State<RinconHome>
                 ? '/sweet'
                 : screen is WordleScreen
                 ? '/wordle'
+                : screen is BomberScreen
+                ? '/bomber'
                 : '/blocks',
           ),
           builder: (_) => screen,
@@ -875,6 +881,18 @@ class _RinconHomeState extends State<RinconHome>
         onTap: () => _play(LeapScreen(store: s)),
       ),
       const SizedBox(height: 24),
+      _gameSpotlight(
+        gameId: 'bomber-miau',
+        eyebrow: 'DUELO DE PATITAS',
+        title: 'Bomber Miau',
+        description:
+            'Cuatro arenas, seis poderes y cuatro gatos. Desafía a la IA o invita a otro jugador.',
+        icon: Icons.local_fire_department_rounded,
+        colors: const [Color(0xff345e68), Color(0xff6c78a8)],
+        accent: const Color(0xffffd989),
+        onTap: () => _play(BomberScreen(store: s)),
+      ),
+      const SizedBox(height: 24),
       Wrap(
         spacing: 12,
         runSpacing: 8,
@@ -962,7 +980,7 @@ class _RinconHomeState extends State<RinconHome>
   }
 
   Future<void> _openPack() async {
-    if (_openingPack || s.coins < 20) return;
+    if (_openingPack || s.coins < s.packPrice) return;
     final opener = _packCat;
     final selectedVolume = _selectedPackVolume;
     _packSoundFlags = 0;
@@ -1190,24 +1208,31 @@ class _RinconHomeState extends State<RinconHome>
       ),
       const SizedBox(height: 28),
       FilledButton.icon(
-        onPressed: s.coins < 20 || _openingPack ? null : _openPack,
+        onPressed: s.coins < s.packPrice || _openingPack ? null : _openPack,
         icon: Icon(_openingPack ? Icons.auto_awesome : Icons.card_giftcard),
         label: Text(
           _openingPack
               ? '¡Brillando tu sorpresa…!'
-              : 'Abrir sobre · 20 monedas',
+              : 'Abrir sobre · ${s.packPrice} monedas',
         ),
       ),
       const SizedBox(height: 16),
       Text(
-        'Legendaria asegurada en ${25 - s.packsSinceLegendary} aperturas como máximo.\n6 rarezas · Clásica, Foil plateada y Foil dorada',
+        s.packPrice == 20
+            ? 'Tu primer sobre del día: 20 monedas'
+            : 'Sobres: 50 monedas · mañana vuelve el primero a 20',
+        textAlign: TextAlign.center,
+        style: const TextStyle(fontSize: 12, color: green),
+      ),
+      Text(
+        'Legendaria o superior en ${25 - s.packsSinceLegendary} aperturas como máximo.\n7 rarezas · Celestial: 1% por sobre\nClásica, Foil plateada y Foil dorada',
         textAlign: TextAlign.center,
         style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
       ),
       Text(
-        s.coins < 20
-            ? 'Te faltan ${20 - s.coins} monedas. ¡Consíguelas jugando!'
-            : '${cardsForCollection(_selectedPackVolume == 0 ? anniversaryCollectionId : anniversaryCollectionV2Id).length} memes · misma probabilidad para todos.\nLas repetidas se conservan en tu colección.',
+        s.coins < s.packPrice
+            ? 'Te faltan ${s.packPrice - s.coins} monedas. ¡Consíguelas jugando!'
+            : '${cardsForCollection(_selectedPackVolume == 0 ? anniversaryCollectionId : anniversaryCollectionV2Id).length} cartas · las celestiales tienen un 1% por sobre.\nLas repetidas se conservan en tu colección.',
         textAlign: TextAlign.center,
         style: const TextStyle(fontSize: 12, height: 1.6),
       ),
@@ -1225,7 +1250,7 @@ class _RinconHomeState extends State<RinconHome>
             shrinkWrap: true,
             children: [
               ListTile(
-                title: Text(cardNames[id]),
+                title: Text(cardName(id)),
                 subtitle: const Text('Elige una variante para verla'),
               ),
               for (final key in variants)
@@ -1340,7 +1365,7 @@ class _RinconHomeState extends State<RinconHome>
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    unlocked ? cardNames[i] : 'Por descubrir',
+                    unlocked ? cardName(i) : 'Por descubrir',
                     textAlign: TextAlign.center,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
@@ -1410,7 +1435,7 @@ class _RinconHomeState extends State<RinconHome>
             .where((id) => (s.rarities[id] ?? CardRarity.common) == rarity)
             .length,
     };
-    final order = List<int>.generate(cardNames.length, (i) => i)
+    final order = cardNames.keys.toList()
       ..removeWhere((i) {
         final owned = s.cards.containsKey(i);
         if (_selectedCollection != null &&
@@ -1424,7 +1449,7 @@ class _RinconHomeState extends State<RinconHome>
           return true;
         }
         return query.isNotEmpty &&
-            (!owned || !cardNames[i].toLowerCase().contains(query));
+            (!owned || !cardName(i).toLowerCase().contains(query));
       })
       ..sort((a, b) {
         final owned =
@@ -1435,9 +1460,9 @@ class _RinconHomeState extends State<RinconHome>
             (s.rarities[b] ?? CardRarity.common).rank.compareTo(
               (s.rarities[a] ?? CardRarity.common).rank,
             ),
-          _CollectionSort.name => cardNames[a].toLowerCase().compareTo(
-            cardNames[b].toLowerCase(),
-          ),
+          _CollectionSort.name => cardName(
+            a,
+          ).toLowerCase().compareTo(cardName(b).toLowerCase()),
           _CollectionSort.copies => (s.cards[b] ?? 0).compareTo(
             s.cards[a] ?? 0,
           ),
@@ -3639,11 +3664,11 @@ class _CardShinePainter extends CustomPainter {
 
 class _CardArt extends StatelessWidget {
   final int cardId;
-  const _CardArt({required this.cardId});
+  final Key? imageKey;
+  const _CardArt({required this.cardId, this.imageKey});
 
   @override
   Widget build(BuildContext context) {
-    final asset = cardAsset(cardId);
     return Container(
       width: double.infinity,
       height: double.infinity,
@@ -3664,21 +3689,7 @@ class _CardArt extends StatelessWidget {
         borderRadius: BorderRadius.circular(7),
         child: ColoredBox(
           color: const Color(0xff281a43),
-          child: asset == null
-              ? Center(
-                  child: Text(
-                    cardIcons[cardId],
-                    style: const TextStyle(fontSize: 62),
-                  ),
-                )
-              : Image.asset(
-                  asset,
-                  fit: BoxFit.contain,
-                  filterQuality: FilterQuality.medium,
-                  errorBuilder: (_, _, _) => const Center(
-                    child: Icon(Icons.broken_image, color: Colors.white),
-                  ),
-                ),
+          child: CardMedia(cardId: cardId, imageKey: imageKey),
         ),
       ),
     );
@@ -3722,7 +3733,8 @@ class _RarityBurstPainter extends CustomPainter {
 class _FoilArt extends StatefulWidget {
   final int cardId;
   final CardFinish finish;
-  const _FoilArt({required this.cardId, required this.finish});
+  final Key? imageKey;
+  const _FoilArt({required this.cardId, required this.finish, this.imageKey});
   @override
   State<_FoilArt> createState() => _FoilArtState();
 }
@@ -3753,7 +3765,7 @@ class _FoilArtState extends State<_FoilArt>
       child: Stack(
         fit: StackFit.expand,
         children: [
-          _CardArt(cardId: widget.cardId),
+          _CardArt(cardId: widget.cardId, imageKey: widget.imageKey),
           if (widget.finish != CardFinish.normal) ...[
             IgnorePointer(
               child: DecoratedBox(
@@ -3825,6 +3837,7 @@ class _InspectCardDialogState extends State<_InspectCardDialog>
   Timer? _idle;
   double _spinBase = 0;
   final _arTextureKey = GlobalKey();
+  final _arArtworkKey = GlobalKey();
   bool _arBusy = false;
   late int _variantIndex;
 
@@ -3903,6 +3916,24 @@ class _InspectCardDialogState extends State<_InspectCardDialog>
       final boundary =
           _arTextureKey.currentContext!.findRenderObject()!
               as RenderRepaintBoundary;
+      Uint8List? animatedTexture;
+      Rect? animatedRect;
+      if (isCelestialCard(widget.cardId)) {
+        final art =
+            _arArtworkKey.currentContext!.findRenderObject()! as RenderBox;
+        final origin = art.localToGlobal(Offset.zero, ancestor: boundary);
+        animatedRect = Rect.fromLTWH(
+          origin.dx / boundary.size.width,
+          origin.dy / boundary.size.height,
+          art.size.width / boundary.size.width,
+          art.size.height / boundary.size.height,
+        );
+        final bytes = await rootBundle.load(cardAsset(widget.cardId)!);
+        animatedTexture = bytes.buffer.asUint8List(
+          bytes.offsetInBytes,
+          bytes.lengthInBytes,
+        );
+      }
       final image = await boundary.toImage(pixelRatio: 2);
       late Uint8List texture;
       try {
@@ -3924,7 +3955,12 @@ class _InspectCardDialogState extends State<_InspectCardDialog>
         backImage.dispose();
       }
       setState(() => _turn = 0);
-      final photo = await CardAr.capture(texture, backTexture: backTexture);
+      final photo = await CardAr.capture(
+        texture,
+        backTexture: backTexture,
+        animatedTexture: animatedTexture,
+        animatedRect: animatedRect,
+      );
       if (photo == null || !mounted) return;
       final save = await showDialog<bool>(
         context: context,
@@ -4181,11 +4217,15 @@ class _InspectCardDialogState extends State<_InspectCardDialog>
         child: Column(
           children: [
             Expanded(
-              child: _FoilArt(cardId: widget.cardId, finish: _activeFinish),
+              child: _FoilArt(
+                cardId: widget.cardId,
+                finish: _activeFinish,
+                imageKey: _arArtworkKey,
+              ),
             ),
             const SizedBox(height: 10),
             Text(
-              cardNames[widget.cardId],
+              cardName(widget.cardId),
               textAlign: TextAlign.center,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
@@ -4611,6 +4651,13 @@ class _CardRevealDialogState extends State<CardRevealDialog>
   @override
   Widget build(BuildContext context) {
     final milestone = total == 1 || total == 6 || total == 9 ? '+$total' : '+1';
+    if (widget.rarity == CardRarity.celestial) {
+      return CelestialRevealDialog(
+        cardId: cardId,
+        copies: copies,
+        collectionId: widget.collectionId,
+      );
+    }
     final bonus = total == 6 || total == 9;
     return Dialog(
       backgroundColor: Colors.transparent,
@@ -4799,7 +4846,7 @@ class _CardRevealDialogState extends State<CardRevealDialog>
                                       horizontal: 12,
                                     ),
                                     child: Text(
-                                      cardNames[cardId],
+                                      cardName(cardId),
                                       textAlign: TextAlign.center,
                                       maxLines: 2,
                                       overflow: TextOverflow.ellipsis,

@@ -30,8 +30,24 @@ String mergeTradeReceipts(String local, String remote) {
     );
   }
   variants.removeWhere((_, count) => count == 0);
-  const names = ['common', 'epic', 'legendary', 'uncommon', 'rare', 'mythic'];
-  const ranks = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic'];
+  const names = [
+    'common',
+    'epic',
+    'legendary',
+    'uncommon',
+    'rare',
+    'mythic',
+    'celestial',
+  ];
+  const ranks = [
+    'common',
+    'uncommon',
+    'rare',
+    'epic',
+    'legendary',
+    'mythic',
+    'celestial',
+  ];
   final counts = <String, int>{}, rarities = <String, int>{};
   for (final entry in variants.entries) {
     final parts = entry.key.split(':');

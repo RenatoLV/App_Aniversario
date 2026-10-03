@@ -4,6 +4,19 @@ async function main() {
   const account = auth.getGlobalDefaultAccount();
   if (!account) throw Error('Run firebase login first');
   const token = await auth.getAccessToken(account.tokens.refresh_token, ['https://www.googleapis.com/auth/cloud-platform']);
+  if (process.argv.includes('--storage-cors')) {
+    const url='https://storage.googleapis.com/storage/v1/b/cumplemes.firebasestorage.app';
+    const headers={Authorization:'Bearer '+token.access_token,'Content-Type':'application/json'};
+    const info=await (await fetch(url,{headers})).json();
+    console.log('Storage CORS',JSON.stringify(info.cors || []));
+    if (process.argv.includes('--fix-cors')) {
+      const rule={origin:['http://127.0.0.1:7360','http://localhost:7360','https://cumplemes.web.app','https://cumplemes.firebaseapp.com'],method:['GET','HEAD'],responseHeader:['Content-Type','Content-Length'],maxAgeSeconds:3600};
+      const response=await fetch(url,{method:'PATCH',headers,body:JSON.stringify({cors:[...(info.cors||[]),rule]})});
+      if(!response.ok) throw Error('No se pudo actualizar CORS: '+response.status);
+      console.log('Storage CORS updated for app origins.');
+    }
+    return;
+  }
   if (process.argv.includes('--auth-config')) {
     const headers = {Authorization:'Bearer '+token.access_token};
     const base = 'https://identitytoolkit.googleapis.com/admin/v2/projects/cumplemes/defaultSupportedIdpConfigs/google.com';
@@ -119,14 +132,18 @@ async function main() {
     }
     const documents = 'https://firestore.googleapis.com/v1/projects/cumplemes/databases/(default)/documents';
     const email = process.argv.find(a=>a.startsWith('--email='))?.slice(8);
-    if (!email) return;
+    const nickname=process.argv.find(a=>a.startsWith('--nickname='))?.slice(11);
+    if (!email && !nickname) return;
     const rows = await api(documents+':runQuery', {structuredQuery:{
       from:[{collectionId:'players'}],
       select:{fields:[{fieldPath:'spaceId'}]},
-      where:{fieldFilter:{field:{fieldPath:'email'},op:'EQUAL',value:{stringValue:email}}},limit:1}});
+      where:{fieldFilter:{field:{fieldPath:email?'email':'nickname'},op:'EQUAL',value:{stringValue:email||nickname}}},limit:1}});
     const player = rows.find(row=>row.document)?.document;
     if (!player) {console.log('Player profile not found'); return;}
     const uid = player.name.split('/').pop();
+    const saved=await api(documents+'/players/'+uid+'/progress/current?mask.fieldPaths=payload');
+    const payload=JSON.parse(saved.fields?.payload?.stringValue||'{}'),core=JSON.parse(payload['rincon.v1']||'{}');
+    console.log('Cloud cosmetics',JSON.stringify({ownedClothes:core.catCare?.ownedClothes?.length || 0,hasCatOutfits:!!core.catCare?.maru?.outfit,trail:payload['leap.trail']||null,ownedTrails:payload['leap.trails']||null}));
     const space = player.fields?.spaceId?.stringValue;
     const member = await api(documents+'/spaces/'+space+'/members/'+uid);
     const notes = await api(documents+'/spaces/'+space+'/notes?pageSize=100&mask.fieldPaths=mediaPath&mask.fieldPaths=mediaKind');

@@ -10,7 +10,21 @@ class CardAr {
   static Future<Uint8List?> capture(
     Uint8List texture, {
     Uint8List? backTexture,
+    Uint8List? animatedTexture,
+    Rect? animatedRect,
   }) async {
+    if ((animatedTexture == null) != (animatedRect == null) ||
+        (animatedRect != null &&
+            (!animatedRect.isFinite ||
+                animatedRect.isEmpty ||
+                animatedRect.left < 0 ||
+                animatedRect.top < 0 ||
+                animatedRect.right > 1 ||
+                animatedRect.bottom > 1))) {
+      throw ArgumentError(
+        'La animación debe tener un marco dentro de la carta.',
+      );
+    }
     if (!supportedPlatform) {
       throw PlatformException(
         code: 'platform',
@@ -20,6 +34,14 @@ class CardAr {
     return channel.invokeMethod<Uint8List>('open', {
       'texture': texture,
       'backTexture': ?backTexture,
+      'animatedTexture': ?animatedTexture,
+      if (animatedRect != null)
+        'animatedRect': [
+          animatedRect.left,
+          animatedRect.top,
+          animatedRect.width,
+          animatedRect.height,
+        ],
     });
   }
 }

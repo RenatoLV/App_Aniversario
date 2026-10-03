@@ -1,8 +1,8 @@
 'use strict';
-const rarities = ['common', 'epic', 'legendary', 'uncommon', 'rare', 'mythic'];
-const ranks = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic'];
+const rarities = ['common', 'epic', 'legendary', 'uncommon', 'rare', 'mythic', 'celestial'];
+const ranks = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic', 'celestial'];
 function variant(key) {
-  if (typeof key !== 'string' || !/^\d+:(common|uncommon|rare|epic|legendary|mythic):(normal|silver|gold)$/.test(key))
+  if (typeof key !== 'string' || !/^\d+:(common|uncommon|rare|epic|legendary|mythic|celestial):(normal|silver|gold)$/.test(key))
     throw Error('Elige una variante válida de la carta.');
   const [id, rarity, finish] = key.split(':');
   return {id, rarity, finish};

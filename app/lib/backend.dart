@@ -7,8 +7,10 @@ import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:http/http.dart' as http;
 import 'firebase_options.dart';
 import 'bloc_people.dart';
+import 'latest_note_media.dart';
 
 class Backend {
   static bool configured = false;
@@ -256,55 +258,55 @@ class Backend {
   static CollectionReference<Map<String, dynamic>> notesRef(String spaceId) =>
       db.collection('spaces').doc(spaceId).collection('notes');
 
-  static Stream<List<Map<String, dynamic>>> notes(
-    String spaceId,
-  ) => notesRef(spaceId).snapshots(includeMetadataChanges: true).asyncExpand((
-    snapshot,
-  ) async* {
-    // An empty offline cache is not proof that the shared mural was deleted.
-    if (snapshot.metadata.isFromCache && snapshot.docs.isEmpty) return;
-    // Text and positions remain available even while one image is downloading.
-    yield snapshot.docs
-        .map(
-          (doc) => {
-            ...doc.data(),
-            'id': doc.id,
-            'fromCache': snapshot.metadata.isFromCache,
-          },
-        )
-        .toList();
-    yield await Future.wait(
-      snapshot.docs.map((doc) async {
-        final data = doc.data();
-        final path = data['mediaPath'] as String?;
-        String? image;
-        String? mediaError;
-        if (path != null) {
-          image = _mediaCache[path];
-          if (image == null) {
-            try {
-              final bytes = await FirebaseStorage.instance
-                  .ref(path)
-                  .getData(6 * 1024 * 1024)
-                  .timeout(const Duration(seconds: 30));
-              if (bytes != null) {
-                image = _mediaCache[path] = base64Encode(bytes);
+  static Stream<List<Map<String, dynamic>>> notes(String spaceId) =>
+      latestNoteMedia(
+        notesRef(spaceId)
+            .snapshots(includeMetadataChanges: true)
+            .where((s) => !(s.metadata.isFromCache && s.docs.isEmpty))
+            .map(
+              (snapshot) => snapshot.docs
+                  .map(
+                    (doc) => {
+                      ...doc.data(),
+                      'id': doc.id,
+                      'fromCache': snapshot.metadata.isFromCache,
+                      if (!doc.metadata.hasPendingWrites &&
+                          doc.data()['updatedAt'] is Timestamp)
+                        'revisionMicros': (doc.data()['updatedAt'] as Timestamp)
+                            .microsecondsSinceEpoch,
+                    },
+                  )
+                  .toList(),
+            ),
+        (rows) => Future.wait(
+          rows.map((data) async {
+            final path = data['mediaPath'] as String?;
+            String? image;
+            String? mediaError;
+        if (path != null && data['deleted'] != true) {
+              image = _mediaCache[path];
+              if (image == null) {
+                try {
+                  final bytes = await FirebaseStorage.instance
+                      .ref(path)
+                      .getData(6 * 1024 * 1024)
+                      .timeout(const Duration(seconds: 30));
+                  if (bytes != null) {
+                    image = _mediaCache[path] = base64Encode(bytes);
+                  }
+                } catch (error) {
+                  mediaError = noteErrorMessage(error);
+                }
               }
-            } catch (error) {
-              mediaError = noteErrorMessage(error);
             }
-          }
-        }
-        return {
-          ...data,
-          'id': doc.id,
-          'fromCache': snapshot.metadata.isFromCache,
-          'imageBase64': image,
-          'mediaLoadError': mediaError,
-        };
-      }),
-    );
-  });
+            return {
+              ...data,
+              'imageBase64': image,
+              'mediaLoadError': mediaError,
+            };
+          }),
+        ),
+      );
 
   static Future<void> putNote(
     String spaceId,
@@ -381,6 +383,7 @@ class Backend {
   }
 
   static String noteErrorMessage(Object error) {
+    debugPrint('Bloc sync: ${error.runtimeType}${error is FirebaseException ? ' (${error.plugin}/${error.code})' : ''}');
     const prefix = 'Nota guardada aquí. ';
     if (error is FirebaseException) {
       final storage = error.plugin == 'firebase_storage';
@@ -404,6 +407,9 @@ class Backend {
     }
     if (error is TimeoutException) {
       return '${prefix}La conexión tardó demasiado; se reintentará automáticamente.';
+    }
+    if (error is http.ClientException) {
+      return '${prefix}No se pudo descargar una foto. Comprueba la conexión y el acceso del navegador a Storage.';
     }
     if (error is StateError && error.message.toString().contains('6 MB')) {
       return '${prefix}La imagen debe ocupar menos de 6 MB.';

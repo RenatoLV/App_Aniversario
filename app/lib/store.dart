@@ -8,6 +8,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'game.dart';
 import 'backend.dart';
 import 'meme_cards.dart';
+import 'celestial_cards.dart';
+export 'celestial_cards.dart';
 import 'cat_character.dart';
 import 'progress_sync.dart';
 import 'note_cloud.dart';
@@ -18,24 +20,38 @@ const anniversaryCollectionEdition = 'EDICIÓN ANIVERSARIO';
 const anniversaryCollectionV2Id = 'momazos-v2-anniversary';
 const anniversaryCollectionV2Title = 'MOMAZOS VOL. 2';
 
-const cardNames = [
+const _sampleNames = [
   'Modo siesta',
   'La mirada del juicio',
   'Somos un equipo',
   'Cinco minutos más',
   'Dueño del sillón',
   'Mi lugar favorito',
-  ...memeNames,
 ];
+// Celestial IDs use their own range so later static/GIF imports cannot shift
+// cards that players already own.
+final cardNames = Map<int, String>.unmodifiable({
+  for (var i = 0; i < _sampleNames.length; i++) i: _sampleNames[i],
+  for (var i = 0; i < memeNames.length; i++) i + sampleCardCount: memeNames[i],
+  for (final card in celestialCatalog) card.id: card.name,
+});
+final _celestials = {for (final card in celestialCatalog) card.id: card};
+String cardName(int id) => cardNames[id] ?? 'Carta desconocida';
+CelestialCardDefinition? celestialCard(int id) => _celestials[id];
+bool isCelestialCard(int id) => _celestials.containsKey(id);
 const cardIcons = ['😴', '😼', '🐾', '🥱', '👑', '💛'];
 const sampleCardCount = 6;
 final anniversaryCollectionCards = List<int>.unmodifiable([
   for (var i = 0; i < memeVolumes.length; i++)
     if (memeVolumes[i] == 1) i + sampleCardCount,
+  for (final card in celestialCatalog)
+    if (card.volume == 1) card.id,
 ]);
 final anniversaryCollectionV2Cards = List<int>.unmodifiable([
   for (var i = 0; i < memeVolumes.length; i++)
     if (memeVolumes[i] == 2) i + sampleCardCount,
+  for (final card in celestialCatalog)
+    if (card.volume == 2) card.id,
 ]);
 
 List<int> cardsForCollection(String collectionId) => switch (collectionId) {
@@ -43,10 +59,13 @@ List<int> cardsForCollection(String collectionId) => switch (collectionId) {
   anniversaryCollectionV2Id => anniversaryCollectionV2Cards,
   _ => const <int>[],
 };
-String? cardAsset(int id) =>
-    id < sampleCardCount ? null : memeAssets[id - sampleCardCount];
+String? cardAsset(int id) => isCelestialCard(id)
+    ? celestialCard(id)!.asset
+    : id < sampleCardCount || id >= sampleCardCount + memeAssets.length
+    ? null
+    : memeAssets[id - sampleCardCount];
 
-enum CardRarity { common, epic, legendary, uncommon, rare, mythic }
+enum CardRarity { common, epic, legendary, uncommon, rare, mythic, celestial }
 
 enum CardFinish { normal, silver, gold }
 
@@ -66,6 +85,7 @@ extension CardRarityLook on CardRarity {
     CardRarity.uncommon => 'Poco común',
     CardRarity.rare => 'Rara',
     CardRarity.mythic => 'Mítica',
+    CardRarity.celestial => 'Celestial',
   };
   int get rank => switch (this) {
     CardRarity.common => 0,
@@ -74,6 +94,7 @@ extension CardRarityLook on CardRarity {
     CardRarity.epic => 3,
     CardRarity.legendary => 4,
     CardRarity.mythic => 5,
+    CardRarity.celestial => 6,
   };
 }
 
@@ -125,6 +146,11 @@ class GameStore extends ChangeNotifier {
   CardRarity lastOpenedRarity = CardRarity.common;
   CardFinish lastOpenedFinish = CardFinish.normal;
   int packsSinceLegendary = 0;
+  String? lastDiscountPackDay;
+  String _packDay(DateTime now) => '${now.year}-${now.month}-${now.day}';
+  int packPriceAt(DateTime now) =>
+      lastDiscountPackDay == _packDay(now) ? 50 : 20;
+  int get packPrice => packPriceAt(DateTime.now());
   Map<String, int> cardVariants = {};
   Map<String, dynamic> _tradeReceipts = {};
   List<String> variantsFor(int id) =>
@@ -135,6 +161,7 @@ class GameStore extends ChangeNotifier {
   List<Map<String, dynamic>> _latestCloudNotes = [];
   final Set<String> _dirtyNotes = {};
   final Set<String> _editingNotes = {};
+  final Map<String, int> _noteRevisions = {};
   int get pendingNoteCount => _dirtyNotes.length;
   String? saveError;
   String? _noteReadError;
@@ -162,6 +189,7 @@ class GameStore extends ChangeNotifier {
       _wordleRewards.addAll(List<String>.from(j['wordleRewards'] ?? []));
       best = j['best'] as int;
       packsSinceLegendary = (j['packsSinceLegendary'] as int?) ?? 0;
+      lastDiscountPackDay = j['lastDiscountPackDay'] as String?;
       _tradeReceipts = Map<String, dynamic>.from(j['tradeReceipts'] ?? {});
       cardVariants = ((j['cardVariants'] as Map<String, dynamic>?) ?? {}).map(
         (k, v) => MapEntry(k, v as int),
@@ -252,6 +280,7 @@ class GameStore extends ChangeNotifier {
     await save();
     _cloudSpaceId = spaceId;
     _latestCloudNotes = [];
+    _noteRevisions.clear();
     _noteReadError = null;
     _noteWriteError = null;
     _watchNotes(spaceId);
@@ -309,7 +338,14 @@ class GameStore extends ChangeNotifier {
     for (final row in _latestCloudNotes) {
       final id = row['id'] as String;
       final local = localById[id];
-      final next = _dirtyNotes.contains(id) && local != null
+      final revision = row['revisionMicros'] as int?;
+      final stale = revision != null && revision < (_noteRevisions[id] ?? 0);
+      if (revision != null && !stale && row['fromCache'] != true) {
+        _noteRevisions[id] = revision;
+      }
+      final next =
+          local != null &&
+              (_dirtyNotes.contains(id) || stale || row['fromCache'] == true)
           ? local
           : PocketNote(
               row['body'] as String,
@@ -437,6 +473,7 @@ class GameStore extends ChangeNotifier {
     cardVariants = restored.cardVariants;
     _tradeReceipts = restored._tradeReceipts;
     packsSinceLegendary = restored.packsSinceLegendary;
+    lastDiscountPackDay = restored.lastDiscountPackDay;
     game = restored.game;
     notes = restored.notes;
     _dirtyNotes
@@ -487,6 +524,7 @@ class GameStore extends ChangeNotifier {
       'wordleRewards': _wordleRewards.toList(),
       'best': best,
       'packsSinceLegendary': packsSinceLegendary,
+      'lastDiscountPackDay': lastDiscountPackDay,
       'cardVariants': cardVariants,
       'tradeReceipts': _tradeReceipts,
       'cards': cards.map((k, v) => MapEntry('$k', v)),
@@ -546,14 +584,23 @@ class GameStore extends ChangeNotifier {
     Random? random,
     required CatKind opener,
     String collectionId = anniversaryCollectionId,
+    DateTime? now,
   }) {
-    if (coins < 20) return null;
+    final day = now ?? DateTime.now();
+    final price = packPriceAt(day);
+    if (coins < price) return null;
     final generator = random ?? Random();
-    final pool = cardsForCollection(collectionId);
-    if (pool.isEmpty) return null;
-    final id = pool[generator.nextInt(pool.length)];
+    final catalog = cardsForCollection(collectionId);
+    if (catalog.isEmpty) return null;
     final roll = generator.nextInt(100);
-    lastOpenedRarity = packsSinceLegendary >= 24
+    final celestial = roll == 0 && catalog.any(isCelestialCard);
+    final pool = catalog
+        .where((id) => isCelestialCard(id) == celestial)
+        .toList();
+    final id = pool[generator.nextInt(pool.length)];
+    lastOpenedRarity = celestial
+        ? CardRarity.celestial
+        : packsSinceLegendary >= 24
         ? CardRarity.legendary
         : roll < 2
         ? CardRarity.mythic
@@ -566,7 +613,7 @@ class GameStore extends ChangeNotifier {
         : roll < 65
         ? CardRarity.uncommon
         : CardRarity.common;
-    packsSinceLegendary = lastOpenedRarity == CardRarity.legendary
+    packsSinceLegendary = lastOpenedRarity.rank >= CardRarity.legendary.rank
         ? 0
         : packsSinceLegendary + 1;
     final finishRoll = generator.nextInt(100);
@@ -577,7 +624,8 @@ class GameStore extends ChangeNotifier {
         : CardFinish.normal;
     final variant = '$id:${lastOpenedRarity.name}:${lastOpenedFinish.name}';
     cardVariants[variant] = (cardVariants[variant] ?? 0) + 1;
-    coins -= 20;
+    coins -= price;
+    if (price == 20) lastDiscountPackDay = _packDay(day);
     cards[id] = (cards[id] ?? 0) + 1;
     cardOpeners.putIfAbsent(id, () => opener.index);
     cardCollections.putIfAbsent(id, () => collectionId);
