@@ -10,6 +10,7 @@ import 'package:nuestro_rincon/store.dart';
 import 'package:nuestro_rincon/cat_room.dart';
 import 'package:nuestro_rincon/cat_character.dart';
 import 'package:nuestro_rincon/cat_care_screen.dart';
+import 'package:nuestro_rincon/cat_care_art.dart';
 
 Future<void> capture(WidgetTester tester, GlobalKey key, String name) async {
   if (Platform.environment['CAPTURE_CAT_CARE'] != '1') return;
@@ -30,10 +31,24 @@ Future<void> rub(WidgetTester tester, {int moves = 12}) async {
   await Scrollable.ensureVisible(tester.element(pelage), alignment: .25);
   await tester.pump();
   final center = tester.getCenter(pelage);
-  final finger = await tester.startGesture(center);
+  final scene = tester
+      .widgetList<CustomPaint>(find.byType(CustomPaint))
+      .map((w) => w.painter)
+      .whereType<BathScenePainter>()
+      .single;
+  final source = scene.tool == BathTool.shower
+      ? center - Offset(0, tester.getSize(pelage).height * .32)
+      : center;
+  final finger = await tester.startGesture(source);
   for (var i = 0; i < moves; i++) {
-    await finger.moveTo(center + Offset(i.isEven ? 60 : -60, 0));
+    await finger.moveTo(source + Offset(i.isEven ? 60 : -60, 0));
     await tester.pump(const Duration(milliseconds: 30));
+  }
+  if (scene.tool == BathTool.shower && moves >= 12) {
+    for (var i = 0; i < 40; i++) {
+      await finger.moveTo(source + Offset(-60 + 120 * (i % 20) / 19, 0));
+      await tester.pump(const Duration(milliseconds: 100));
+    }
   }
   await finger.up();
   await tester.pump();
@@ -329,11 +344,15 @@ void main() {
       expect(store.catCare.needs(CatKind.maru).clean, 35);
       await capture(tester, boundary, 'cat-care-rinse');
       final fur = find.byKey(const ValueKey('care-pelaje'));
-      final center = tester.getCenter(fur);
+      final center =
+          tester.getCenter(fur) - Offset(0, tester.getSize(fur).height * .32);
       final showerFinger = await tester.startGesture(center);
       await showerFinger.moveTo(center + const Offset(24, 0));
       // Water keeps rinsing while the shower is held still, without rubbing.
       for (var i = 0; i < 40; i++) {
+        await showerFinger.moveTo(
+          center + Offset(-60 + 120 * (i % 20) / 19, 0),
+        );
         await tester.pump(const Duration(milliseconds: 100));
         if (i == 5) await capture(tester, boundary, 'cat-care-shower-running');
       }

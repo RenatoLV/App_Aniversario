@@ -13,8 +13,9 @@ y su conjunto de ropa.
   entrega una porción inicial de cada alimento, sin reponerlas al volver a abrir.
 - **Baño:** selecciona o arrastra el jabón y frota al gato hasta hacer espuma.
   El jabón gira al frotar y genera burbujas desde el punto de contacto. Cambia a la
-  regadera y mantenla sobre el gato para enjuagarlo: se mueve horizontalmente por
-  encima de las orejas, con gotas que caen hasta el suelo y salpicaduras. El agua
+  regadera y dirígela libremente: el agua cae desde su posición hasta el suelo,
+  con salpicaduras. La espuma permanece donde pasó el jabón y solo desaparece
+  cuando el chorro la alcanza; las burbujas a los lados o encima quedan intactas. El agua
   sigue limpiando aunque mantengas el dedo quieto y borra progresivamente las manchas
   de lodo; la limpieza se recupera cuando terminas el enjuague. También puedes
   tocar al gato para aplicar la herramienta elegida.

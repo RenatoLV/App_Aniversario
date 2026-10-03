@@ -5,6 +5,7 @@ import 'cat_character.dart';
 import 'store.dart';
 import 'game_audio.dart';
 import 'cat_care_art.dart';
+import 'bath_foam.dart';
 
 enum _CareRoom { food, bath, wardrobe }
 
@@ -28,6 +29,8 @@ class _CatCareScreenState extends State<CatCareScreen>
   BathTool _tool = BathTool.soap;
   Offset? _hand;
   double _soapAngle = 0;
+  final _foam = BathFoam();
+  double _bathSize = 200;
   Duration? _lastWaterTick;
   bool _fridgeOpen = false;
   bool _bathFinishedDuringDrag = false;
@@ -51,7 +54,7 @@ class _CatCareScreenState extends State<CatCareScreen>
           !_busy &&
           _tool == BathTool.shower &&
           _hand != null &&
-          _scrub >= .8 &&
+          _foam.deposited > 0 &&
           previous != null) {
         final seconds = (stamp - previous).inMicroseconds / 1000000;
         _applyTool(seconds.clamp(0.0, .1) / 3.5);
@@ -118,6 +121,7 @@ class _CatCareScreenState extends State<CatCareScreen>
       setState(() {
         _busy = false;
         _scrub = 0;
+        _foam.clear();
         _rinse = 0;
         _hand = null;
         _message = '¡$name quedó limpio y esponjoso!';
@@ -127,35 +131,48 @@ class _CatCareScreenState extends State<CatCareScreen>
   }
 
   void _rub(DragUpdateDetails details, double catSize) {
+    _bathSize = catSize;
     if (_busy || _bathFinishedDuringDrag) return;
     final distance = _lastScrub == null
         ? 0.0
         : (details.localPosition - _lastScrub!).distance;
+    final previous = _lastScrub ?? details.localPosition;
     _lastScrub = details.localPosition;
     _soapAngle += distance / catSize * 7;
     _hand = Offset(
       details.localPosition.dx.clamp(0, catSize),
       details.localPosition.dy.clamp(0, catSize),
     );
-    _applyTool(distance / (catSize * 2.5));
+    if (distance > 0) {
+      final steps = (distance / (catSize * .035)).ceil().clamp(1, 20);
+      for (var i = 1; i <= steps; i++) {
+        _hand = Offset.lerp(previous, details.localPosition, i / steps);
+        _applyTool(distance / (catSize * 2.5 * steps));
+      }
+      _hand = details.localPosition;
+    } else {
+      _applyTool(distance / (catSize * 2.5));
+    }
   }
 
   void _applyTool(double amount) {
     if (_busy) return;
     setState(() {
       if (_tool == BathTool.soap) {
+        if (_hand != null) _foam.soap(_hand! / _bathSize, amount);
         _scrub = (_scrub + amount).clamp(0.0, 1.0);
         _message = _scrub >= .8
             ? '¡Qué espuma! Ahora usa la regadera para enjuagar.'
             : 'Pasa el jabón por el pelaje de $name';
-      } else if (_scrub >= .8) {
-        _rinse = (_rinse + amount).clamp(0.0, 1.0);
+      } else if (_foam.deposited > 0) {
+        if (_hand != null) _foam.water(_hand! / _bathSize, amount * 2);
+        _rinse = _foam.progress;
         _message = 'Enjuaga a $name hasta quitar toda la espuma y el lodo';
       } else {
         _message = 'Primero frota con el jabón para hacer espuma';
       }
     });
-    if (_rinse >= 1) _finishBath();
+    if (_foam.finished && _tool == BathTool.shower) _finishBath();
   }
 
   void _selectTool(BathTool tool) {
@@ -228,6 +245,7 @@ class _CatCareScreenState extends State<CatCareScreen>
                               : (values) => setState(() {
                                   _cat = values.first;
                                   _scrub = 0;
+                                  _foam.clear();
                                   _rinse = 0;
                                   _hand = null;
                                   _message = 'Ahora cuidamos a $name';
@@ -407,6 +425,7 @@ class _CatCareScreenState extends State<CatCareScreen>
                       !_busy && _room == _CareRoom.bath,
                   onAcceptWithDetails: (details) {
                     _selectTool(details.data);
+                    _bathSize = size;
                     _hand = Offset(size * .5, size * .55);
                     _applyTool(.18);
                   },
@@ -420,7 +439,10 @@ class _CatCareScreenState extends State<CatCareScreen>
                           ? (d) {
                               _bathFinishedDuringDrag = false;
                               _lastScrub = d.localPosition;
-                              setState(() => _hand = d.localPosition);
+                              setState(() {
+                                _bathSize = size;
+                                _hand = d.localPosition;
+                              });
                             }
                           : null,
                       onPanUpdate: _room == _CareRoom.bath
@@ -468,6 +490,7 @@ class _CatCareScreenState extends State<CatCareScreen>
                               onPet: () {
                                 if (!_busy) {
                                   if (_room == _CareRoom.bath) {
+                                    _bathSize = size;
                                     _hand = Offset(size * .5, size * .55);
                                     _applyTool(.2);
                                   } else {
@@ -488,6 +511,7 @@ class _CatCareScreenState extends State<CatCareScreen>
                                   tool: _tool,
                                   hand: _hand,
                                   soapAngle: _soapAngle,
+                                  patches: _foam.patches,
                                 ),
                               ),
                             ),
@@ -766,7 +790,9 @@ class _CatCareScreenState extends State<CatCareScreen>
       ),
       const SizedBox(height: 16),
       Text(
-        _scrub < .8 ? '1. Enjabonar el pelaje' : '2. Enjuagar con la regadera',
+        _tool == BathTool.soap
+            ? 'Frota donde quieras hacer espuma'
+            : 'Dirige el agua hacia la espuma',
         style: const TextStyle(fontWeight: FontWeight.w700),
       ),
       const SizedBox(height: 8),

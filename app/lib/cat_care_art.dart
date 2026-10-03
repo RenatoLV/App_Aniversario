@@ -1,3 +1,4 @@
+import 'bath_foam.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'cat_care.dart';
@@ -517,6 +518,7 @@ class BathScenePainter extends CustomPainter {
   final BathTool tool;
   final Offset? hand;
   final double soapAngle;
+  final List<FoamPatch> patches;
   const BathScenePainter({
     required this.foam,
     required this.rinse,
@@ -524,29 +526,42 @@ class BathScenePainter extends CustomPainter {
     required this.tool,
     this.hand,
     this.soapAngle = 0,
+    this.patches = const [],
   });
   @override
   void paint(Canvas c, Size size) {
-    final bubbles = foam * (1 - rinse);
-    for (var i = 0; i < 24; i++) {
-      final t = (phase + i * .137) % 1;
-      final x = size.width * (.22 + (i * .23 % .56)),
-          y = size.height * (.82 - t * .45);
-      final radius = size.width * (.018 + (i % 4) * .009);
-      c.drawCircle(
-        Offset(x, y),
-        radius,
-        _p(
-          const Color(
-            0xfff2ffff,
-          ).withValues(alpha: (bubbles * 1.3).clamp(0.0, .92)),
-        ),
-      );
-      c.drawCircle(
-        Offset(x - radius * .3, y - radius * .3),
-        radius * .23,
-        _p(Colors.white.withValues(alpha: bubbles)),
-      );
+    for (var n = 0; n < patches.length; n++) {
+      final patch = patches[n];
+      for (var i = 0; i < 7; i++) {
+        final angle = i * 2.4 + n;
+        final drift = math.sin(phase * math.pi * 2 + i) * size.width * .004;
+        final at =
+            Offset(
+              patch.position.dx * size.width,
+              patch.position.dy * size.height,
+            ) +
+            Offset(
+              math.cos(angle) * size.width * .035 + drift,
+              math.sin(angle) * size.height * .035 + drift,
+            );
+        final r = size.width * (.018 + i % 3 * .008);
+        final opacity = (patch.strength * 6).clamp(0.0, .85);
+        c.drawCircle(
+          at,
+          r,
+          _p(const Color(0xffe5f9ff).withValues(alpha: opacity)),
+        );
+        c.drawCircle(
+          at,
+          r,
+          _p(Colors.white.withValues(alpha: opacity * .8), 1),
+        );
+        c.drawCircle(
+          at - Offset(r * .3, r * .3),
+          r * .22,
+          _p(Colors.white.withValues(alpha: opacity)),
+        );
+      }
     }
     if (hand != null) {
       if (tool == BathTool.soap) {
@@ -579,9 +594,9 @@ class BathScenePainter extends CustomPainter {
         BathPropPainter(tool).paint(c, Size.square(size.width * .22));
         c.restore();
       } else {
-        // The finger steers the shower horizontally; the nozzle stays above the ears.
-        final x = hand!.dx.clamp(size.width * .22, size.width * .78);
-        final top = size.height * .16;
+        // Nozzle follows the finger freely; drops fall only below its position.
+        final x = hand!.dx.clamp(0.0, size.width);
+        final top = hand!.dy - size.width * .24 * .4;
         final span = size.width * .24;
         final ink = _p(
           const Color(0xff76cfe5).withValues(alpha: .8),
@@ -590,7 +605,10 @@ class BathScenePainter extends CustomPainter {
         for (var i = 0; i < 18; i++) {
           final age = (phase * 4 + i * .137) % 1;
           final dx = (i % 6 - 2.5) * size.width * .017;
-          final y = top + span * .4 + age * size.height * .67;
+          final y =
+              top +
+              span * .4 +
+              age * (size.height - hand!.dy).clamp(0.0, size.height);
           c.drawLine(
             Offset(x + dx, y),
             Offset(x + dx, y + size.height * .035),
@@ -625,5 +643,6 @@ class BathScenePainter extends CustomPainter {
       phase != old.phase ||
       tool != old.tool ||
       soapAngle != old.soapAngle ||
+      patches != old.patches ||
       hand != old.hand;
 }
