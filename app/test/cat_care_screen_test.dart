@@ -25,6 +25,28 @@ Future<void> capture(WidgetTester tester, GlobalKey key, String name) async {
   });
 }
 
+Future<void> rub(WidgetTester tester, {int moves = 12}) async {
+  final pelage = find.byKey(const ValueKey('care-pelaje'));
+  await Scrollable.ensureVisible(tester.element(pelage), alignment: .25);
+  await tester.pump();
+  final center = tester.getCenter(pelage);
+  final finger = await tester.startGesture(center);
+  for (var i = 0; i < moves; i++) {
+    await finger.moveTo(center + Offset(i.isEven ? 60 : -60, 0));
+    await tester.pump(const Duration(milliseconds: 30));
+  }
+  await finger.up();
+  await tester.pump();
+}
+
+Future<void> chooseShower(WidgetTester tester) async {
+  final tool = find.byKey(const ValueKey('bath-shower'));
+  await Scrollable.ensureVisible(tester.element(tool), alignment: .8);
+  await tester.pump();
+  await tester.tap(tool);
+  await tester.pump();
+}
+
 void main() {
   setUpAll(() async {
     TestWidgetsFlutterBinding.ensureInitialized();
@@ -140,13 +162,11 @@ void main() {
       expect(store.catCare.needs(CatKind.maru).food, 50);
       await tester.tap(find.text('Baño'));
       await tester.pump();
-      await tester.scrollUntilVisible(
-        find.byKey(const ValueKey('care-bathe')),
-        100,
-      );
-      await tester.tap(find.byKey(const ValueKey('care-bathe')));
-      await tester.pump();
-      await tester.pump(const Duration(seconds: 2));
+      expect(find.text('Dar un baño'), findsNothing);
+      await rub(tester);
+      expect(store.catCare.needs(CatKind.maru).clean, 20);
+      await chooseShower(tester);
+      await rub(tester);
       await tester.pump();
       expect(store.catCare.needs(CatKind.maru).clean, 100);
       await tester.tap(find.text('Ropa'));
@@ -204,10 +224,17 @@ void main() {
       'maru': {'food': 20, 'clean': 20},
     });
     await tester.pumpWidget(MaterialApp(home: CatCareScreen(store: store)));
+    final fridge = find.byKey(const ValueKey('care-fridge'));
+    await Scrollable.ensureVisible(tester.element(fridge), alignment: .7);
+    await tester.pump();
+    await tester.tap(fridge);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
     final fish = find.byWidgetPredicate(
       (w) => w is Draggable<CatFood> && w.data == CatFood.fish,
     );
     final target = find.byType(DragTarget<CatFood>);
+    // Tall viewport keeps the fridge's first shelf and cat visible together.
     final finger = await tester.startGesture(tester.getCenter(fish));
     await finger.moveTo(tester.getCenter(target));
     await tester.pump();
@@ -218,18 +245,86 @@ void main() {
     expect(store.catCare.needs(CatKind.maru).food, 58);
     await tester.tap(find.text('Baño'));
     await tester.pump();
-    final center = tester.getCenter(find.byType(CatActor));
-    final rubbing = await tester.startGesture(center);
-    for (var i = 0; i < 12; i++) {
-      await rubbing.moveTo(center + Offset(i.isEven ? 70 : -70, 0));
-      await tester.pump(const Duration(milliseconds: 30));
-    }
-    await rubbing.up();
-    await tester.pump();
-    await tester.pump(const Duration(seconds: 2));
+    await rub(tester);
+    expect(store.catCare.needs(CatKind.maru).clean, 20);
+    await chooseShower(tester);
+    await rub(tester);
     await tester.pump();
     expect(store.catCare.needs(CatKind.maru).clean, 100);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
   });
+
+  testWidgets(
+    'Fridge, dirty fur, soap and progressive rinsing stay usable on a phone',
+    (tester) async {
+      tester.view.physicalSize = const Size(390, 1000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      SharedPreferences.setMockInitialValues({});
+      final store = GameStore(await SharedPreferences.getInstance());
+      store.catCare.restore({
+        'maru': {'food': 15, 'clean': 35, 'happy': 41},
+      });
+      await store.catCare.equip(CatKind.maru, clothingById('explorer')!);
+      await store.catCare.equip(CatKind.maru, clothingById('shirt_stripes')!);
+      final boundary = GlobalKey();
+      await tester.pumpWidget(
+        RepaintBoundary(
+          key: boundary,
+          child: MaterialApp(
+            debugShowCheckedModeBanner: false,
+            theme: ThemeData(
+              colorScheme: ColorScheme.fromSeed(
+                seedColor: const Color(0xff31594c),
+              ),
+            ),
+            home: CatCareScreen(store: store),
+          ),
+        ),
+      );
+      await tester.tap(find.byKey(const ValueKey('care-fridge')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.byType(Draggable<CatFood>), findsNWidgets(10));
+      tester
+          .state<ScrollableState>(find.byType(Scrollable).first)
+          .position
+          .jumpTo(240);
+      await tester.pump();
+      await capture(tester, boundary, 'cat-care-fridge');
+      tester
+          .state<ScrollableState>(find.byType(Scrollable).first)
+          .position
+          .jumpTo(0);
+      await tester.pump();
+      await tester.tap(find.text('Baño'));
+      await tester.pump();
+      await chooseShower(tester);
+      await rub(tester);
+      expect(store.catCare.needs(CatKind.maru).clean, 35);
+      final soap = find.byKey(const ValueKey('bath-soap'));
+      await Scrollable.ensureVisible(tester.element(soap), alignment: .8);
+      await tester.pump();
+      await tester.tap(soap);
+      await tester.pump();
+      await rub(tester);
+      expect(store.catCare.needs(CatKind.maru).clean, 35);
+      await capture(tester, boundary, 'cat-care-soap');
+      await chooseShower(tester);
+      await rub(tester, moves: 3);
+      final actor = tester.widget<CatActor>(find.byType(CatActor));
+      expect(actor.cleanliness, greaterThan(35));
+      expect(actor.cleanliness, lessThan(100));
+      expect(store.catCare.needs(CatKind.maru).clean, 35);
+      await capture(tester, boundary, 'cat-care-rinse');
+      await rub(tester);
+      await tester.pump();
+      expect(store.catCare.needs(CatKind.maru).clean, 100);
+      await capture(tester, boundary, 'cat-care-washed');
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
 }

@@ -32,7 +32,7 @@ El repositorio incluye **334 memes** de Momazos vol. 1 y vol. 2 y sus imágenes 
 
 - Escena interactiva de Maru y Lady: caricias, movimiento, siestas, pensamientos, churu y caja de arena.
 - La casita: doble toque en el recuadro de los gatos para darles comida, bañarlos
-  y vestirlos. Cada gato conserva sus cuidados y su ropa; las ocho prendas iniciales
+  y vestirlos. Cada gato conserva sus cuidados y su ropa; las 40 prendas iniciales
   se combinan por categoría y aparecen también en juegos, sobres y animaciones.
   Detalles y personalización: [app/CAT_CARE.md](app/CAT_CARE.md).
 - Block Blaster Maru Editions: juego de bloques 8×8 con puntuación, combos, récord, monedas y SFX Android.

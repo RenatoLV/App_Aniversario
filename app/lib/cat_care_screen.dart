@@ -1,8 +1,10 @@
 import 'dart:math' as math;
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'cat_character.dart';
 import 'store.dart';
 import 'game_audio.dart';
+import 'cat_care_art.dart';
 
 enum _CareRoom { food, bath, wardrobe }
 
@@ -22,6 +24,12 @@ class _CatCareScreenState extends State<CatCareScreen>
   String _message = 'Un ratito de cariño para tus compañeros';
   late final AnimationController _action;
   double _scrub = 0;
+  double _rinse = 0;
+  BathTool _tool = BathTool.soap;
+  Offset? _hand;
+  bool _fridgeOpen = false;
+  bool _bathFinishedDuringDrag = false;
+  late final Timer _needsRefresh;
   Offset? _lastScrub;
   CatCare get care => widget.store.catCare;
   String get name => _cat == CatKind.maru ? 'Maru' : 'Lady';
@@ -33,11 +41,15 @@ class _CatCareScreenState extends State<CatCareScreen>
       vsync: this,
       duration: const Duration(milliseconds: 1800),
     );
+    _needsRefresh = Timer.periodic(const Duration(minutes: 1), (_) {
+      if (mounted) setState(() {});
+    });
   }
 
   @override
   void dispose() {
     _action.dispose();
+    _needsRefresh.cancel();
     super.dispose();
   }
 
@@ -47,7 +59,8 @@ class _CatCareScreenState extends State<CatCareScreen>
     setState(() {
       _busy = true;
       _food = meal;
-      _message = '¡Ñam ñam! $name disfruta su ${meal.label.toLowerCase()}';
+      _fridgeOpen = false;
+      _message = '$name: ${meal.reaction}';
     });
     GameAudio.instance.play(GameSfx.kitten);
     try {
@@ -65,23 +78,21 @@ class _CatCareScreenState extends State<CatCareScreen>
     }
   }
 
-  Future<void> _bath() async {
+  Future<void> _finishBath() async {
     if (_busy) return;
     final target = _cat;
+    _bathFinishedDuringDrag = true;
     setState(() {
       _busy = true;
-      _message = 'Agüita tibia, burbujas y mucho cuidado…';
+      _message = '¡Fuera espuma y manchitas!';
     });
-    try {
-      await _action.forward(from: 0).orCancel;
-    } on TickerCanceled {
-      return;
-    }
     await care.bathe(target);
     if (mounted) {
       setState(() {
         _busy = false;
         _scrub = 0;
+        _rinse = 0;
+        _hand = null;
         _message = '¡$name quedó limpio y esponjoso!';
       });
     }
@@ -89,15 +100,71 @@ class _CatCareScreenState extends State<CatCareScreen>
   }
 
   void _rub(DragUpdateDetails details, double catSize) {
-    if (_busy) return;
+    if (_busy || _bathFinishedDuringDrag) return;
     final distance = _lastScrub == null
         ? 0.0
         : (details.localPosition - _lastScrub!).distance;
     _lastScrub = details.localPosition;
-    setState(
-      () => _scrub = (_scrub + distance / (catSize * 3)).clamp(0.0, 1.0),
+    _hand = Offset(
+      details.localPosition.dx.clamp(0, catSize),
+      details.localPosition.dy.clamp(0, catSize),
     );
-    if (_scrub >= 1) _bath();
+    _applyTool(distance / (catSize * 2.5));
+  }
+
+  void _applyTool(double amount) {
+    if (_busy) return;
+    setState(() {
+      if (_tool == BathTool.soap) {
+        _scrub = (_scrub + amount).clamp(0.0, 1.0);
+        _message = _scrub >= .8
+            ? '¡Qué espuma! Ahora usa la regadera para enjuagar.'
+            : 'Pasa el jabón por el pelaje de $name';
+      } else if (_scrub >= .8) {
+        _rinse = (_rinse + amount).clamp(0.0, 1.0);
+        _message = 'Enjuaga a $name hasta quitar toda la espuma y el lodo';
+      } else {
+        _message = 'Primero frota con el jabón para hacer espuma';
+      }
+    });
+    if (_rinse >= 1) _finishBath();
+  }
+
+  void _selectTool(BathTool tool) {
+    if (_busy) return;
+    setState(() {
+      _tool = tool;
+      _hand = null;
+      _message = tool == BathTool.soap
+          ? 'Frota el jabón sobre el gato. También puedes tocar su pelaje.'
+          : 'Pasa la regadera por el pelaje enjabonado para enjuagar';
+    });
+  }
+
+  Offset _mealMovement(double t) {
+    if (!_busy || _room != _CareRoom.food) return Offset.zero;
+    final wave = math.sin(t * math.pi * 8);
+    return switch (_food) {
+      CatFood.kibble => Offset(0, wave.abs() * 2),
+      CatFood.fish => Offset(
+        math.sin(t * math.pi * 4) * 3,
+        -math.sin(t * math.pi * 2).abs() * 3,
+      ),
+      CatFood.churu => Offset(wave * 1.5, 0),
+      CatFood.tuna => Offset(-2 * math.sin(t * math.pi * 6), wave.abs()),
+      CatFood.salmon => Offset(
+        wave * .8,
+        math.sin(t * math.pi * 12).abs() * 1.5,
+      ),
+      CatFood.chicken => Offset(wave * 2, -wave.abs() * 2),
+      CatFood.shrimp => Offset(0, -math.sin(t * math.pi * 4).abs() * 7),
+      CatFood.egg => Offset(
+        math.sin(t * math.pi * 2) * 2,
+        -math.sin(t * math.pi).abs() * 2,
+      ),
+      CatFood.pumpkin => Offset(wave * 2.5, wave.abs() * 1.5),
+      CatFood.broth => Offset(0, math.sin(t * math.pi * 6) * 1.5),
+    };
   }
 
   @override
@@ -146,6 +213,8 @@ class _CatCareScreenState extends State<CatCareScreen>
                               : (values) => setState(() {
                                   _cat = values.first;
                                   _scrub = 0;
+                                  _rinse = 0;
+                                  _hand = null;
                                   _message = 'Ahora cuidamos a $name';
                                 }),
                         ),
@@ -177,7 +246,7 @@ class _CatCareScreenState extends State<CatCareScreen>
                         const SizedBox(height: 16),
                         _stage(),
                         const SizedBox(height: 12),
-                        AnimatedSwitcher(
+                        AnimatedSize(
                           duration: const Duration(milliseconds: 250),
                           child: Text(
                             _message,
@@ -192,8 +261,9 @@ class _CatCareScreenState extends State<CatCareScreen>
                         const SizedBox(height: 18),
                         SegmentedButton<_CareRoom>(
                           style: SegmentedButton.styleFrom(
-                            textStyle: Theme.of(context).textTheme.labelLarge!
-                                .copyWith(fontSize: 12),
+                            textStyle: Theme.of(
+                              context,
+                            ).textTheme.labelLarge!.copyWith(fontSize: 12),
                             padding: const EdgeInsets.symmetric(horizontal: 8),
                           ),
                           segments: const [
@@ -218,12 +288,17 @@ class _CatCareScreenState extends State<CatCareScreen>
                               ? null
                               : (values) => setState(() {
                                   _room = values.first;
-                                  _scrub = 0;
+                                  _hand = null;
+                                  if (_room == _CareRoom.bath) {
+                                    _action.repeat();
+                                  } else {
+                                    _action.stop();
+                                  }
                                   _message = switch (_room) {
                                     _CareRoom.food =>
                                       'Elige su comida o arrástrala hasta $name',
                                     _CareRoom.bath =>
-                                      'Frota sobre $name para enjabonarlo, o usa el botón de baño',
+                                      'Jabón para hacer espuma, regadera para enjuagar',
                                     _CareRoom.wardrobe =>
                                       'Combina accesorios. Se verán también en todos los juegos.',
                                   };
@@ -312,79 +387,136 @@ class _CatCareScreenState extends State<CatCareScreen>
               ),
               AnimatedBuilder(
                 animation: _action,
-                builder: (context, _) => DragTarget<CatFood>(
+                builder: (context, _) => DragTarget<BathTool>(
                   onWillAcceptWithDetails: (_) =>
-                      !_busy && _room == _CareRoom.food,
-                  onAcceptWithDetails: (details) => _feed(details.data),
-                  builder: (context, candidates, rejected) => GestureDetector(
-                    onPanStart: _room == _CareRoom.bath
-                        ? (d) => _lastScrub = d.localPosition
-                        : null,
-                    onPanUpdate: _room == _CareRoom.bath
-                        ? (d) => _rub(d, size)
-                        : null,
-                    onPanEnd: (_) => _lastScrub = null,
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        CatActor(
-                          key: ValueKey('care-cat-${_cat.name}'),
-                          cat: _cat,
-                          size: size,
-                          active: true,
-                          showLabel: false,
-                          munching: _busy && _room == _CareRoom.food,
-                          onPet: () {
-                            if (!_busy) care.pet(_cat);
-                          },
-                        ),
-                        if (_room == _CareRoom.bath && (_busy || _scrub > 0))
-                          IgnorePointer(
-                            child: CustomPaint(
-                              size: Size.square(size),
-                              painter: _CareEffects(
-                                bath: true,
-                                phase: _busy ? _action.value : _scrub,
+                      !_busy && _room == _CareRoom.bath,
+                  onAcceptWithDetails: (details) {
+                    _selectTool(details.data);
+                    _hand = Offset(size * .5, size * .55);
+                    _applyTool(.18);
+                  },
+                  builder: (context, tools, rejectedTools) =>
+                      DragTarget<CatFood>(
+                        onWillAcceptWithDetails: (_) =>
+                            !_busy && _room == _CareRoom.food,
+                        onAcceptWithDetails: (details) => _feed(details.data),
+                        builder: (context, candidates, rejected) =>
+                            GestureDetector(
+                              key: const ValueKey('care-pelaje'),
+                              onPanStart: _room == _CareRoom.bath && !_busy
+                                  ? (d) {
+                                      _bathFinishedDuringDrag = false;
+                                      _lastScrub = d.localPosition;
+                                      setState(() => _hand = d.localPosition);
+                                    }
+                                  : null,
+                              onPanUpdate: _room == _CareRoom.bath
+                                  ? (d) => _rub(d, size)
+                                  : null,
+                              onPanEnd: _room == _CareRoom.bath
+                                  ? (_) => setState(() {
+                                      _lastScrub = null;
+                                      _hand = null;
+                                      _bathFinishedDuringDrag = false;
+                                    })
+                                  : null,
+                              onPanCancel: _room == _CareRoom.bath
+                                  ? () => setState(() {
+                                      _lastScrub = null;
+                                      _hand = null;
+                                      _bathFinishedDuringDrag = false;
+                                    })
+                                  : null,
+                              child: Stack(
+                                alignment: Alignment.center,
+                                children: [
+                                  Transform.translate(
+                                    offset: _mealMovement(_action.value),
+                                    child: CatActor(
+                                      key: ValueKey('care-cat-${_cat.name}'),
+                                      cat: _cat,
+                                      size: size,
+                                      active: true,
+                                      showLabel: false,
+                                      cleanliness:
+                                          care.needs(_cat).clean +
+                                          (100 - care.needs(_cat).clean) *
+                                              (_room == _CareRoom.bath
+                                                  ? _rinse
+                                                  : 0),
+                                      feeding: _busy && _room == _CareRoom.food,
+                                      munching:
+                                          _busy &&
+                                          _room == _CareRoom.food &&
+                                          _food != CatFood.churu &&
+                                          _food != CatFood.broth,
+                                      onPet: () {
+                                        if (!_busy) {
+                                          if (_room == _CareRoom.bath) {
+                                            _hand = Offset(
+                                              size * .5,
+                                              size * .55,
+                                            );
+                                            _applyTool(.2);
+                                          } else {
+                                            care.pet(_cat);
+                                          }
+                                        }
+                                      },
+                                    ),
+                                  ),
+                                  if (_room == _CareRoom.bath)
+                                    IgnorePointer(
+                                      child: CustomPaint(
+                                        size: Size.square(size),
+                                        painter: BathScenePainter(
+                                          foam: _scrub,
+                                          rinse: _rinse,
+                                          phase: _action.value,
+                                          tool: _tool,
+                                          hand: _hand,
+                                        ),
+                                      ),
+                                    ),
+                                  if (_busy && _room == _CareRoom.food)
+                                    IgnorePointer(
+                                      child: CustomPaint(
+                                        size: Size.square(size),
+                                        painter: FeedingScenePainter(
+                                          food: _food,
+                                          phase: _action.value,
+                                        ),
+                                      ),
+                                    ),
+                                  if (candidates.isNotEmpty)
+                                    IgnorePointer(
+                                      child: Container(
+                                        width: size,
+                                        height: size,
+                                        decoration: BoxDecoration(
+                                          borderRadius: BorderRadius.circular(
+                                            26,
+                                          ),
+                                          border: Border.all(
+                                            color: const Color(0xff15846b),
+                                            width: 3,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                ],
                               ),
                             ),
-                          ),
-                        if (_busy && _room == _CareRoom.food)
-                          IgnorePointer(
-                            child: CustomPaint(
-                              size: Size.square(size),
-                              painter: _CareEffects(
-                                bath: false,
-                                phase: _action.value,
-                              ),
-                            ),
-                          ),
-                        if (candidates.isNotEmpty)
-                          IgnorePointer(
-                            child: Container(
-                              width: size,
-                              height: size,
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(26),
-                                border: Border.all(
-                                  color: const Color(0xff15846b),
-                                  width: 3,
-                                ),
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
+                      ),
                 ),
               ),
               if (_room == _CareRoom.food)
                 Positioned(
                   bottom: 6,
                   child: IgnorePointer(
-                    child: Text(
-                      _food.emoji,
-                      style: const TextStyle(fontSize: 34),
-                    ),
+                    child: _busy
+                        ? const SizedBox.shrink()
+                        : FoodIcon(food: _food, size: 34),
                   ),
                 ),
             ],
@@ -396,51 +528,150 @@ class _CatCareScreenState extends State<CatCareScreen>
 
   Widget _foodTray() => Column(
     children: [
-      Row(
-        children: [
-          for (final food in CatFood.values)
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 3),
-                child: Draggable<CatFood>(
-                  data: food,
-                  maxSimultaneousDrags: _busy ? 0 : 1,
-                  feedback: Material(
-                    color: Colors.transparent,
-                    child: Text(
-                      food.emoji,
-                      style: const TextStyle(fontSize: 44),
-                    ),
-                  ),
-                  child: ChoiceChip(
-                    label: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(food.emoji, style: const TextStyle(fontSize: 25)),
-                        Text(food.label, style: const TextStyle(fontSize: 11)),
-                      ],
-                    ),
-                    selected: food == _food,
-                    onSelected: _busy
-                        ? null
-                        : (_) => setState(() => _food = food),
-                    showCheckmark: false,
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
-      const SizedBox(height: 14),
       FilledButton.icon(
         key: const ValueKey('care-feed'),
         onPressed: _busy ? null : () => _feed(),
         icon: const Icon(Icons.restaurant_rounded),
         label: Text(_busy ? 'Comiendo…' : 'Dar ${_food.label.toLowerCase()}'),
       ),
+      const SizedBox(height: 14),
+      Container(
+        decoration: BoxDecoration(
+          color: const Color(0xffe3f0eb),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: const Color(0xffb6cfc7)),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          children: [
+            InkWell(
+              key: const ValueKey('care-fridge'),
+              onTap: _busy
+                  ? null
+                  : () => setState(() => _fridgeOpen = !_fridgeOpen),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    const CustomPaint(
+                      size: Size(54, 72),
+                      painter: FridgePainter(),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _fridgeOpen
+                                ? 'El refri está abierto'
+                                : 'Abre el refri',
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          const Text(
+                            '10 alimentos · cada uno con su animación',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Color(0xff58786c),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'En el plato: ${_food.label}',
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Icon(_fridgeOpen ? Icons.expand_less : Icons.expand_more),
+                  ],
+                ),
+              ),
+            ),
+            AnimatedSize(
+              duration: const Duration(milliseconds: 280),
+              alignment: Alignment.topCenter,
+              child: !_fridgeOpen
+                  ? const SizedBox(width: double.infinity)
+                  : Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
+                      child: LayoutBuilder(
+                        builder: (context, constraints) => GridView.count(
+                          crossAxisCount: constraints.maxWidth > 500 ? 5 : 3,
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          mainAxisSpacing: 8,
+                          crossAxisSpacing: 8,
+                          childAspectRatio: .95,
+                          children: [
+                            for (final food in CatFood.values)
+                              Draggable<CatFood>(
+                                data: food,
+                                maxSimultaneousDrags: _busy ? 0 : 1,
+                                feedback: Material(
+                                  color: Colors.transparent,
+                                  child: FoodIcon(food: food, size: 64),
+                                ),
+                                child: Material(
+                                  color: _food == food
+                                      ? const Color(0xffcce6d9)
+                                      : const Color(0xfffffcf4),
+                                  borderRadius: BorderRadius.circular(15),
+                                  child: InkWell(
+                                    key: ValueKey('food-${food.name}'),
+                                    borderRadius: BorderRadius.circular(15),
+                                    onTap: _busy
+                                        ? null
+                                        : () => setState(() {
+                                            _food = food;
+                                            _fridgeOpen = false;
+                                            _message =
+                                                '${food.label}: ${food.reaction}';
+                                          }),
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(6),
+                                      child: Column(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          FoodIcon(food: food, size: 34),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            food.label,
+                                            style: const TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                            maxLines: 1,
+                                          ),
+                                          Text(
+                                            '+${food.nutrition} comida',
+                                            style: const TextStyle(
+                                              fontSize: 9,
+                                              color: Color(0xff708376),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+            ),
+          ],
+        ),
+      ),
       const SizedBox(height: 8),
       const Text(
-        'Comida disponible para Maru y Lady.',
+        'Elige un alimento o arrástralo del refri hasta el gato.',
         textAlign: TextAlign.center,
         style: TextStyle(fontSize: 12, color: Color(0xff6e8276)),
       ),
@@ -449,24 +680,61 @@ class _CatCareScreenState extends State<CatCareScreen>
 
   Widget _bathControls() => Column(
     children: [
-      if (_scrub > 0 && !_busy)
-        Padding(
-          padding: const EdgeInsets.only(bottom: 16),
-          child: LinearProgressIndicator(
-            value: _scrub,
-            minHeight: 8,
-            borderRadius: BorderRadius.circular(8),
-          ),
-        ),
-      FilledButton.icon(
-        key: const ValueKey('care-bathe'),
-        onPressed: _busy ? null : _bath,
-        icon: const Icon(Icons.shower_rounded),
-        label: Text(_busy ? 'Bañando…' : 'Dar un baño'),
+      Row(
+        children: [
+          for (final tool in BathTool.values)
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+                child: Draggable<BathTool>(
+                  data: tool,
+                  maxSimultaneousDrags: _busy ? 0 : 1,
+                  feedback: Material(
+                    color: Colors.transparent,
+                    child: BathPropIcon(tool: tool, size: 70),
+                  ),
+                  child: OutlinedButton(
+                    key: ValueKey('bath-${tool.name}'),
+                    onPressed: _busy ? null : () => _selectTool(tool),
+                    style: OutlinedButton.styleFrom(
+                      backgroundColor: _tool == tool
+                          ? const Color(0xffd4eae5)
+                          : Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      side: BorderSide(
+                        color: _tool == tool
+                            ? const Color(0xff418677)
+                            : const Color(0xffb8cfcd),
+                        width: _tool == tool ? 2 : 1,
+                      ),
+                    ),
+                    child: Column(
+                      children: [
+                        BathPropIcon(tool: tool, size: 44),
+                        Text(tool == BathTool.soap ? 'Jabón' : 'Regadera'),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+      const SizedBox(height: 16),
+      Text(
+        _scrub < .8 ? '1. Enjabonar el pelaje' : '2. Enjuagar con la regadera',
+        style: const TextStyle(fontWeight: FontWeight.w700),
+      ),
+      const SizedBox(height: 8),
+      LinearProgressIndicator(
+        value: _scrub < .8 ? _scrub : _rinse,
+        minHeight: 8,
+        borderRadius: BorderRadius.circular(8),
+        color: _scrub < .8 ? const Color(0xffdf9bb9) : const Color(0xff65b8c7),
       ),
       const SizedBox(height: 12),
       const Text(
-        'También puedes frotar con el dedo sobre el gato para hacer espuma.',
+        'Elige o arrastra la herramienta. Desliza sobre el pelaje, o tócalo varias veces: primero jabón y después agua.',
         textAlign: TextAlign.center,
         style: TextStyle(color: Color(0xff657f75)),
       ),
@@ -482,7 +750,7 @@ class _CatCareScreenState extends State<CatCareScreen>
       ),
       const SizedBox(height: 6),
       const Text(
-        '8 prendas iniciales · toca de nuevo una prenda para quitarla',
+        '40 prendas · 10 de cada categoría · toca de nuevo para quitar',
         style: TextStyle(fontSize: 12, color: Color(0xff6b8075)),
       ),
       const SizedBox(height: 12),
@@ -582,50 +850,4 @@ class _Need extends StatelessWidget {
       ),
     ),
   );
-}
-
-class _CareEffects extends CustomPainter {
-  final bool bath;
-  final double phase;
-  _CareEffects({required this.bath, required this.phase});
-  @override
-  void paint(Canvas canvas, Size size) {
-    for (var i = 0; i < (bath ? 18 : 10); i++) {
-      final t = (phase + i * .137) % 1;
-      final x = size.width * (.17 + ((i * .23) % .68));
-      final y = size.height * (bath ? .9 - t * .7 : .66 + t * .2);
-      final radius = bath ? size.width * (.016 + (i % 4) * .009) : 2.5;
-      final color = bath ? const Color(0xffe9feff) : const Color(0xffbe884f);
-      canvas.drawCircle(
-        Offset(x, y),
-        radius,
-        Paint()
-          ..color = color.withValues(
-            alpha: bath ? .75 : math.sin(t * math.pi).abs(),
-          ),
-      );
-      if (bath) {
-        canvas.drawCircle(
-          Offset(x - radius * .3, y - radius * .3),
-          radius * .24,
-          Paint()..color = Colors.white,
-        );
-      }
-    }
-    if (bath && phase > .5) {
-      final ink = Paint()
-        ..color = const Color(0xff62bdd5).withValues(alpha: .55)
-        ..strokeWidth = 2
-        ..strokeCap = StrokeCap.round;
-      for (var i = 0; i < 6; i++) {
-        final x = size.width * (.2 + i * .12),
-            y = (phase * 2 % 1) * size.height * .6;
-        canvas.drawLine(Offset(x, y), Offset(x, y + 12), ink);
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(_CareEffects old) =>
-      bath != old.bath || phase != old.phase;
 }

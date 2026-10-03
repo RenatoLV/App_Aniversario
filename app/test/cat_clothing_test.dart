@@ -61,7 +61,7 @@ void main() {
     final picture = atlas.endRecording();
     if (Platform.environment['CAPTURE_CAT_CARE'] == '1') {
       await tester.runAsync(() async {
-        final image = await picture.toImage(680, 1360);
+        final image = await picture.toImage(680, outfits.length * 170);
         final data = await image.toByteData(format: ui.ImageByteFormat.png);
         final file = File('build/qa/cat-clothing-atlas.png');
         await file.parent.create(recursive: true);
@@ -70,6 +70,43 @@ void main() {
       });
     }
     picture.dispose();
+    if (Platform.environment['CAPTURE_CAT_CARE'] == '1') {
+      for (final slot in ClothingSlot.values) {
+        final recorder = ui.PictureRecorder();
+        final canvas = Canvas(recorder)
+          ..drawColor(const Color(0xfffaf6ed), BlendMode.src);
+        final items = catWardrobe.where((item) => item.slot == slot).toList();
+        for (var row = 0; row < items.length; row++) {
+          final clothes = const CatOutfit().withItem(slot, items[row].id);
+          for (var col = 0; col < 4; col++) {
+            final CustomPainter painter = switch (col) {
+              0 => MaruPainter(outfit: clothes),
+              1 => LadyPainter(outfit: clothes),
+              2 => AlienCatPainter(cat: CatKind.maru, outfit: clothes),
+              _ => PackOpeningCatPainter(
+                cat: CatKind.lady,
+                outfit: clothes,
+                progress: .45,
+              ),
+            };
+            canvas.save();
+            canvas.translate(col * 170 + 10, row * 155 + 5);
+            painter.paint(canvas, const Size.square(145));
+            canvas.restore();
+          }
+        }
+        final picture = recorder.endRecording();
+        await tester.runAsync(() async {
+          final image = await picture.toImage(680, 1550);
+          final data = await image.toByteData(format: ui.ImageByteFormat.png);
+          await File(
+            'build/qa/cat-clothing-${slot.name}.png',
+          ).writeAsBytes(data!.buffer.asUint8List());
+          image.dispose();
+        });
+        picture.dispose();
+      }
+    }
   });
 
   testWidgets(

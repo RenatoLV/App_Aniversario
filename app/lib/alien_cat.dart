@@ -10,12 +10,14 @@ class AlienCatPainter extends CustomPainter {
   final CatKind cat;
   final double phase, blink;
   final CatOutfit outfit;
+  final double cleanliness;
 
   const AlienCatPainter({
     required this.cat,
     this.phase = 0,
     this.blink = 0,
     this.outfit = const CatOutfit(),
+    this.cleanliness = 100,
   });
 
   @override
@@ -70,6 +72,7 @@ class AlienCatPainter extends CustomPainter {
     canvas.scale(.8, 1);
     canvas.translate(-50, 0);
     paintCatBodyClothing(canvas, outfit);
+    paintCatDirt(canvas, cleanliness);
     canvas.restore();
     canvas.drawPath(
       Path()
@@ -217,6 +220,7 @@ class AlienCatPainter extends CustomPainter {
         whiskers,
       );
     }
+    paintCatDirt(canvas, cleanliness, head: true);
     paintCatHeadClothing(canvas, outfit, alien: true);
     canvas.restore();
   }
@@ -226,5 +230,6 @@ class AlienCatPainter extends CustomPainter {
       cat != oldDelegate.cat ||
       phase != oldDelegate.phase ||
       blink != oldDelegate.blink ||
-      outfit != oldDelegate.outfit;
+      outfit != oldDelegate.outfit ||
+      cleanliness != oldDelegate.cleanliness;
 }

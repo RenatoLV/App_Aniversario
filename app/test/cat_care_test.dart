@@ -5,6 +5,14 @@ import 'package:nuestro_rincon/cat_care.dart';
 import 'package:nuestro_rincon/store.dart';
 
 void main() {
+  test('Wardrobe has ten unique garments per category and ten foods', () {
+    expect(catWardrobe.length, 40);
+    expect(catWardrobe.map((item) => item.id).toSet().length, 40);
+    for (final slot in ClothingSlot.values) {
+      expect(catWardrobe.where((item) => item.slot == slot).length, 10);
+    }
+    expect(CatFood.values.length, 10);
+  });
   test(
     'Care is independent, gently decays offline and remains recoverable',
     () async {

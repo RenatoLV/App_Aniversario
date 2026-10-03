@@ -502,11 +502,11 @@ class _LeapScreenState extends State<LeapScreen>
                         CustomPaint(
                           size: const Size(76, 76),
                           painter: _cat == CatKind.maru
-                              ? MaruPainter(outfit: widget.store.catCare.outfit(_cat),
+                              ? MaruPainter(outfit: widget.store.catCare.outfit(_cat), cleanliness: widget.store.catCare.needs(_cat).clean.toDouble(),
                                   phase: _tail.value,
                                   blink: _blink.value,
                                 )
-                              : LadyPainter(outfit: widget.store.catCare.outfit(_cat),
+                              : LadyPainter(outfit: widget.store.catCare.outfit(_cat), cleanliness: widget.store.catCare.needs(_cat).clean.toDouble(),
                                   phase: _tail.value,
                                   blink: _blink.value,
                                 ),
@@ -675,18 +675,18 @@ class _LeapScreenState extends State<LeapScreen>
                                         child: CustomPaint(
                                           size: Size.square(catSize),
                                           painter: _game.alien
-                                              ? AlienCatPainter(outfit: widget.store.catCare.outfit(_cat),
+                                              ? AlienCatPainter(outfit: widget.store.catCare.outfit(_cat), cleanliness: widget.store.catCare.needs(_cat).clean.toDouble(),
                                                   cat: _cat,
                                                   phase: _tail.value,
                                                   blink: _blink.value,
                                                 )
                                               : _cat == CatKind.maru
-                                              ? MaruPainter(outfit: widget.store.catCare.outfit(_cat),
+                                              ? MaruPainter(outfit: widget.store.catCare.outfit(_cat), cleanliness: widget.store.catCare.needs(_cat).clean.toDouble(),
                                                   phase: _tail.value,
                                                   blink: _blink.value,
                                                   joy: _joy.value,
                                                 )
-                                              : LadyPainter(outfit: widget.store.catCare.outfit(_cat),
+                                              : LadyPainter(outfit: widget.store.catCare.outfit(_cat), cleanliness: widget.store.catCare.needs(_cat).clean.toDouble(),
                                                   phase: _tail.value,
                                                   blink: _blink.value,
                                                   joy: _joy.value,
@@ -1092,8 +1092,8 @@ class _LeapScreenState extends State<LeapScreen>
                                                             painter:
                                                                 cat ==
                                                                     CatKind.maru
-                                                                ? MaruPainter(outfit: widget.store.catCare.outfit(cat))
-                                                                : LadyPainter(outfit: widget.store.catCare.outfit(cat)),
+                                                                ? MaruPainter(outfit: widget.store.catCare.outfit(cat), cleanliness: widget.store.catCare.needs(cat).clean.toDouble())
+                                                                : LadyPainter(outfit: widget.store.catCare.outfit(cat), cleanliness: widget.store.catCare.needs(cat).clean.toDouble()),
                                                           ),
                                                           Text(
                                                             cat == CatKind.maru

@@ -27,6 +27,7 @@ class CatActor extends StatefulWidget {
   final double packProgress;
   final VoidCallback? onPet;
   final CatOutfit? outfit;
+  final double? cleanliness;
 
   const CatActor({
     super.key,
@@ -45,6 +46,7 @@ class CatActor extends StatefulWidget {
     this.packProgress = 0,
     this.onPet,
     this.outfit,
+    this.cleanliness,
   });
 
   @override
@@ -201,6 +203,9 @@ class _CatActorState extends State<CatActor> with TickerProviderStateMixin {
                       outfit:
                           widget.outfit ??
                           CatCareScope.outfitOf(context, widget.cat),
+                      cleanliness:
+                          widget.cleanliness ??
+                          CatCareScope.cleanlinessOf(context, widget.cat),
                       action: widget.action,
                       active: widget.active,
                       phase: _idle.value,
@@ -241,17 +246,20 @@ class _CatActorState extends State<CatActor> with TickerProviderStateMixin {
 abstract class CatPainter extends CustomPainter {
   final double phase, blink, joy;
   final CatOutfit outfit;
+  final double cleanliness;
   const CatPainter({
     this.phase = 0,
     this.blink = 0,
     this.joy = 0,
     this.outfit = const CatOutfit(),
+    this.cleanliness = 100,
   });
   CatKind get kind;
   @override
   void paint(Canvas canvas, Size size) => _CatPainter(
     cat: kind,
     outfit: outfit,
+    cleanliness: cleanliness,
     action: CatAction.blocks,
     active: true,
     phase: phase,
@@ -271,19 +279,32 @@ abstract class CatPainter extends CustomPainter {
   bool shouldRepaint(covariant CatPainter old) =>
       old.kind != kind ||
       old.outfit != outfit ||
+      old.cleanliness != cleanliness ||
       old.phase != phase ||
       old.blink != blink ||
       old.joy != joy;
 }
 
 class MaruPainter extends CatPainter {
-  const MaruPainter({super.phase, super.blink, super.joy, super.outfit});
+  const MaruPainter({
+    super.phase,
+    super.blink,
+    super.joy,
+    super.outfit,
+    super.cleanliness,
+  });
   @override
   CatKind get kind => CatKind.maru;
 }
 
 class LadyPainter extends CatPainter {
-  const LadyPainter({super.phase, super.blink, super.joy, super.outfit});
+  const LadyPainter({
+    super.phase,
+    super.blink,
+    super.joy,
+    super.outfit,
+    super.cleanliness,
+  });
   @override
   CatKind get kind => CatKind.lady;
 }
@@ -293,16 +314,19 @@ class PackOpeningCatPainter extends CustomPainter {
   final CatKind cat;
   final double progress;
   final CatOutfit outfit;
+  final double cleanliness;
   const PackOpeningCatPainter({
     required this.cat,
     required this.progress,
     this.outfit = const CatOutfit(),
+    this.cleanliness = 100,
   });
 
   @override
   void paint(Canvas canvas, Size size) => _CatPainter(
     cat: cat,
     outfit: outfit,
+    cleanliness: cleanliness,
     action: CatAction.pack,
     active: false,
     phase: (progress * 2) % 1,
@@ -322,12 +346,16 @@ class PackOpeningCatPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(PackOpeningCatPainter old) =>
-      old.cat != cat || old.progress != progress || old.outfit != outfit;
+      old.cat != cat ||
+      old.progress != progress ||
+      old.outfit != outfit ||
+      old.cleanliness != cleanliness;
 }
 
 class _CatPainter extends CustomPainter {
   final CatKind cat;
   final CatOutfit outfit;
+  final double cleanliness;
   final CatAction action;
   final bool active;
   final double phase, pet, focus;
@@ -344,6 +372,7 @@ class _CatPainter extends CustomPainter {
   const _CatPainter({
     required this.cat,
     this.outfit = const CatOutfit(),
+    this.cleanliness = 100,
     required this.action,
     required this.active,
     required this.phase,
@@ -512,6 +541,7 @@ class _CatPainter extends CustomPainter {
     }
 
     paintCatBodyClothing(canvas, outfit);
+    paintCatDirt(canvas, cleanliness);
     // One foreleg reaches toward the current activity.
     ellipse(canvas, 37, 86, 12, 8, maru ? dark : fur);
     if (!hideWorkingPaw) {
@@ -608,6 +638,7 @@ class _CatPainter extends CustomPainter {
       path(canvas, patch2, caramel);
       ellipse(canvas, 50, 52, 17, 11, const Color(0xffffffff));
     }
+    paintCatDirt(canvas, cleanliness, head: true);
     for (final x in [38.0, 62.0]) {
       if (sleeping) {
         final lid = Path()
@@ -799,5 +830,6 @@ class _CatPainter extends CustomPainter {
       old.showShadow != showShadow ||
       old.hideWorkingPaw != hideWorkingPaw ||
       old.cat != cat ||
-      old.outfit != outfit;
+      old.outfit != outfit ||
+      old.cleanliness != cleanliness;
 }

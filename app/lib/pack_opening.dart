@@ -194,6 +194,10 @@ class PackOpeningStage extends StatelessWidget {
                               painter: _OpeningCatChoreography(
                                 cat: cat,
                                 outfit: CatCareScope.outfitOf(context, cat),
+                                cleanliness: CatCareScope.cleanlinessOf(
+                                  context,
+                                  cat,
+                                ),
                                 progress: t,
                                 tear: tear,
                                 sealOffset: sealOffset,
@@ -218,12 +222,14 @@ class PackOpeningStage extends StatelessWidget {
 class _OpeningCatChoreography extends CustomPainter {
   final CatKind cat;
   final CatOutfit outfit;
+  final double cleanliness;
   final double progress, tear, sealAngle;
   final Offset sealOffset;
   final bool reducedMotion;
   const _OpeningCatChoreography({
     required this.cat,
     required this.outfit,
+    required this.cleanliness,
     required this.progress,
     required this.tear,
     required this.sealOffset,
@@ -255,6 +261,7 @@ class _OpeningCatChoreography extends CustomPainter {
     PackOpeningCatPainter(
       cat: cat,
       outfit: outfit,
+      cleanliness: cleanliness,
       progress: reducedMotion ? 0 : t,
     ).paint(canvas, const Size.square(106));
     canvas.restore();
@@ -325,6 +332,7 @@ class _OpeningCatChoreography extends CustomPainter {
   @override
   bool shouldRepaint(_OpeningCatChoreography old) =>
       old.outfit != outfit ||
+      old.cleanliness != cleanliness ||
       old.progress != progress ||
       old.cat != cat ||
       old.reducedMotion != reducedMotion;
