@@ -1,3 +1,4 @@
+import 'paw_background.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
@@ -443,7 +444,7 @@ class _RinconHomeState extends State<RinconHome>
             const SizedBox(width: 16),
           ],
         ),
-        body: SafeArea(
+        body: PawBackground(child: SafeArea(
           child: Column(
             children: [
               if (s.saveError != null || s.noteSyncError != null)
@@ -471,7 +472,7 @@ class _RinconHomeState extends State<RinconHome>
               ),
             ],
           ),
-        ),
+        )),
         bottomNavigationBar: NavigationBar(
           selectedIndex: page,
           onDestinationSelected: (i) => setState(() => page = i),

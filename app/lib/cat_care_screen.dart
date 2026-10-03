@@ -1,3 +1,4 @@
+import 'paw_background.dart';
 import 'dart:math' as math;
 import 'dart:async';
 import 'package:flutter/material.dart';
@@ -212,7 +213,7 @@ class _CatCareScreenState extends State<CatCareScreen>
             title: const Text('La casita'),
             actions: const [AudioSettingsButton()],
           ),
-          body: SafeArea(
+          body: PawBackground(child: SafeArea(
             child: SingleChildScrollView(
               child: Center(
                 child: ConstrainedBox(
@@ -354,7 +355,7 @@ class _CatCareScreenState extends State<CatCareScreen>
                 ),
               ),
             ),
-          ),
+          )),
         );
       },
     ),

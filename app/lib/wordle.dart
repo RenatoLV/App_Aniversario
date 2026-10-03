@@ -1,3 +1,4 @@
+import 'paw_background.dart';
 import 'dart:convert';
 import 'dart:math';
 
@@ -534,7 +535,7 @@ class _WordleScreenState extends State<WordleScreen>
         title: const Text('Wordlady'),
         actions: const [AudioSettingsButton()],
       ),
-      body: Focus(
+      body: PawBackground(child: Focus(
         focusNode: _focus,
         autofocus: true,
         onKeyEvent: (_, event) {
@@ -758,7 +759,7 @@ class _WordleScreenState extends State<WordleScreen>
             ),
           ),
         ),
-      ),
+      )),
     );
   }
 }
