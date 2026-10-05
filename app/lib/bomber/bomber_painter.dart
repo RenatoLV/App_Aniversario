@@ -256,6 +256,31 @@ class BomberBoardPainter extends CustomPainter {
         }
       }
     }
+    for (final key in sim.coinCells) {
+      final xy = key.split('_').map(int.parse).toList();
+      final center = Offset((xy[0] + .5) * cell, (xy[1] + .5) * h);
+      c.drawCircle(center, cell * .3, Paint()..color = const Color(0xffffcd45));
+      c.drawCircle(
+        center,
+        cell * .24,
+        Paint()
+          ..color = const Color(0xfffff0a1)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2,
+      );
+      final label = TextPainter(
+        text: TextSpan(
+          text: '5',
+          style: TextStyle(
+            color: const Color(0xff714400),
+            fontSize: cell * .38,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      label.paint(c, center - Offset(label.width / 2, label.height / 2));
+    }
     for (final item in sim.powers.values) {
       final v = objectMap(item),
           center = Offset(

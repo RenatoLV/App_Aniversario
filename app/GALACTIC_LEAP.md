@@ -1,5 +1,10 @@
 # Ascenso Maruzon
 
+Cada escenario nuevo desbloquea además un logro de premio único:
+300, 500, 700, 900, 1.100, 1.500 y 2.000 monedas al llegar al Cielo.
+Estos premios se suman a las recompensas por zona de cada partida.
+Los logros se consultan desde el trofeo del menú principal.
+
 Actualización: Android incluye inclinación ON/OFF entre flechas, calibrada al activar y combinable con teclado/touch. Cruzar un lateral reaparece por el otro manteniendo velocidad. El viaje incluye ocho zonas, terminando en el Cielo con puerta dorada. Las tormentas dañan también durante el impulso del cohete.
 
 Juego de saltos verticales infinitos integrado al menú principal. No requiere
@@ -17,6 +22,11 @@ código; se incluye además el recurso `assets/gato_cohete.png` para el efecto d
   alternan la pausa.
 - Recoge monedas para el monedero de los sobres. Se guardan al recogerlas,
   incluso si la partida termina después.
+- Hay monedas de 1, 5 y 10; las de mayor valor llevan su número visible.
+  Los cambios de zona entregan 30, 60, 90, 120, 150 y 180 monedas,
+  y llegar al Cielo final entrega 200. Cada recompensa se cobra una vez por partida.
+- Los peligros siguen apareciendo en todas las zonas, incluido el Cielo;
+  en las zonas de cielo se muestran como nubes electrificadas junto a la ruta.
 - Los cohetes desactivan la gravedad y dan impulso durante 2,4 segundos.
   Cohetes, paraguas y OVNIs alternan en un calendario compartido, con menos
   apariciones totales. Se distinguen con un halo sobre plataformas quietas.

@@ -54,6 +54,7 @@ class _BomberScreenState extends State<BomberScreen> {
         context,
         MaterialPageRoute(
           builder: (_) => BomberGameScreen(
+            store: widget.store,
             sim: BomberSimulation.network(Backend.uid!),
             room: id,
           ),
@@ -253,6 +254,7 @@ class _BomberScreenState extends State<BomberScreen> {
                           context,
                           MaterialPageRoute(
                             builder: (_) => BomberGameScreen(
+                              store: widget.store,
                               sim: BomberSimulation.training(
                                 mapId: mapId,
                                 cat: cat,
@@ -529,7 +531,13 @@ class _ArenaThumbnail extends CustomPainter {
 }
 
 class BomberGameScreen extends StatefulWidget {
-  const BomberGameScreen({super.key, required this.sim, this.room});
+  const BomberGameScreen({
+    super.key,
+    required this.sim,
+    required this.store,
+    this.room,
+  });
+  final GameStore store;
   final BomberSimulation sim;
   final String? room;
   @override
@@ -546,6 +554,9 @@ class _BomberGameScreenState extends State<BomberGameScreen>
   int hudAt = 0;
   bool paused = false, bombBusy = false, readySent = false;
   String message = '';
+  int _paidCoins = 0;
+  bool _paidWin = false;
+  late final String _rewardId;
   final keys = <LogicalKeyboardKey>{};
   BomberSimulation get sim => widget.sim;
   @override
@@ -553,6 +564,7 @@ class _BomberGameScreenState extends State<BomberGameScreen>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     localTime = DateTime.now().millisecondsSinceEpoch;
+    _rewardId = widget.room ?? 'training:$localTime';
     sim.now = localTime;
     sim.onEffect = (effect) => GameAudio.instance.play(switch (effect) {
       'explosion' => GameSfx.clear,
@@ -590,6 +602,31 @@ class _BomberGameScreenState extends State<BomberGameScreen>
         });
       }
       if (localTime - hudAt > 180 || sim.finished) {
+        while (_paidCoins < sim.coins) {
+          _paidCoins += 5;
+          unawaited(
+            widget.store.rewardGameCoins(
+              'bomber:$_rewardId:${sim.localId}:coin:$_paidCoins',
+              5,
+            ),
+          );
+        }
+        if (!_paidWin &&
+            sim.finished &&
+            objectMap(sim.state['result'])['winner'] == sim.localId) {
+          _paidWin = true;
+          unawaited(
+            widget.store
+                .rewardGameCoins('bomber:$_rewardId:${sim.localId}:win', 150)
+                .then((_) async {
+                  for (final count in [5, 10]) {
+                    if (widget.store.bomberWins >= count) {
+                      await widget.store.unlockAchievement('bomber:$count');
+                    }
+                  }
+                }),
+          );
+        }
         hudAt = localTime;
         if (mounted) setState(() {});
         if (sim.finished) ticker.stop();
@@ -698,7 +735,7 @@ class _BomberGameScreenState extends State<BomberGameScreen>
                   builder: (context) => AlertDialog(
                     title: const Text('Escapa antes del ¡pum!'),
                     content: const Text(
-                      'Desliza en el control izquierdo para moverte. Usa la bomba a la derecha y corre: explota en 2,8 segundos. Las paredes frenan el fuego, las cajas esconden seis poderes. En computadora: flechas o WASD y espacio.',
+                      'Desliza en el control izquierdo para moverte. Recoge monedas de 5 en los caminos libres; ganar entrega 150 monedas. Usa la bomba a la derecha y corre: explota en 2,8 segundos. Las paredes frenan el fuego, las cajas esconden seis poderes. En computadora: flechas o WASD y espacio.',
                     ),
                     actions: [
                       TextButton(
@@ -756,6 +793,10 @@ class _BomberGameScreenState extends State<BomberGameScreen>
                   runSpacing: 4,
                   children: [
                     Text(
+                      '🪙 ${sim.coins}',
+                      style: const TextStyle(color: Color(0xffffd45c)),
+                    ),
+                    Text(
                       'Bombas ${stats['maxBombs'] ?? 1}',
                       style: const TextStyle(color: Colors.white),
                     ),
@@ -788,12 +829,12 @@ class _BomberGameScreenState extends State<BomberGameScreen>
                   builder: (context, constraints) {
                     final width = math.min(
                       constraints.maxWidth - 20,
-                      constraints.maxHeight * 11 / 13,
+                      constraints.maxHeight * sim.columns / sim.rows,
                     );
                     return Center(
                       child: SizedBox(
                         width: width,
-                        height: width * 13 / 11,
+                        height: width * sim.rows / sim.columns,
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(16),
                           child: Stack(
@@ -876,7 +917,7 @@ class _BomberGameScreenState extends State<BomberGameScreen>
                                             draw
                                                 ? '¡Empate de patitas!'
                                                 : won
-                                                ? '¡Miau victoria!'
+                                                ? '¡Miau victoria! +150 monedas'
                                                 : '¡Una escapada más!',
                                             textAlign: TextAlign.center,
                                             style: TextStyle(

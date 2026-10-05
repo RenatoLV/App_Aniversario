@@ -212,6 +212,9 @@ class _LeapScreenState extends State<LeapScreen>
       HapticFeedback.lightImpact();
     }
     if (_game.zone != _lastZone) {
+      for (var i = _lastZone.index + 1; i <= _game.zone.index; i++) {
+        widget.store.unlockAchievement('leap:$i');
+      }
       _lastZone = _game.zone;
       _zoneMessageUntil = _game.clock + 2.8;
       HapticFeedback.mediumImpact();
@@ -989,7 +992,7 @@ class _LeapScreenState extends State<LeapScreen>
                                           ),
                                         ),
                                         Text(
-                                          _zoneName(_lastZone),
+                                          '${_zoneName(_lastZone)}${_lastZone.index > 0 ? ' · +${LeapGame.zoneReward(_lastZone)} monedas' : ''}',
                                           textAlign: TextAlign.center,
                                           style: const TextStyle(
                                             color: Colors.white,
@@ -1858,7 +1861,11 @@ class LeapWorldPainter extends CustomPainter {
       final y = height - (platform.y - game.camera) + vanish * 14;
       if (y < -40 || y > height + 40) continue;
       if (platform.kind == LeapPlatformKind.storm &&
-          game.zoneAt(platform.y) != LeapWorldZone.skyscrapers) {
+          !const [
+            LeapWorldZone.skyscrapers,
+            LeapWorldZone.upperSky,
+            LeapWorldZone.heaven,
+          ].contains(game.zoneAt(platform.y))) {
         _zoneHazard(
           canvas,
           Offset(platform.x, y),
@@ -2137,6 +2144,20 @@ class LeapWorldPainter extends CustomPainter {
               ..style = PaintingStyle.stroke
               ..strokeWidth = 1.5,
           );
+          if (pickup.value > 1) {
+            final label = TextPainter(
+              text: TextSpan(
+                text: '${pickup.value}',
+                style: const TextStyle(
+                  color: Color(0xff644000),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              textDirection: TextDirection.ltr,
+            )..layout();
+            label.paint(canvas, at - Offset(label.width / 2, label.height / 2));
+          }
       }
     }
     if (game.abducting || game.ufoDepartureTime > 0) {

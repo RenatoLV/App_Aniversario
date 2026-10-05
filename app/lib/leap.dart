@@ -39,8 +39,9 @@ class LeapPlatform {
 class LeapPickup {
   final double x, y;
   final LeapPickupKind kind;
+  final int value;
   bool taken = false;
-  LeapPickup(this.x, this.y, this.kind);
+  LeapPickup(this.x, this.y, this.kind, {this.value = 1});
 }
 
 /// World units equal logical pixels at a width of 360. Positive Y is upwards.
@@ -74,6 +75,9 @@ class LeapGame {
   int _sameDirectionSteps = 0;
   int _nextId = 1, coins = 0, rockets = 0, ufos = 0, landings = 0;
   int umbrellas = 0, springJumps = 0;
+  int _rewardedZone = 0;
+  static int zoneReward(LeapWorldZone zone) =>
+      zone == LeapWorldZone.heaven ? 200 : zone.index * 30;
   bool over = false;
   String endReason = '';
   LeapGame({math.Random? random}) : random = random ?? math.Random() {
@@ -195,7 +199,19 @@ class LeapGame {
       );
       platforms.add(platform);
       if (powerup == null && random.nextDouble() < .55) {
-        pickups.add(LeapPickup(_pathX, _top + 30, LeapPickupKind.coin));
+        final roll = random.nextDouble();
+        pickups.add(
+          LeapPickup(
+            _pathX,
+            _top + 30,
+            LeapPickupKind.coin,
+            value: roll < .15
+                ? 10
+                : roll < .45
+                ? 5
+                : 1,
+          ),
+        );
       }
       if (powerup != null) {
         pickups.add(LeapPickup(_pathX, _top + 42, powerup));
@@ -203,7 +219,7 @@ class LeapGame {
         _nextPowerHeight = _top + 1200 + random.nextDouble() * 350;
       }
       // Storms are optional hazards beside, never in place of the reachable route.
-      if (!skyTraffic && _top > 700 && random.nextDouble() < .18) {
+      if (_top > 700 && random.nextDouble() < .18) {
         final hazardX = _pathX < 180 ? 305.0 : 55.0;
         if ((hazardX - _pathX).abs() > 120) {
           platforms.add(
@@ -308,7 +324,7 @@ class LeapGame {
         pickup.taken = true;
         switch (pickup.kind) {
           case LeapPickupKind.coin:
-            coins++;
+            coins += pickup.value;
           case LeapPickupKind.rocket:
             rockets++;
             rocketTime = 2.4;
@@ -328,6 +344,10 @@ class LeapGame {
 
   void _updateWorld(double viewportHeight) {
     maxHeight = math.max(maxHeight, y);
+    while (_rewardedZone < zone.index) {
+      _rewardedZone++;
+      coins += zoneReward(LeapWorldZone.values[_rewardedZone]);
+    }
     // Keep the gameplay camera locked to the cat's scroll threshold. A lagged
     // camera can leave the generated platforms outside the viewport during a
     // jump, making the game look like it changed to an empty map.

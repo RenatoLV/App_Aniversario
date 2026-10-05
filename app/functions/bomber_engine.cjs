@@ -1,5 +1,5 @@
 'use strict';
-const config = {columns:11,rows:13,speed:2.6,fuse:2800,fire:650,match:180000,grace:10000,
+const config = {columns:13,rows:15,speed:2.6,fuse:2800,fire:650,match:180000,grace:10000,
   maxRange:5,maxBombs:3,maxSpeed:1.5,drop:30};
 const key=(x,y)=>`${x}_${y}`;
 function hash(seed,x,y) { return ((seed ^ Math.imul(x+17,73856093) ^ Math.imul(y+31,19349663)) >>> 0); }
@@ -7,7 +7,7 @@ function board(seed, columns=config.columns, rows=config.rows, mapId=0) {
   const walls={}, crates={};
   for(let y=0;y<rows;y++) for(let x=0;x<columns;x++) {
     const k=key(x,y);
-    if(x===0 || y===0 || x===columns-1 || y===rows-1 || (x%2===0 && y%2===0 && !(mapId===1 && y===6) && !(mapId===3 && (x===4||x===6)))) walls[k]=true;
+    if(x===0 || y===0 || x===columns-1 || y===rows-1 || (x%2===0 && y%2===0 && !(mapId===1 && (y===6||y===rows-7)) && !(mapId===3 && (x===4||x===columns-5)))) walls[k]=true;
     else {
       const spawn=(x<=2 && y>=rows-3)||(x>=columns-3 && y<=2);
       const mx=Math.min(x,columns-1-x),my=Math.min(y,rows-1-y);
@@ -17,7 +17,7 @@ function board(seed, columns=config.columns, rows=config.rows, mapId=0) {
   return {columns,rows,seed,mapId,walls,crates};
 }
 function player() { return {alive:true,range:2,maxBombs:1,speed:1,paw:false,shieldUntil:0,immuneUntil:0,boxUntil:0,stunUntil:0}; }
-function create(seed,uid,mapId=0) { return {status:'waiting',createdAt:Date.now(),board:board(seed,11,13,mapId),players:{[uid]:player()},bombs:{},powers:{},events:{}}; }
+function create(seed,uid,mapId=0) { return {status:'waiting',createdAt:Date.now(),board:board(seed,config.columns,config.rows,mapId),players:{[uid]:player()},bombs:{},powers:{},events:{}}; }
 function blast(s,x,y,range) {
   const cells=[key(x,y)];
   for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]) for(let n=1;n<=range;n++) {
@@ -74,10 +74,18 @@ function advance(s,motions={},now=Date.now()) {
   for(const [id,e] of Object.entries(s.events)) if(e.until<now-30000) delete s.events[id];
   return s;
 }
-function place(s,uid,id,motions,now=Date.now()) {
+function place(s,uid,id,motions,now=Date.now(),requestedCell=null) {
   if(s.bombs?.[id] || s.events?.[id]) return s;
   const p=s.players[uid]; if(!active(s,now) || !p?.alive || p.stunUntil>now) throw Error('Aún no puedes colocar una bomba.');
-  const m=motionOf(motions[uid]),x=Math.floor(m.x),y=Math.floor(m.y),k=key(x,y);
+  const m=motionOf(motions[uid]);
+  let x=Math.floor(m.x),y=Math.floor(m.y);
+  if(requestedCell!==null) {
+    if(typeof requestedCell!=='string'||!/^\d{1,2}_\d{1,2}$/.test(requestedCell)) throw Error('Casilla de bomba inválida.');
+    [x,y]=requestedCell.split('_').map(Number);
+    if(Math.abs(m.x-x-.5)>1.25 || Math.abs(m.y-y-.5)>1.25) throw Error('La posición cambió. Coloca la bomba de nuevo.');
+  }
+  if(x<1||y<1||x>=s.board.columns-1||y>=s.board.rows-1) throw Error('Casilla de bomba inválida.');
+  const k=key(x,y);
   s.bombs||={};
   if(s.board.walls[k] || s.board.crates[k] || Object.values(s.bombs).some(b=>key(b.x,b.y)===k)) throw Error('Esta casilla ya está ocupada.');
   if(Object.values(s.bombs).filter(b=>b.owner===uid).length>=p.maxBombs) throw Error('Espera a que explote tu bomba.');

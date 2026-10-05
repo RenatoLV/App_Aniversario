@@ -15,14 +15,14 @@ async function member(uid,cat) {
   let care={};try {care=JSON.parse(JSON.parse(saved.data()?.payload||'{}')['rincon.v1']||'{}').catCare||{};} catch (_) {}
   return {name:(profile.data()?.nickname||'Gatito').slice(0,40),cat,outfit:care[cat]?.outfit||{}};
 }
-function motion(first) {const x=first?1.5:9.5,y=first?11.5:1.5;return {x,y,gx:Math.floor(x),gy:Math.floor(y),cell:E.key(Math.floor(x),Math.floor(y)),vx:0,vy:0,at:Date.now()};}
+function motion(first,board) {const x=first?1.5:board.columns-1.5,y=first?board.rows-1.5:1.5;return {x,y,gx:Math.floor(x),gy:Math.floor(y),cell:E.key(Math.floor(x),Math.floor(y)),vx:0,vy:0,at:Date.now()};}
 async function join(id,uid,kitten) {
   const joined=await room(id).transaction(data=>{
     if(!data) return data; // A cold RTDB transaction retries with the server value.
     if(data.state.status!=='waiting'||Date.now()-data.state.createdAt>60000||data.members[uid]||Object.keys(data.members).length!==1) return;
     if(data.invitedUid&&data.invitedUid!==uid) return;
     data.members[uid]=kitten;data.state.players[uid]=E.player();data.state.status='ready';
-    data.motion[uid]=motion(false);data.presence[uid]={online:true,at:Date.now()};return data;
+    data.motion[uid]=motion(false,data.state.board);data.presence[uid]={online:true,at:Date.now()};return data;
   });
   if(!joined.committed||!joined.snapshot.child('members').child(uid).exists()) throw Error('La invitación expiró o la sala ya está ocupada.');
   await database().ref(`bomberUsers/${uid}/room`).set(id);
@@ -62,7 +62,7 @@ exports.bomberMatch=onRequest({region:'us-central1',cors:true,maxInstances:4,mem
       const mapId=input.mapId??0;if(!Number.isInteger(mapId)||mapId<0||mapId>3) throw Error('Arena inválida.');
       if(input.action==='invite'&&(typeof input.target!=='string'||input.target===uid||!/^[\w-]{1,128}$/.test(input.target)||(await getFirestore().doc(`user_directory/${input.target}`).get()).exists===false)) throw Error('Jugador no disponible.');
       const myRoom=room(rtdb.ref('bomberRooms').push().key),seed=crypto.randomInt(0,2147483647);
-      await myRoom.set({members:{[uid]:kitten},state:E.create(seed,uid,mapId),motion:{[uid]:motion(true)},presence:{[uid]:{online:true,at:Date.now()}},...(input.action==='invite'?{invitedUid:input.target}:{})});
+      await myRoom.set({members:{[uid]:kitten},state:E.create(seed,uid,mapId),motion:{[uid]:motion(true,E.board(seed,E.config.columns,E.config.rows,mapId))},presence:{[uid]:{online:true,at:Date.now()}},...(input.action==='invite'?{invitedUid:input.target}:{})});
       let chosen=myRoom.key;
       if(input.action==='invite') await rtdb.ref(`bomberInvites/${input.target}/${chosen}`).set({room:chosen,name:kitten.name,fromUid:uid,mapId,until:Date.now()+60000});
       else {
@@ -84,7 +84,7 @@ exports.bomberMatch=onRequest({region:'us-central1',cors:true,maxInstances:4,mem
         if(Object.keys(s.players).length===2&&Object.keys(s.players).every(u=>s.ready[u])) {s.status='playing';s.startsAt=Date.now()+3000;}return s;
       });
     } else if(input.action==='bomb') {
-      if(typeof input.id!=='string'||!/^[a-f0-9]{32}$/.test(input.id)) throw Error('Bomba inválida.');await settle(input.room,(s,m,n)=>E.place(s,uid,input.id,m,n));
+      if(typeof input.id!=='string'||!/^[a-f0-9]{32}$/.test(input.id)) throw Error('Bomba inválida.');await settle(input.room,(s,m,n)=>E.place(s,uid,input.id,m,n,input.cell??null));
     } else if(input.action==='pickup') {
       if(typeof input.cell!=='string'||!/^\d{1,2}_\d{1,2}$/.test(input.cell)) throw Error('Poder inválido.');await settle(input.room,(s,m,n)=>E.pickup(s,uid,input.cell,m,n));
     } else if(input.action==='sync') {

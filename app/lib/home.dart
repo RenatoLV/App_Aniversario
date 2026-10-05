@@ -434,8 +434,53 @@ class _RinconHomeState extends State<RinconHome>
       onStep: (step) => setState(() => page = (page + step).clamp(0, 3)),
       child: Scaffold(
         appBar: AppBar(
-          title: BrandTitle(prefs: s.prefs),
+          title: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: BrandTitle(prefs: s.prefs),
+          ),
           actions: [
+            IconButton(
+              tooltip: 'Logros y recompensas',
+              icon: const Icon(Icons.emoji_events_rounded),
+              onPressed: () => showDialog<void>(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text('Logros · premio único'),
+                  content: SizedBox(
+                    width: 360,
+                    child: SingleChildScrollView(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text(
+                            'Los premios se suman automáticamente al monedero una sola vez.',
+                          ),
+                          for (final entry
+                              in GameStore.achievementRewards.entries)
+                            ListTile(
+                              leading: Icon(
+                                s.achievementUnlocked(entry.key)
+                                    ? Icons.check_circle
+                                    : Icons.emoji_events_outlined,
+                              ),
+                              title: Text(entry.value.$1),
+                              subtitle: Text(
+                                '+${entry.value.$2} monedas · ${s.achievementUnlocked(entry.key) ? 'Conseguido' : 'Pendiente'}',
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('Listo'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
             const AudioSettingsButton(),
             const AppUpdateButton(),
             Chip(avatar: const CoinIcon(size: 20), label: Text('${s.coins}')),

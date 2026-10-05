@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 class BomberConfig {
-  static const columns = 11, rows = 13;
+  static const columns = 13, rows = 15;
   static const speed = 2.6, radius = .22;
   static const fuse = 2800,
       fire = 650,

@@ -39,6 +39,11 @@ async function main(){
   assert.equal(Object.keys((await rt(a,root)).state.bombs).length,1);
   await sleep(3200);
   room=await rt(a,root);
+  // Emulator cold starts can deliver the database event after the fuse expires.
+  // Poll the result without calling sync, preserving the authoritative-trigger check.
+  for(let n=0;n<60&&room.state.bombs?.['f'.repeat(32)];n++) {
+    await sleep(100);room=await rt(a,root);
+  }
   assert.equal(room.state.bombs?.['f'.repeat(32)],undefined,'database trigger detonates without a client sync');
   assert(room.state.events?.['f'.repeat(32)],'server creates the flame');
   assert.equal(room.state.result.winner,b.id,'standing on the bomb loses on the server');
@@ -54,7 +59,7 @@ async function main(){
   await rt('admin',contactRoot+'/state/status','PUT','playing');
   await rt('admin',contactRoot+'/state/startsAt','PUT',Date.now()-1000);
   const flameTime=Date.now();
-  await rt('admin',contactRoot+'/state/events/contact','PUT',{cells:['1_11'],at:flameTime,until:flameTime+650});
+  await rt('admin',contactRoot+'/state/events/contact','PUT',{cells:[room.motion[a.id].cell],at:flameTime,until:flameTime+650});
   await rt(a,contactRoot+'/motion/'+a.id,'PUT',{...room.motion[a.id],x:1.6,at:{'.sv':'timestamp'}});
   for(let n=0;n<20;n++){room=await rt(a,contactRoot);if(room.state.result)break;await sleep(100);}
   assert.equal(room.state.result?.winner,b.id,'motion trigger catches contact with an existing flame');

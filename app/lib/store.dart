@@ -138,6 +138,31 @@ class GameStore extends ChangeNotifier {
   BlockGame game = BlockGame();
   int coins = 30, best = 0;
   final Set<String> _wordleRewards = {};
+  final Set<String> _gameRewards = {};
+  static const achievementRewards = <String, (String, int)>{
+    'sweet:5': ('Candy: llegar al nivel 5', 500),
+    'sweet:10': ('Candy: llegar al nivel 10', 1500),
+    'bomber:5': ('Bomber: ganar 5 partidas', 500),
+    'bomber:10': ('Bomber: ganar 10 partidas', 1500),
+    'leap:1': ('Ascenso: Subida luminosa', 300),
+    'leap:2': ('Ascenso: Las compañias', 500),
+    'leap:3': ('Ascenso: Ciudad gatuna', 700),
+    'leap:4': ('Ascenso: Cima de Santiago', 900),
+    'leap:5': ('Ascenso: Cielo estrellado', 1100),
+    'leap:6': ('Ascenso: Universo', 1500),
+    'leap:7': ('Ascenso: Cielo', 2000),
+  };
+  bool achievementUnlocked(String id) =>
+      _gameRewards.contains('achievement:$id');
+  int get bomberWins => _gameRewards
+      .where((id) => id.startsWith('bomber:') && id.endsWith(':win'))
+      .length;
+  Future<void> unlockAchievement(String id) async {
+    final reward = achievementRewards[id];
+    if (reward == null) return;
+    await rewardGameCoins('achievement:$id', reward.$2);
+  }
+
   int get totalCards => cards.values.fold(0, (sum, copies) => sum + copies);
   Map<int, int> cards = {};
   Map<int, CardRarity> rarities = {};
@@ -187,6 +212,7 @@ class GameStore extends ChangeNotifier {
       _dirtyNotes.addAll(List<String>.from(j['dirtyNotes'] ?? []));
       coins = j['coins'] as int;
       _wordleRewards.addAll(List<String>.from(j['wordleRewards'] ?? []));
+      _gameRewards.addAll(List<String>.from(j['gameRewards'] ?? []));
       best = j['best'] as int;
       packsSinceLegendary = (j['packsSinceLegendary'] as int?) ?? 0;
       lastDiscountPackDay = j['lastDiscountPackDay'] as String?;
@@ -482,6 +508,9 @@ class GameStore extends ChangeNotifier {
     _wordleRewards
       ..clear()
       ..addAll(restored._wordleRewards);
+    _gameRewards
+      ..clear()
+      ..addAll(restored._gameRewards);
     notifyListeners();
   }
 
@@ -522,6 +551,7 @@ class GameStore extends ChangeNotifier {
       'coins': coins,
       'catCare': catCare.toJson(),
       'wordleRewards': _wordleRewards.toList(),
+      'gameRewards': _gameRewards.toList(),
       'best': best,
       'packsSinceLegendary': packsSinceLegendary,
       'lastDiscountPackDay': lastDiscountPackDay,
@@ -566,6 +596,13 @@ class GameStore extends ChangeNotifier {
 
   Future<void> collectLeapCoins(int amount) async {
     if (amount <= 0) return;
+    coins += amount;
+    await save();
+  }
+
+  /// Persisted claim IDs prevent a restored result from paying twice.
+  Future<void> rewardGameCoins(String claimId, int amount) async {
+    if (amount <= 0 || !_gameRewards.add(claimId)) return;
     coins += amount;
     await save();
   }

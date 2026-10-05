@@ -4,6 +4,47 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:nuestro_rincon/leap.dart';
 
 void main() {
+  test('Coins credit their denomination only once', () {
+    for (final value in [1, 5, 10]) {
+      final game = LeapGame(random: math.Random(2));
+      game.pickups
+        ..clear()
+        ..add(LeapPickup(180, 106, LeapPickupKind.coin, value: value));
+      game.step(.01, 0, 640);
+      expect(game.coins, value);
+      game.step(.01, 0, 640);
+      expect(game.coins, value);
+    }
+  });
+  test('Every zone has hazards and all coin denominations', () {
+    final game = LeapGame(random: math.Random(42))
+      ..generate(LeapGame.heavenHeight + 10000);
+    expect(
+      game.pickups
+          .where((p) => p.kind == LeapPickupKind.coin)
+          .map((p) => p.value)
+          .toSet(),
+      {1, 5, 10},
+    );
+    for (final zone in LeapWorldZone.values) {
+      expect(
+        game.platforms.where(
+          (p) => p.kind == LeapPlatformKind.storm && game.zoneAt(p.y) == zone,
+        ),
+        isNotEmpty,
+      );
+    }
+  });
+  test('Zone rewards include skipped zones and never repeat', () {
+    final game = LeapGame(random: math.Random(2));
+    game.platforms.clear();
+    game.pickups.clear();
+    game.y = LeapGame.heavenHeight;
+    game.step(.001, 0, 640);
+    expect(game.coins, 30 + 60 + 90 + 120 + 150 + 180 + 200);
+    game.step(.001, 0, 640);
+    expect(game.coins, 830);
+  });
   test('Varied platforms leave enough flight time for taller, wider jumps', () {
     for (var seed = 0; seed < 30; seed++) {
       final game = LeapGame(random: math.Random(seed))..generate(30000);
@@ -266,7 +307,9 @@ void main() {
     game.generate(LeapGame.spaceHeight + 800);
 
     final sky = game.platforms.where(
-      (platform) => platform.y >= LeapGame.skyscraperHeight,
+      (platform) =>
+          platform.y >= LeapGame.skyscraperHeight &&
+          platform.kind != LeapPlatformKind.storm,
     );
     expect(sky, isNotEmpty);
     expect(

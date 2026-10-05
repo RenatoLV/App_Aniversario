@@ -1,7 +1,7 @@
 'use strict';
 const {test}=require('node:test'),assert=require('node:assert/strict');
 const E=require('../bomber_engine.cjs');
-function match(){const s=E.create(42,'a');s.players.b=E.player();s.status='playing';s.startsAt=0;return s;}
+function match(){const s=E.create(42,'a');s.board=E.board(42,11,13);s.players.b=E.player();s.status='playing';s.startsAt=0;return s;}
 const safe={a:{x:1.5,y:11.5},b:{x:9.5,y:1.5}};
 test('four maps are symmetric and both spawns can escape',()=>{
   const maps=[];for(let id=0;id<4;id++){const b=E.board(42,11,13,id);maps.push(JSON.stringify([b.walls,b.crates]));
@@ -46,4 +46,22 @@ test('shield absorbs a hit, grants recovery and clears only once',()=>{
 test('simultaneous death and time expiry produce a draw',()=>{
   const s=match();s.events.one={cells:['1_11','9_1'],at:10,until:1000};E.advance(s,safe,100);assert.equal(s.result.winner,'draw');
   const timeout=match();E.advance(timeout,safe,E.config.match);assert.equal(timeout.result.winner,'draw');
+});
+
+test('larger arenas preserve symmetry and open starting corridors',()=>{
+ for(let map=0;map<4;map++) {
+  const b=E.create(42,'a',map).board;
+  assert.equal(b.columns,13);assert.equal(b.rows,15);
+  for(const k of Object.keys(b.crates)){const [x,y]=k.split('_').map(Number);assert.equal(b.crates[E.key(12-x,14-y)],true);}
+  for(const k of Object.keys(b.walls)){const [x,y]=k.split('_').map(Number);assert.equal(b.walls[E.key(12-x,14-y)],true);}
+  for(const k of ['1_13','1_12','2_13','11_1','10_1','11_2'])assert.equal(b.crates[k]||b.walls[k],undefined);
+ }
+});
+test('delayed bomb uses tap cell rather than newer motion and rejects distant cells',()=>{
+ const s=match();s.board.crates={};
+ E.place(s,'a','tap',{a:{x:2.1,y:11.5}},100,'1_11');
+ assert.equal(s.bombs.tap.x,1);assert.equal(s.bombs.tap.y,11);
+ const other=match();other.board.crates={};
+ assert.throws(()=>E.place(other,'a','far',safe,100,'7_11'),/posición/);
+ assert.throws(()=>E.place(other,'a','outside',safe,100,'0_11'),/inválida/);
 });

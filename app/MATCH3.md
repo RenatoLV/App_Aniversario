@@ -1,5 +1,10 @@
 # Dulces & bigotes
 
+Cada oleada que explota dulces entrega 5 monedas, incluidas las cascadas y
+los especiales. Completar un nivel entrega 100. Llegar a los niveles 5 y 10
+desbloquea premios únicos de 500 y 1.500 monedas. Las recompensas cobradas
+se guardan con el progreso para evitar duplicarlas al reabrir la partida.
+
 Juego Flutter local de combinar tres piezas, con arte vectorial original y los
 actores de Maru y Lady usados en el resto de la aplicación.
 

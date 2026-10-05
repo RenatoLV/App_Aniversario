@@ -180,14 +180,17 @@ class BomberNetwork {
 
   Future<void> bomb() async {
     if (!connected || !sim.canBomb(sim.localId)) return;
+    final position = sim.local;
+    final cell = cellKey(position.dx.floor(), position.dy.floor());
     if (writing) await pendingMotion;
+    if (closed || !connected || !sim.canBomb(sim.localId)) return;
     await sendMotion();
     final random = Random.secure(),
         nonce = List.generate(
           16,
           (_) => random.nextInt(256).toRadixString(16).padLeft(2, '0'),
         ).join();
-    await request('bomb', room: id, extra: {'id': nonce});
+    await request('bomb', room: id, extra: {'id': nonce, 'cell': cell});
   }
 
   Future<void> close() async {

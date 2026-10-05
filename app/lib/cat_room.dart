@@ -949,11 +949,37 @@ class _WindowLandscape extends CustomPainter {
         s.width * (.08 + ((n * 37) % 87) / 100),
         s.height * (.07 + ((n * 19) % 43) / 100),
       );
-      final alpha =
-          light.night * (.65 + .25 * math.sin((t + n / 11) * math.pi * 2));
+      // Keep a few distant stars steady; the rest shimmer at different rates.
+      // Whole cycles keep the six-second animation loop seamless.
+      final phase = n * 2.399;
+      final shimmer =
+          .5 +
+          .5 *
+              (.65 * math.sin(t * math.pi * 2 * (1 + n % 3) + phase) +
+                  .35 * math.sin(t * math.pi * 2 * (3 + n % 2) + phase * 1.7));
+      final brightness = n % 3 == 0 ? .72 : .3 + .7 * shimmer;
+      final alpha = light.night * brightness;
+      final radius = (n.isEven ? 1.1 : .7) * (.85 + brightness * .3);
+      c.drawCircle(
+        star,
+        radius * 2.4,
+        Paint()
+          ..color = const Color(0xffc7dcff).withValues(alpha: alpha * .16)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.2),
+      );
       final p = Paint()
         ..color = const Color(0xfffff0ce).withValues(alpha: alpha);
-      c.drawCircle(star, n.isEven ? 1.1 : .7, p);
+      c.drawCircle(star, radius, p);
+      if (n % 3 != 0 && n.isEven) {
+        final ray = radius * 2;
+        final sparkle = Paint()
+          ..color = const Color(0xffeef5ff).withValues(
+            alpha: light.night * ((brightness - .65) / .35).clamp(0.0, 1.0),
+          )
+          ..strokeWidth = .6;
+        c.drawLine(star - Offset(ray, 0), star + Offset(ray, 0), sparkle);
+        c.drawLine(star - Offset(0, ray), star + Offset(0, ray), sparkle);
+      }
     }
     final orb = Offset(s.width * .74, s.height * .23);
     c.drawCircle(

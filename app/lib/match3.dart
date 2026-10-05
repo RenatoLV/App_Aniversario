@@ -97,6 +97,7 @@ class SweetGame {
   late List<SweetCell> cells;
   int level, score = 0, moves = 26, randomState;
   int hammers = 3, switches = 2, extraMoves = 1;
+  int explosions = 0;
   bool won = false, lost = false;
   String id;
   List<SweetFrame> frames = [];
@@ -111,9 +112,8 @@ class SweetGame {
     int? hammers,
     int? switches,
     int? extraMoves,
-  })
-    : randomState = seed,
-      id = '$seed-$level' {
+  }) : randomState = seed,
+       id = '$seed-$level' {
     this.hammers = hammers ?? 3;
     this.switches = switches ?? 2;
     this.extraMoves = extraMoves ?? 1;
@@ -461,6 +461,9 @@ class SweetGame {
         );
       }
     }
+    if (hit.any((i) => cells[i].playable && cells[i].color >= 0)) {
+      explosions++;
+    }
     _frame(SweetPhase.clear, caption, hit: hit, chain: chain);
     for (final i in hit) {
       final c = cells[i];
@@ -731,6 +734,7 @@ class SweetGame {
     'cells': cells.map((c) => c.toJson()).toList(),
     'level': level,
     'score': score,
+    'explosions': explosions,
     'moves': moves,
     'rng': randomState,
     'id': id,
@@ -752,6 +756,7 @@ class SweetGame {
       throw const FormatException('Invalid sweet board');
     }
     game.score = j['score'] as int;
+    game.explosions = (j['explosions'] as num?)?.toInt() ?? 0;
     game.moves = j['moves'] as int;
     game.randomState = j['rng'] as int;
     game.id = j['id'] as String;

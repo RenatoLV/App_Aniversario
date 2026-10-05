@@ -75,6 +75,17 @@ class _SweetScreenState extends State<SweetScreen>
 
   Future<void> _save() async {
     try {
+      for (var i = 1; i <= _game.explosions; i++) {
+        await widget.store.rewardGameCoins('sweet:${_game.id}:blast:$i', 5);
+      }
+      if (_game.won) {
+        await widget.store.rewardGameCoins('sweet:${_game.id}:win', 100);
+      }
+      for (final level in [5, 10]) {
+        if (_game.level >= level) {
+          await widget.store.unlockAchievement('sweet:$level');
+        }
+      }
       if (_game.score > (widget.store.prefs.getInt('sweet.best') ?? 0)) {
         await widget.store.prefs.setInt('sweet.best', _game.score);
       }
@@ -162,7 +173,7 @@ class _SweetScreenState extends State<SweetScreen>
             ? SweetPhase.defeat
             : SweetPhase.input,
         _game.won
-            ? '¡Nivel superado! 🐾'
+            ? '¡Nivel superado! +100 monedas 🐾'
             : _game.lost
             ? '¡Maru y Lady creen en ti! Inténtalo otra vez.'
             : caption ?? 'Desliza una ficha hacia su vecina para combinar 3.',
@@ -191,7 +202,7 @@ class _SweetScreenState extends State<SweetScreen>
       detail: 'Candy Churu Cat · Nivel ${_game.level}',
       stat: '${_game.score} puntos',
       caption: _game.won
-          ? '¡Gelatinas despejadas! Recuperas un poder de cada tipo para el siguiente nivel.'
+          ? '¡Gelatinas despejadas! +100 monedas. Recuperas un poder de cada tipo para el siguiente nivel.'
           : 'Quedan ${_game.jellyLeft} gelatinas. Tus poderes restantes se conservan al reintentar.',
       again: _game.won ? 'Siguiente nivel' : 'Reintentar',
     );
@@ -304,7 +315,7 @@ class _SweetScreenState extends State<SweetScreen>
           '4 en línea: premio rayado que limpia una fila o columna.\n5 en L/T: regalo envuelto, dos explosiones.\n5 en línea: ovillo mágico que elimina un color.\n\n'
           'Combina dos especiales: rayados forman una cruz; rayado y envuelto limpian 3 filas y columnas; dos envueltos explotan dos veces en 5×5. Ovillo y rayado convierten un color en rayados; ovillo y envuelto activan regalos y otro color; dos ovillos limpian todo.\n\n'
           'Nivel 2: glaseado y lazos. Nivel 3: doble gelatina y chocolate que crece si no lo eliminas. Nivel 4: huecos. Combina junto al glaseado o chocolate; combina un premio atrapado para liberar su lazo.\n\n'
-          'Cada nivel trae 3 martillos, 2 cambios libres y un +5. El martillo y el cambio libre no gastan turno. Limpia toda la gelatina para ganar y convertir los movimientos sobrantes en una fiesta de rayados.',
+          'Cada explosión de dulces da 5 monedas y completar un nivel da 100. Llegar a los niveles 5 y 10 desbloquea logros de premio único.\n\nCada nivel trae 3 martillos, 2 cambios libres y un +5. El martillo y el cambio libre no gastan turno. Limpia toda la gelatina para ganar y convertir los movimientos sobrantes en una fiesta de rayados.',
         ),
       ),
       actions: [

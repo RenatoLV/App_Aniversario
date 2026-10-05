@@ -23,8 +23,8 @@ Map<String, dynamic> kittenStats() => {
 };
 Map<String, dynamic> makeBomberBoard(
   int seed, {
-  int columns = 11,
-  int rows = 13,
+  int columns = BomberConfig.columns,
+  int rows = BomberConfig.rows,
   int mapId = 0,
 }) {
   final walls = <String, dynamic>{}, crates = <String, dynamic>{};
@@ -37,8 +37,8 @@ Map<String, dynamic> makeBomberBoard(
           y == rows - 1 ||
           (x.isEven &&
               y.isEven &&
-              !(mapId == 1 && y == 6) &&
-              !(mapId == 3 && (x == 4 || x == 6)))) {
+              !(mapId == 1 && (y == 6 || y == rows - 7)) &&
+              !(mapId == 3 && (x == 4 || x == columns - 5)))) {
         walls[key] = true;
       } else if (!((x <= 2 && y >= rows - 3) || (x >= columns - 3 && y <= 2)) &&
           bomberHash(
@@ -84,8 +84,8 @@ class BomberSimulation extends ChangeNotifier {
       'events': <String, dynamic>{},
     };
     positions = {
-      'maru': const Offset(1.5, 11.5),
-      'lady': const Offset(9.5, 1.5),
+      'maru': Offset(1.5, rows - 1.5),
+      'lady': Offset(columns - 1.5, 1.5),
     };
     members = {
       'maru': {'cat': cat.name, 'name': cat.label, 'outfit': outfit},
@@ -110,9 +110,28 @@ class BomberSimulation extends ChangeNotifier {
   String? lastPower;
   int powerAt = 0;
   final Set<String> _heardBombs = {}, _heardExplosions = {};
+  final Set<String> collectedCoins = {};
+  int coins = 0;
+
+  /// Personal pickups in the open spawn corridors, also for online arenas.
+  Set<String> get coinCells {
+    final walls = objectMap(board['walls']),
+        crates = objectMap(board['crates']);
+    return {
+      for (var y = 1; y < rows - 1; y++)
+        for (var x = 1; x < columns - 1; x++)
+          if (((x <= 2 && y >= rows - 3) || (x >= columns - 3 && y <= 2)) &&
+              !walls.containsKey(cellKey(x, y)) &&
+              !crates.containsKey(cellKey(x, y)) &&
+              !collectedCoins.contains(cellKey(x, y)))
+            cellKey(x, y),
+    };
+  }
+
   void Function(String)? onEffect;
-  int get columns => (board['columns'] as num?)?.toInt() ?? 11;
-  int get rows => (board['rows'] as num?)?.toInt() ?? 13;
+  int get columns =>
+      (board['columns'] as num?)?.toInt() ?? BomberConfig.columns;
+  int get rows => (board['rows'] as num?)?.toInt() ?? BomberConfig.rows;
   Map<String, dynamic> get board => objectMap(state['board']);
   Map<String, dynamic> get players => objectMap(state['players']);
   Map<String, dynamic> get bombs => objectMap(state['bombs']);
@@ -142,7 +161,7 @@ class BomberSimulation extends ChangeNotifier {
       valueNum(stats(uid)['stunUntil']) <= now &&
       bombs.values.where((v) => objectMap(v)['owner'] == uid).length <
           valueNum(stats(uid)['maxBombs'], 1);
-  Offset get local => positions[localId] ?? const Offset(1.5, 11.5);
+  Offset get local => positions[localId] ?? Offset(1.5, rows - 1.5);
   void receive(Map<String, dynamic> data, {bool resync = false}) {
     state = objectMap(data['state']);
     members = objectMap(data['members']);
@@ -161,7 +180,12 @@ class BomberSimulation extends ChangeNotifier {
         final b = objectMap(bombs[id]);
         for (final uid in positions.keys) {
           final p = positions[uid]!;
-          if (p.dx.floor() == b['x'] && p.dy.floor() == b['y']) {
+          if (Rect.fromLTWH(
+            valueNum(b['x']),
+            valueNum(b['y']),
+            1,
+            1,
+          ).inflate(BomberConfig.radius).contains(p)) {
             (_walkOffBombs[uid] ??= {}).add(id);
           }
         }
@@ -331,6 +355,13 @@ class BomberSimulation extends ChangeNotifier {
         }
       }
       move(localId, input, dt);
+      if (alive(localId)) {
+        final key = cellKey(local.dx.floor(), local.dy.floor());
+        if (coinCells.contains(key) && collectedCoins.add(key)) {
+          coins += 5;
+          onEffect?.call('power');
+        }
+      }
       if (!online) {
         _bot(dt);
         resolve(time);
