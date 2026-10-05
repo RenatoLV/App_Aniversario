@@ -27,6 +27,8 @@ class _LeapScreenState extends State<LeapScreen>
   String _trail = 'rainbow';
   final Set<String> _ownedTrails = {'rainbow'};
   late final Ticker _physics;
+  final _worldFrames = ValueNotifier<int>(0);
+  double _lastHudClock = 0;
   late final AnimationController _breath,
       _tail,
       _blink,
@@ -228,7 +230,16 @@ class _LeapScreenState extends State<LeapScreen>
       _left = false;
       _right = false;
     }
-    setState(() {});
+    _worldFrames.value++;
+    // Physics and painting keep their full frame rate; HUD changes are smaller.
+    if (_game.over ||
+        _game.clock - _lastHudClock >= .1 ||
+        _game.coins != coins ||
+        _game.rockets != rockets ||
+        _game.ufos != ufos) {
+      _lastHudClock = _game.clock;
+      setState(() {});
+    }
   }
 
   Future<void> _record() async {
@@ -256,6 +267,7 @@ class _LeapScreenState extends State<LeapScreen>
   void _start() {
     setState(() {
       _game = LeapGame();
+      _lastHudClock = 0;
       _started = true;
       _paused = false;
       _lastZone = LeapWorldZone.underground;
@@ -491,6 +503,7 @@ class _LeapScreenState extends State<LeapScreen>
     WidgetsBinding.instance.removeObserver(this);
     _blinkTimer?.cancel();
     _physics.dispose();
+    _worldFrames.dispose();
     for (final controller in [
       _breath,
       _tail,
@@ -655,7 +668,6 @@ class _LeapScreenState extends State<LeapScreen>
                 builder: (context, c) {
                   final scale = c.maxWidth / LeapGame.width;
                   _height = c.maxHeight / scale;
-                  final foot = (_height - (_game.y - _game.camera)) * scale;
                   final catSize = 60 * scale;
                   return RepaintBoundary(
                     key: _captureKey,
@@ -699,13 +711,13 @@ class _LeapScreenState extends State<LeapScreen>
                                   _game,
                                   _cat,
                                   trail: _trail,
+                                  repaint: _worldFrames,
                                 ),
                               ),
                             ),
                           ),
-                          Positioned(
-                            left: _game.x * scale - catSize / 2,
-                            top: foot - catSize * .94,
+                          AnimatedBuilder(
+                            animation: _worldFrames,
                             child: IgnorePointer(
                               child: AnimatedBuilder(
                                 animation: Listenable.merge([
@@ -714,6 +726,7 @@ class _LeapScreenState extends State<LeapScreen>
                                   _blink,
                                   _bounce,
                                   _joy,
+                                  _worldFrames,
                                 ]),
                                 builder: (context, _) {
                                   final squash = _bounce.isAnimating
@@ -809,6 +822,13 @@ class _LeapScreenState extends State<LeapScreen>
                                   );
                                 },
                               ),
+                            ),
+                            builder: (context, child) => Positioned(
+                              left: _game.x * scale - catSize / 2,
+                              top:
+                                  (_height - (_game.y - _game.camera)) * scale -
+                                  catSize * .94,
+                              child: child!,
                             ),
                           ),
                           Positioned(
@@ -1395,7 +1415,12 @@ class LeapWorldPainter extends CustomPainter {
   final LeapGame game;
   final CatKind cat;
   final String trail;
-  LeapWorldPainter(this.game, this.cat, {this.trail = 'rainbow'});
+  LeapWorldPainter(
+    this.game,
+    this.cat, {
+    this.trail = 'rainbow',
+    super.repaint,
+  });
 
   void _zoneHazard(
     Canvas canvas,

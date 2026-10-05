@@ -57,7 +57,7 @@ class CameraCardActivity : Activity(), TextureView.SurfaceTextureListener {
                 intent.getFloatArrayExtra("animationBounds"))
         } catch (_: Exception) {
             front.recycle(); if (back !== front) back.recycle()
-            fail("No pudimos reproducir el GIF de esta carta."); return
+            fail("No pudimos reproducir la animación de esta carta."); return
         }
         stage.addView(card, FrameLayout.LayoutParams(-1, -1))
         instructions = TextView(this).apply {

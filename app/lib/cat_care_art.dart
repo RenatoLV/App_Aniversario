@@ -6,7 +6,8 @@ import 'cat_care.dart';
 enum BathTool { soap, shower }
 
 class FridgePainter extends CustomPainter {
-  const FridgePainter();
+  final double open;
+  const FridgePainter({this.open = 0});
   @override
   void paint(Canvas c, Size size) {
     c.save();
@@ -18,6 +19,30 @@ class FridgePainter extends CustomPainter {
       ),
       _p(const Color(0xff9cbdb3)),
     );
+    c.drawRRect(
+      RRect.fromRectAndRadius(
+        const Rect.fromLTWH(14, 7, 48, 89),
+        const Radius.circular(6),
+      ),
+      _p(const Color(0xffe5f3eb)),
+    );
+    for (final y in [30.0, 57.0, 81.0]) {
+      c.drawLine(Offset(16, y), Offset(60, y), _p(const Color(0xff9dc6b5), 2));
+      c.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromLTWH(38, y - 17, 14, 16),
+          const Radius.circular(3),
+        ),
+        _p(y == 30 ? const Color(0xffe4b28f) : const Color(0xffdf9daf)),
+      );
+      c.drawOval(Rect.fromLTWH(20, y - 8, 15, 7), _p(const Color(0xffd1b26f)));
+    }
+    c.drawCircle(const Offset(55, 13), 3, _p(const Color(0xffffe19b)));
+    c.save();
+    c.translate(8, 0);
+    c.scale(1 - open.clamp(0, 1) * .75, 1);
+    c.skew(0, -open * .12);
+    c.translate(-8, 0);
     c.drawRRect(
       RRect.fromRectAndRadius(
         const Rect.fromLTWH(8, 1, 56, 98),
@@ -56,6 +81,7 @@ class FridgePainter extends CustomPainter {
         _p(const Color(0xff9bbecb), 1.5),
       );
     }
+    c.restore();
     c.drawLine(
       const Offset(17, 100),
       const Offset(17, 105),
@@ -70,7 +96,7 @@ class FridgePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(FridgePainter old) => false;
+  bool shouldRepaint(FridgePainter old) => open != old.open;
 }
 
 class FoodIcon extends StatelessWidget {

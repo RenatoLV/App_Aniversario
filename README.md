@@ -38,7 +38,9 @@ El repositorio incluye **334 memes**, **27 cartas celestiales animadas** y seis 
 
 - Escena interactiva de Maru y Lady: caricias, movimiento, siestas, pensamientos, churu y caja de arena.
 - La casita: doble toque en el recuadro de los gatos para darles comida, bañarlos
-  y vestirlos. Cada gato conserva sus cuidados y su ropa; las 40 prendas iniciales
+  y vestirlos. Cocina, baño y probador decorados, refri con apertura animada y
+  dormitorios independientes con camas, alfombras, lámparas y pósteres de tus
+  cartas. Cada gato conserva sus cuidados, decoración y ropa; las 40 prendas iniciales
   se combinan por categoría y aparecen también en juegos, sobres y animaciones.
   Detalles y personalización: [app/CAT_CARE.md](app/CAT_CARE.md).
 - Block Blaster Maru Editions: juego de bloques 8×8 con puntuación, combos, récord, monedas y SFX Android.

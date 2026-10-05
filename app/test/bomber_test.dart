@@ -6,6 +6,38 @@ import 'package:nuestro_rincon/bomber/bomber_simulation.dart';
 import 'package:nuestro_rincon/bomber/bomber_screen.dart';
 
 void main() {
+  testWidgets('Leaving the app releases the joystick until a new touch', (
+    tester,
+  ) async {
+    var input = Offset.zero;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Center(
+          child: BomberJoystick(
+            onChanged: (v) => input = v,
+            color: Colors.teal,
+          ),
+        ),
+      ),
+    );
+    final stick = find.byKey(const ValueKey('bomber-joystick'));
+    final finger = await tester.startGesture(tester.getCenter(stick));
+    await finger.moveBy(const Offset(32, 0));
+    expect(input.dx, greaterThan(.5));
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    await tester.pump();
+    expect(input, Offset.zero);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await finger.moveBy(const Offset(1, 0));
+    expect(input, Offset.zero);
+    await finger.cancel();
+    final next = await tester.startGesture(tester.getCenter(stick));
+    await next.moveBy(const Offset(0, -30));
+    expect(input.dy, lessThan(-.5));
+    await next.up();
+    expect(input, Offset.zero);
+    await tester.pumpWidget(const SizedBox());
+  });
   test('Offline fire keeps the scheduled expiry after a late frame', () {
     final sim = BomberSimulation.training(now: 0)..now = 2000;
     sim.state['startsAt'] = 0;

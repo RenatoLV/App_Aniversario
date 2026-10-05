@@ -15,4 +15,13 @@ flutter build apk --debug
 
 Para importar memes desde la raíz: `py app/tool/import_memes.py --source "C:\ruta\a\tus\memes"`. Requiere Pillow. Hay 334 memes en dos volúmenes; el catálogo conserva IDs estables. Añadir imágenes requiere reconstruir la app; no hay todavía un catálogo descargable remoto.
 
-APK de prueba: `build/app/outputs/flutter-apk/app-debug.apk`. No se incluye en Git. La distribución release, iOS y las pruebas físicas de cámara/inclinación permanecen pendientes.
+APK de prueba: `build/app/outputs/flutter-apk/app-debug.apk`. No se incluye en Git.
+Los cambios en `main` generan una APK firmada en GitHub Releases. iOS y las pruebas
+físicas de cámara/inclinación permanecen pendientes.
+
+La optimización de recursos reduce 8.42 MB con animaciones verificadas sin pérdida,
+sin retirar cartas, audio ni fuentes. Las miniaturas se decodifican al tamaño
+físico mostrado y el visor mantiene resolución original. Ascenso actualiza la
+física y el dibujo en cada frame, con menos reconstrucciones del HUD; Bomber
+suelta el control táctil al cambiar de aplicación. Ver [La casita](CAT_CARE.md)
+y [cartas celestiales](CELESTIAL_CARDS.md).

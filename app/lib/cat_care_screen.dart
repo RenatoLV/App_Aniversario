@@ -8,8 +8,10 @@ import 'game_audio.dart';
 import 'cat_care_art.dart';
 import 'bath_foam.dart';
 import 'house_day_cycle.dart';
+import 'cat_bedroom.dart';
+import 'care_space_art.dart';
 
-enum _CareRoom { food, bath, wardrobe }
+enum _CareRoom { food, bath, wardrobe, bedroom }
 
 class CatCareScreen extends StatefulWidget {
   final GameStore store;
@@ -20,13 +22,15 @@ class CatCareScreen extends StatefulWidget {
 }
 
 class _CatCareScreenState extends State<CatCareScreen>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   CatKind _cat = CatKind.maru;
   _CareRoom _room = _CareRoom.food;
   CatFood _food = CatFood.kibble;
   bool _busy = false;
   String _message = 'Un ratito de cariño para tus compañeros';
-  late final AnimationController _action;
+  late final AnimationController _action, _dress;
+  final _stageKey = GlobalKey();
+  CatOutfit? _previousOutfit;
   double _scrub = 0;
   double _rinse = 0;
   BathTool _tool = BathTool.soap;
@@ -42,12 +46,28 @@ class _CatCareScreenState extends State<CatCareScreen>
   CatCare get care => widget.store.catCare;
   String get name => _cat == CatKind.maru ? 'Maru' : 'Lady';
 
+  void _showStage() {
+    final context = _stageKey.currentContext;
+    if (context != null) {
+      Scrollable.ensureVisible(
+        context,
+        alignment: .15,
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
+      );
+    }
+  }
+
   @override
   void initState() {
     super.initState();
     _action = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 2800),
+    );
+    _dress = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 650),
     );
     _action.addListener(() {
       final stamp = _action.lastElapsedDuration ?? Duration.zero;
@@ -71,6 +91,7 @@ class _CatCareScreenState extends State<CatCareScreen>
   @override
   void dispose() {
     _action.dispose();
+    _dress.dispose();
     _needsRefresh.cancel();
     super.dispose();
   }
@@ -202,6 +223,64 @@ class _CatCareScreenState extends State<CatCareScreen>
     return Offset(gentle * sway, envelope * .7);
   }
 
+  Widget _roomButtons() => LayoutBuilder(
+    builder: (context, bounds) => Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        for (final room in _CareRoom.values)
+          SizedBox(
+            width: bounds.maxWidth < 520
+                ? (bounds.maxWidth - 8) / 2
+                : (bounds.maxWidth - 24) / 4,
+            child: ChoiceChip(
+              key: ValueKey('care-room-${room.name}'),
+              avatar: Icon(switch (room) {
+                _CareRoom.food => Icons.restaurant_rounded,
+                _CareRoom.bath => Icons.bathtub_rounded,
+                _CareRoom.wardrobe => Icons.checkroom_rounded,
+                _CareRoom.bedroom => Icons.bedtime_rounded,
+              }, size: 18),
+              label: Text(
+                switch (room) {
+                  _CareRoom.food => 'Comida',
+                  _CareRoom.bath => 'Baño',
+                  _CareRoom.wardrobe => 'Ropa',
+                  _CareRoom.bedroom => 'Dormitorio',
+                },
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              selected: _room == room,
+              onSelected: _busy
+                  ? null
+                  : (_) => setState(() {
+                      _room = room;
+                      _dress.reset();
+                      _hand = null;
+                      _lastWaterTick = null;
+                      if (room == _CareRoom.bath) {
+                        _action.repeat();
+                      } else {
+                        _action.stop();
+                      }
+                      _message = switch (room) {
+                        _CareRoom.food =>
+                          'Elige su comida o arrástrala hasta $name',
+                        _CareRoom.bath =>
+                          'Jabón para hacer espuma, regadera para enjuagar',
+                        _CareRoom.wardrobe =>
+                          'Combina accesorios. Se verán también en todos los juegos.',
+                        _CareRoom.bedroom =>
+                          'Su camita, sus colores y una carta favorita en la pared.',
+                      };
+                    }),
+            ),
+          ),
+      ],
+    ),
+  );
+
   @override
   Widget build(BuildContext context) => CatCareScope(
     care: care,
@@ -217,7 +296,11 @@ class _CatCareScreenState extends State<CatCareScreen>
           ),
           body: PawBackground(
             child: SafeArea(
-              child: SingleChildScrollView(
+              child: _CareScroll(
+                header: Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 8, 18, 8),
+                  child: _roomButtons(),
+                ),
                 child: Center(
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 720),
@@ -247,6 +330,7 @@ class _CatCareScreenState extends State<CatCareScreen>
                             onSelectionChanged: _busy
                                 ? null
                                 : (values) => setState(() {
+                                    _dress.reset();
                                     _cat = values.first;
                                     _scrub = 0;
                                     _foam.clear();
@@ -281,73 +365,39 @@ class _CatCareScreenState extends State<CatCareScreen>
                             ],
                           ),
                           const SizedBox(height: 16),
-                          _stage(),
+                          if (_room == _CareRoom.bedroom)
+                            CatBedroomScene(
+                              store: widget.store,
+                              cat: _cat,
+                              clock: widget.clock,
+                            )
+                          else
+                            _stage(),
                           const SizedBox(height: 12),
-                          AnimatedSize(
-                            duration: const Duration(milliseconds: 250),
-                            child: Text(
-                              _message,
-                              key: ValueKey(_message),
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                color: Color(0xff4c6457),
-                                height: 1.4,
+                          SizedBox(
+                            width: double.infinity,
+                            child: AnimatedSize(
+                              duration: const Duration(milliseconds: 250),
+                              child: Text(
+                                _message,
+                                key: ValueKey(_message),
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  color: Color(0xff4c6457),
+                                  height: 1.4,
+                                ),
                               ),
                             ),
                           ),
                           const SizedBox(height: 18),
-                          SegmentedButton<_CareRoom>(
-                            style: SegmentedButton.styleFrom(
-                              textStyle: Theme.of(
-                                context,
-                              ).textTheme.labelLarge!.copyWith(fontSize: 12),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                              ),
-                            ),
-                            segments: const [
-                              ButtonSegment(
-                                value: _CareRoom.food,
-                                label: Text('Comida'),
-                                icon: Icon(Icons.restaurant_rounded),
-                              ),
-                              ButtonSegment(
-                                value: _CareRoom.bath,
-                                label: Text('Baño'),
-                                icon: Icon(Icons.bathtub_rounded),
-                              ),
-                              ButtonSegment(
-                                value: _CareRoom.wardrobe,
-                                label: Text('Ropa'),
-                                icon: Icon(Icons.checkroom_rounded),
-                              ),
-                            ],
-                            selected: {_room},
-                            onSelectionChanged: _busy
-                                ? null
-                                : (values) => setState(() {
-                                    _room = values.first;
-                                    _hand = null;
-                                    if (_room == _CareRoom.bath) {
-                                      _action.repeat();
-                                    } else {
-                                      _action.stop();
-                                    }
-                                    _message = switch (_room) {
-                                      _CareRoom.food =>
-                                        'Elige su comida o arrástrala hasta $name',
-                                      _CareRoom.bath =>
-                                        'Jabón para hacer espuma, regadera para enjuagar',
-                                      _CareRoom.wardrobe =>
-                                        'Combina accesorios. Se verán también en todos los juegos.',
-                                    };
-                                  }),
-                          ),
-                          const SizedBox(height: 20),
                           switch (_room) {
                             _CareRoom.food => _foodTray(),
                             _CareRoom.bath => _bathControls(),
                             _CareRoom.wardrobe => _wardrobe(),
+                            _CareRoom.bedroom => CatBedroomControls(
+                              store: widget.store,
+                              cat: _cat,
+                            ),
                           },
                           if (widget.store.saveError != null)
                             Padding(
@@ -371,9 +421,10 @@ class _CatCareScreenState extends State<CatCareScreen>
     clock: widget.clock,
     builder: (context, light) => LayoutBuilder(
       builder: (context, constraints) {
-        final size = math.min(210.0, constraints.maxWidth * .63);
+        final size = math.min(240.0, constraints.maxWidth * .63);
         return Container(
-          height: size + 60,
+          key: _stageKey,
+          height: math.max(310.0, size + 94),
           width: double.infinity,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(28),
@@ -405,6 +456,19 @@ class _CatCareScreenState extends State<CatCareScreen>
             child: Stack(
               alignment: Alignment.center,
               children: [
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: RepaintBoundary(
+                      child: CustomPaint(
+                        painter: CareSpacePainter(switch (_room) {
+                          _CareRoom.bath => CareSpace.bath,
+                          _CareRoom.wardrobe => CareSpace.wardrobe,
+                          _ => CareSpace.kitchen,
+                        }, light),
+                      ),
+                    ),
+                  ),
+                ),
                 Positioned.fill(
                   child: IgnorePointer(
                     child: CustomPaint(painter: HouseLampPainter(light)),
@@ -444,7 +508,7 @@ class _CatCareScreenState extends State<CatCareScreen>
                   ),
                 ),
                 AnimatedBuilder(
-                  animation: _action,
+                  animation: Listenable.merge([_action, _dress]),
                   builder: (context, _) => DragTarget<BathTool>(
                     onWillAcceptWithDetails: (_) =>
                         !_busy && _room == _CareRoom.bath,
@@ -491,13 +555,26 @@ class _CatCareScreenState extends State<CatCareScreen>
                           alignment: Alignment.center,
                           children: [
                             Transform.translate(
-                              offset: _mealMovement(_action.value),
+                              offset:
+                                  _mealMovement(_action.value) +
+                                  Offset(
+                                    0,
+                                    _room == _CareRoom.wardrobe
+                                        ? -math.sin(_dress.value * math.pi) * 5
+                                        : 0,
+                                  ),
                               child: CatActor(
                                 key: ValueKey('care-cat-${_cat.name}'),
                                 cat: _cat,
                                 size: size,
                                 active: true,
                                 showLabel: false,
+                                outfit:
+                                    _room == _CareRoom.wardrobe &&
+                                        _dress.isAnimating &&
+                                        _dress.value < .46
+                                    ? _previousOutfit
+                                    : care.outfit(_cat),
                                 cleanliness:
                                     care.needs(_cat).clean +
                                     (100 - care.needs(_cat).clean) *
@@ -525,6 +602,16 @@ class _CatCareScreenState extends State<CatCareScreen>
                                 },
                               ),
                             ),
+                            if (_room == _CareRoom.wardrobe &&
+                                _dress.isAnimating)
+                              IgnorePointer(
+                                child: CustomPaint(
+                                  size: Size.square(size),
+                                  painter: DressingSparklesPainter(
+                                    _dress.value,
+                                  ),
+                                ),
+                              ),
                             if (_room == _CareRoom.bath)
                               IgnorePointer(
                                 child: CustomPaint(
@@ -621,9 +708,14 @@ class _CatCareScreenState extends State<CatCareScreen>
                 padding: const EdgeInsets.all(16),
                 child: Row(
                   children: [
-                    const CustomPaint(
-                      size: Size(54, 72),
-                      painter: FridgePainter(),
+                    TweenAnimationBuilder<double>(
+                      tween: Tween(end: _fridgeOpen ? 1 : 0),
+                      duration: const Duration(milliseconds: 480),
+                      curve: Curves.easeInOutCubic,
+                      builder: (context, opening, _) => CustomPaint(
+                        size: const Size(70, 96),
+                        painter: FridgePainter(open: opening),
+                      ),
                     ),
                     const SizedBox(width: 16),
                     Expanded(
@@ -667,89 +759,96 @@ class _CatCareScreenState extends State<CatCareScreen>
                   ? const SizedBox(width: double.infinity)
                   : Padding(
                       padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
-                      child: LayoutBuilder(
-                        builder: (context, constraints) => GridView.count(
-                          crossAxisCount: constraints.maxWidth > 500 ? 5 : 3,
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          mainAxisSpacing: 8,
-                          crossAxisSpacing: 8,
-                          childAspectRatio: .7,
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
                           children: [
                             for (final food in CatFood.values)
-                              Draggable<CatFood>(
-                                data: food,
-                                maxSimultaneousDrags:
-                                    _busy || care.stock(food) == 0 ? 0 : 1,
-                                feedback: Material(
-                                  color: Colors.transparent,
-                                  child: FoodIcon(food: food, size: 64),
-                                ),
-                                child: Material(
-                                  color: _food == food
-                                      ? const Color(0xffcce6d9)
-                                      : const Color(0xfffffcf4),
-                                  borderRadius: BorderRadius.circular(15),
-                                  child: InkWell(
-                                    key: ValueKey('food-${food.name}'),
-                                    borderRadius: BorderRadius.circular(15),
-                                    onTap: _busy
-                                        ? null
-                                        : () => setState(() {
-                                            _food = food;
-                                            _fridgeOpen = false;
-                                            _message =
-                                                '${food.label}: ${food.reaction}';
-                                          }),
-                                    child: Padding(
-                                      padding: const EdgeInsets.all(6),
-                                      child: Column(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
-                                        children: [
-                                          FoodIcon(food: food, size: 34),
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            food.label,
-                                            style: const TextStyle(
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.w700,
-                                            ),
-                                            maxLines: 1,
-                                          ),
-                                          Text(
-                                            'Guardados: ${care.stock(food)} · +${food.nutrition}',
-                                            style: const TextStyle(
-                                              fontSize: 9,
-                                              color: Color(0xff708376),
-                                            ),
-                                          ),
-                                          TextButton(
-                                            key: ValueKey(
-                                              'buy-food-${food.name}',
-                                            ),
-                                            onPressed: _busy
-                                                ? null
-                                                : () async {
-                                                    final bought = await widget
-                                                        .store
-                                                        .buyCatFood(food);
-                                                    if (mounted) {
-                                                      setState(
-                                                        () => _message = bought
-                                                            ? '${food.label} guardado en el refri'
-                                                            : 'Necesitas ${food.price} monedas para comprar ${food.label.toLowerCase()}',
-                                                      );
-                                                    }
-                                                  },
-                                            child: Text(
-                                              'Comprar ${food.price} 🪙',
-                                              style: const TextStyle(
-                                                fontSize: 10,
+                              Padding(
+                                padding: const EdgeInsets.only(right: 8),
+                                child: SizedBox(
+                                  width: 110,
+                                  height: 148,
+                                  child: LongPressDraggable<CatFood>(
+                                    data: food,
+                                    delay: const Duration(milliseconds: 180),
+                                    onDragStarted: _showStage,
+                                    maxSimultaneousDrags:
+                                        _busy || care.stock(food) == 0 ? 0 : 1,
+                                    feedback: Material(
+                                      color: Colors.transparent,
+                                      child: FoodIcon(food: food, size: 64),
+                                    ),
+                                    child: Material(
+                                      color: _food == food
+                                          ? const Color(0xffcce6d9)
+                                          : const Color(0xfffffcf4),
+                                      borderRadius: BorderRadius.circular(15),
+                                      child: InkWell(
+                                        key: ValueKey('food-${food.name}'),
+                                        borderRadius: BorderRadius.circular(15),
+                                        onTap: _busy
+                                            ? null
+                                            : () => setState(() {
+                                                _food = food;
+                                                _fridgeOpen = false;
+                                                _message =
+                                                    '${food.label}: ${food.reaction}';
+                                              }),
+                                        child: Padding(
+                                          padding: const EdgeInsets.all(6),
+                                          child: Column(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
+                                            children: [
+                                              FoodIcon(food: food, size: 34),
+                                              const SizedBox(height: 4),
+                                              Text(
+                                                food.label,
+                                                style: const TextStyle(
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w700,
+                                                ),
+                                                maxLines: 1,
                                               ),
-                                            ),
+                                              Text(
+                                                'Guardados: ${care.stock(food)} · +${food.nutrition}',
+                                                style: const TextStyle(
+                                                  fontSize: 9,
+                                                  color: Color(0xff708376),
+                                                ),
+                                              ),
+                                              TextButton(
+                                                key: ValueKey(
+                                                  'buy-food-${food.name}',
+                                                ),
+                                                onPressed: _busy
+                                                    ? null
+                                                    : () async {
+                                                        final bought =
+                                                            await widget.store
+                                                                .buyCatFood(
+                                                                  food,
+                                                                );
+                                                        if (mounted) {
+                                                          setState(
+                                                            () => _message =
+                                                                bought
+                                                                ? '${food.label} guardado en el refri'
+                                                                : 'Necesitas ${food.price} monedas para comprar ${food.label.toLowerCase()}',
+                                                          );
+                                                        }
+                                                      },
+                                                child: Text(
+                                                  'Comprar ${food.price} 🪙',
+                                                  style: const TextStyle(
+                                                    fontSize: 10,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
                                           ),
-                                        ],
+                                        ),
                                       ),
                                     ),
                                   ),
@@ -765,7 +864,7 @@ class _CatCareScreenState extends State<CatCareScreen>
       ),
       const SizedBox(height: 8),
       const Text(
-        'Elige un alimento o arrástralo del refri hasta el gato.',
+        'Desliza para elegir. Mantén un alimento y arrástralo hacia el gato, o tócalo y dale de comer.',
         textAlign: TextAlign.center,
         style: TextStyle(fontSize: 12, color: Color(0xff6e8276)),
       ),
@@ -906,6 +1005,9 @@ class _CatCareScreenState extends State<CatCareScreen>
                       return;
                     }
                   }
+                  _previousOutfit = care.outfit(_cat);
+                  _showStage();
+                  _dress.forward(from: 0);
                   await care.equip(_cat, item);
                   if (mounted) {
                     setState(
@@ -921,10 +1023,27 @@ class _CatCareScreenState extends State<CatCareScreen>
       ],
       TextButton.icon(
         key: const ValueKey('care-undress'),
-        onPressed: () => care.undress(_cat),
+        onPressed: () {
+          _previousOutfit = care.outfit(_cat);
+          _showStage();
+          _dress.forward(from: 0);
+          care.undress(_cat);
+        },
         icon: const Icon(Icons.restart_alt_rounded),
         label: const Text('Sin ropa ni accesorios'),
       ),
+    ],
+  );
+}
+
+class _CareScroll extends StatelessWidget {
+  final Widget header, child;
+  const _CareScroll({required this.header, required this.child});
+  @override
+  Widget build(BuildContext context) => Column(
+    children: [
+      header,
+      Expanded(child: SingleChildScrollView(child: child)),
     ],
   );
 }

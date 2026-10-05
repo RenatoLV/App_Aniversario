@@ -75,6 +75,7 @@ class CoinIcon extends StatelessWidget {
     height: size,
     fit: BoxFit.contain,
     filterQuality: FilterQuality.high,
+    cacheWidth: (size * MediaQuery.devicePixelRatioOf(context)).ceil(),
   );
 }
 
@@ -140,6 +141,7 @@ class _RinconHomeState extends State<RinconHome>
   late final PageController _packCarousel;
   int _selectedPackVolume = 0;
   bool _openingPack = false;
+  bool _gameRouteOpen = false;
   Map<String, dynamic>? _cloudMember;
   List<Map<String, dynamic>> _cloudScores = [];
   String? _cloudError;
@@ -169,7 +171,7 @@ class _RinconHomeState extends State<RinconHome>
     _packCarousel = PageController(viewportFraction: .82);
     _refreshCloud();
     _collectionPlayTimer = Timer.periodic(const Duration(seconds: 28), (_) {
-      if (mounted && page == 2) {
+      if (mounted && page == 2 && ModalRoute.of(context)?.isCurrent == true) {
         setState(() => _collectionShuffle++);
       }
     });
@@ -391,6 +393,8 @@ class _RinconHomeState extends State<RinconHome>
   }
 
   Future<void> _play(Widget screen) async {
+    if (_gameRouteOpen) return;
+    _gameRouteOpen = true;
     s.cloud.allowRestore = false;
     try {
       await Navigator.push(
@@ -411,6 +415,7 @@ class _RinconHomeState extends State<RinconHome>
         ),
       );
     } finally {
+      _gameRouteOpen = false;
       s.cloud.allowRestore = true;
       await s.cloud.sync();
     }
@@ -707,6 +712,7 @@ class _RinconHomeState extends State<RinconHome>
   );
 
   Widget home() => ListView(
+    key: const PageStorageKey('home-scroll'),
     padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
     children: [
       const Text(
@@ -725,7 +731,7 @@ class _RinconHomeState extends State<RinconHome>
           MaterialPageRoute<void>(builder: (_) => CatCareScreen(store: s)),
         ),
         ownedCards: s.cards.keys.toList(),
-        cardBuilder: (id) => _CardArt(cardId: id),
+        cardBuilder: (id) => _CardArt(cardId: id, thumbnail: true),
       ),
       if (Backend.configured) ...[
         const SizedBox(height: 18),
@@ -1403,7 +1409,7 @@ class _RinconHomeState extends State<RinconHome>
                 children: [
                   Expanded(
                     child: unlocked
-                        ? _CardArt(cardId: i)
+                        ? _CardArt(cardId: i, thumbnail: true)
                         : const Center(
                             child: Text(
                               '?',
@@ -2947,6 +2953,7 @@ class _BlockScreenState extends State<BlockScreen>
                                     )
                                   : Draggable<int>(
                                       data: t,
+                                      maxSimultaneousDrags: 1,
                                       dragAnchorStrategy:
                                           (draggable, context, position) =>
                                               Offset(
@@ -3713,7 +3720,8 @@ class _CardShinePainter extends CustomPainter {
 class _CardArt extends StatelessWidget {
   final int cardId;
   final Key? imageKey;
-  const _CardArt({required this.cardId, this.imageKey});
+  final bool thumbnail;
+  const _CardArt({required this.cardId, this.imageKey, this.thumbnail = false});
 
   @override
   Widget build(BuildContext context) {
@@ -3737,7 +3745,11 @@ class _CardArt extends StatelessWidget {
         borderRadius: BorderRadius.circular(7),
         child: ColoredBox(
           color: const Color(0xff281a43),
-          child: CardMedia(cardId: cardId, imageKey: imageKey),
+          child: CardMedia(
+            cardId: cardId,
+            imageKey: imageKey,
+            thumbnail: thumbnail,
+          ),
         ),
       ),
     );

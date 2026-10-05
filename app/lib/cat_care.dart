@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'cat_bedroom_model.dart';
+export 'cat_bedroom_model.dart';
 
 enum CatKind { maru, lady }
 
@@ -620,6 +622,7 @@ class _CatProfile {
   int food = 75, clean = 80, happy = 75;
   DateTime updated;
   CatOutfit outfit = const CatOutfit();
+  CatBedroom? bedroom;
   _CatProfile(this.updated);
 }
 
@@ -673,6 +676,16 @@ class CatCare extends ChangeNotifier {
   }
 
   CatOutfit outfit(CatKind cat) => _profiles[cat]!.outfit;
+  CatBedroom bedroom(CatKind cat) =>
+      _profiles[cat]!.bedroom ?? CatBedroom.defaults(lady: cat == CatKind.lady);
+  Future<void> decorateBedroom(CatKind cat, CatBedroom room) async {
+    _profiles[cat]!.bedroom = CatBedroom.fromJson(
+      room.toJson(),
+      lady: cat == CatKind.lady,
+    );
+    await _changed();
+  }
+
   void _settle(CatKind cat) {
     final values = needs(cat), p = _profiles[cat]!;
     p.food = values.food;
@@ -736,6 +749,7 @@ class CatCare extends ChangeNotifier {
         'happy': _profiles[cat]!.happy,
         'updated': _profiles[cat]!.updated.toUtc().toIso8601String(),
         'outfit': outfit(cat).toJson(),
+        'bedroom': bedroom(cat).toJson(),
       },
   };
   void restore(dynamic data, {bool notify = false}) {
@@ -769,6 +783,10 @@ class CatCare extends ChangeNotifier {
         p.updated =
             DateTime.tryParse(entry['updated']?.toString() ?? '') ?? now();
         p.outfit = CatOutfit.fromJson(entry['outfit']);
+        p.bedroom = CatBedroom.fromJson(
+          entry['bedroom'],
+          lady: cat == CatKind.lady,
+        );
         for (final slot in ClothingSlot.values) {
           final id = p.outfit.at(slot);
           if (id == null) continue;

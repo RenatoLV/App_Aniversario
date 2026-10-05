@@ -253,7 +253,7 @@ void main() {
     });
     await tester.pumpWidget(MaterialApp(home: CatCareScreen(store: store)));
     final fridge = find.byKey(const ValueKey('care-fridge'));
-    await Scrollable.ensureVisible(tester.element(fridge), alignment: .7);
+    await Scrollable.ensureVisible(tester.element(fridge), alignment: .8);
     await tester.pump();
     await tester.tap(fridge);
     await tester.pump();
@@ -262,8 +262,15 @@ void main() {
       (w) => w is Draggable<CatFood> && w.data == CatFood.fish,
     );
     final target = find.byType(DragTarget<CatFood>);
-    // Tall viewport keeps the fridge's first shelf and cat visible together.
+    await Scrollable.ensureVisible(tester.element(fish));
+    await tester.pump();
     final finger = await tester.startGesture(tester.getCenter(fish));
+    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pump();
+    await finger.moveBy(const Offset(0, -25));
+    await tester.pump(const Duration(milliseconds: 250));
+    // Dragging a meal brings the cat back into reach, even after scrolling.
+    expect(tester.getCenter(target).dy, inInclusiveRange(100, 900));
     await finger.moveTo(tester.getCenter(target));
     await tester.pump();
     await finger.up();
@@ -313,10 +320,18 @@ void main() {
           ),
         ),
       );
+      await Scrollable.ensureVisible(
+        tester.element(find.byKey(const ValueKey('care-fridge'))),
+        alignment: .8,
+      );
+      await tester.pump();
       await tester.tap(find.byKey(const ValueKey('care-fridge')));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
-      expect(find.byType(Draggable<CatFood>), findsNWidgets(10));
+      expect(
+        find.byWidgetPredicate((w) => w is Draggable<CatFood>),
+        findsNWidgets(10),
+      );
       tester
           .state<ScrollableState>(find.byType(Scrollable).first)
           .position

@@ -130,7 +130,7 @@ class MainActivity : FlutterActivity() {
                         File.createTempFile("ar-back-", ".png", cacheDir).apply { writeBytes(content) }
                     }
                     animatedTextureFile = animation?.let { content ->
-                        File.createTempFile("ar-animation-", ".gif", cacheDir).apply { writeBytes(content) }
+                        File.createTempFile("ar-animation-", if (WebpTimeline.isWebp(content)) ".webp" else ".gif", cacheDir).apply { writeBytes(content) }
                     }
                     pendingAr = result
                     startActivityForResult(Intent(this, CameraCardActivity::class.java)

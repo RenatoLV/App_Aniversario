@@ -2,11 +2,17 @@ import 'package:flutter/material.dart';
 import 'store.dart';
 
 /// One animated-image implementation shared by every card surface. Image's
-/// multi-frame decoder preserves the GIF's timing, disposal and loop metadata.
+/// multi-frame decoder preserves GIF/WebP timing, disposal and loop metadata.
 class CardMedia extends StatelessWidget {
   final int cardId;
   final Key? imageKey;
-  const CardMedia({super.key, required this.cardId, this.imageKey});
+  final bool thumbnail;
+  const CardMedia({
+    super.key,
+    required this.cardId,
+    this.imageKey,
+    this.thumbnail = false,
+  });
   @override
   Widget build(BuildContext context) {
     final asset = cardAsset(cardId);
@@ -18,8 +24,8 @@ class CardMedia extends StatelessWidget {
         ),
       );
     }
-    return Image.asset(
-      asset,
+    Widget image(ImageProvider provider) => Image(
+      image: provider,
       key: imageKey,
       fit: BoxFit.contain,
       gaplessPlayback: true,
@@ -29,6 +35,26 @@ class CardMedia extends StatelessWidget {
       errorBuilder: (_, _, _) => const Center(
         child: Icon(Icons.broken_image_outlined, color: Colors.white),
       ),
+    );
+    if (!thumbnail) return image(AssetImage(asset));
+    return LayoutBuilder(
+      builder: (context, bounds) {
+        if (!bounds.maxWidth.isFinite || !bounds.maxHeight.isFinite) {
+          return image(AssetImage(asset));
+        }
+        final ratio = MediaQuery.devicePixelRatioOf(context);
+        // Round up to reusable decode sizes while preserving every displayed pixel.
+        int pixels(double logical) =>
+            ((logical * ratio / 64).ceil() * 64).clamp(64, 16384);
+        return image(
+          ResizeImage(
+            AssetImage(asset),
+            width: pixels(bounds.maxWidth),
+            height: pixels(bounds.maxHeight),
+            policy: ResizeImagePolicy.fit,
+          ),
+        );
+      },
     );
   }
 }

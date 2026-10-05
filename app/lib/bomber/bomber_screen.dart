@@ -662,7 +662,7 @@ class _BomberGameScreenState extends State<BomberGameScreen>
   }
 
   Future<void> bomb() async {
-    if (bombBusy || !sim.canBomb(sim.localId) || sim.finished) return;
+    if (paused || bombBusy || !sim.canBomb(sim.localId) || sim.finished) return;
     HapticFeedback.lightImpact();
     if (network == null) {
       sim.place(sim.localId);
@@ -1098,9 +1098,27 @@ class BomberJoystick extends StatefulWidget {
   State<BomberJoystick> createState() => _BomberJoystickState();
 }
 
-class _BomberJoystickState extends State<BomberJoystick> {
+class _BomberJoystickState extends State<BomberJoystick>
+    with WidgetsBindingObserver {
   int? pointer;
   Offset origin = const Offset(60, 60), knob = Offset.zero;
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed && pointer != null) end(pointer!);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
   void update(Offset at) {
     final delta = at - origin;
     setState(

@@ -13,7 +13,12 @@ sus índices guardados. Las celestiales usan IDs permanentes desde 10000 y rarez
    También se puede indicar otra carpeta con `--source "ruta"`.
 3. Ejecutar `dart format lib/celestial_cards.dart`, revisar los nombres y comentarios
    de Maru y Lady en `tool/celestial_catalog.json`, y repetir la importación si se editó
-   ese catálogo. Los archivos originales se copian sin recodificarlos.
+   ese catálogo. Los archivos originales se copian sin recodificarlos. Después,
+   `python tool/optimize_assets.py` puede convertir a WebP sin pérdida únicamente
+   las animaciones más pequeñas cuya resolución, fotogramas, píxeles, tiempos y
+   bucle coincidan exactamente. Requiere Pillow con soporte WebP. El informe
+   `tool/asset_optimization_report.json` conserva hashes y tamaños verificados;
+   las fuentes se respaldan localmente en `build/asset-originals`.
 4. Subir los assets, el catálogo y el Dart generado a GitHub junto con una nueva versión
    en `pubspec.yaml`. El workflow existente compila y publica la nueva APK en Releases.
 
@@ -29,8 +34,11 @@ desde el teléfono. La primera importación contiene 27 cartas: 14 en Vol. 1 y 1
 
 Flutter utiliza su decodificador multiframe en apertura, colección, inspección e
 intercambios. Los GIF mantienen su proporción dentro del marco y sus demoras originales.
-Android AR recibe el GIF completo y el rectángulo del arte: usa AnimatedImageDrawable
-desde Android 9 y Movie en Android 7/8, con recorte y ajuste proporcional. El reverso,
+Android AR recibe la animación completa y el rectángulo del arte: usa
+AnimatedImageDrawable para GIF/WebP desde Android 9 y Movie para GIF en Android 7/8.
+El WebP sin pérdida tiene un reproductor para Android 7/8 que decodifica sus
+fotogramas en un hilo separado, con dos lienzos reutilizables y composición de
+transparencia, recorte y tiempos. El reverso,
 el nombre y el borde permanecen independientes de la animación. Pausar el giro de
 la carta permite seguir viendo el GIF. Una fotografía captura el fotograma visible.
 
@@ -46,5 +54,7 @@ reinicia la garantía de legendaria o superior.
 `flutter build web --release -t tool/celestial_preview.dart --output build/celestial-preview --pwa-strategy none`
 genera un visor de prueba con el catálogo descubierto. Servir esa carpeta en un
 puerto distinto del de la app, por ejemplo 7361. No se incorpora al menú ni a la APK.
-Las pruebas cubren ambas probabilidades, persistencia, decodificación de todos los GIF,
+Las pruebas cubren ambas probabilidades, persistencia, decodificación de todas las animaciones,
 apertura móvil, accesibilidad con movimiento reducido y el contrato de AR.
+Las pruebas nativas de `WebpTimeline` leen todos los WebP optimizados y comprueban
+duraciones, posiciones, composición y rechazo de archivos incompletos.

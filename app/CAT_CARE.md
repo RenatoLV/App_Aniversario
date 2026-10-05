@@ -2,9 +2,14 @@
 
 Toca dos veces la casita de Inicio para entrar. También funciona sobre un gato.
 El selector superior cambia entre Maru y Lady; cada uno tiene sus propios cuidados
-y su conjunto de ropa.
+y su conjunto de ropa y dormitorio. Los cuatro botones de habitación permanecen
+visibles al desplazarse. Cocina, baño y armario tienen un escenario más amplio,
+muebles propios y fondos separados de las animaciones del gato.
 
-- **Comida:** abre el refri y elige entre diez alimentos, o arrastra uno al gato.
+- **Comida:** abre el refri y elige entre diez alimentos. La puerta se abre con
+  animación y muestra sus estantes. Desliza la fila de alimentos; mantén uno
+  durante un instante para arrastrarlo. La vista vuelve al gato al iniciar el
+  arrastre. También puedes tocar una comida y usar el botón para alimentarlo.
   Cada alimento tiene dibujos, movimientos y efectos propios antes de recuperar
   comida y cariño: croquetas, pescado, churú, atún, salmón, pollo, camarón, huevo,
   calabaza y caldo.
@@ -20,7 +25,12 @@ y su conjunto de ropa.
   de lodo; la limpieza se recupera cuando terminas el enjuague. También puedes
   tocar al gato para aplicar la herramienta elegida.
 - **Ropa:** combina collar/pañuelo, gorro, lentes y polera. Toca otra vez una prenda
-  equipada para quitarla, o pulsa «Sin ropa ni accesorios».
+  equipada para quitarla, o pulsa «Sin ropa ni accesorios». La vista vuelve al
+  probador y el cambio aparece con un pequeño rebote y destellos.
+- **Dormitorio:** cada gato conserva su propia habitación. Elige entre cuatro
+  paletas, tres camitas, alfombra redonda o de patitas, plantita/libros/juguetes y
+  lámpara encendida o apagada. Las cartas que ya tienes pueden convertirse en
+  póster. La ventana y la iluminación acompañan el ciclo de día y noche.
 - Las caricias en la casita y en el menú de cuidados recuperan cariño.
 
 El armario inicial es gratuito: diez collares y pañuelos, diez gorros, diez lentes
@@ -31,7 +41,10 @@ No modifican la dificultad de los juegos ni eliminan las mascotas.
 
 ## Guardado y dibujos compartidos
 
-`GameStore.catCare` guarda necesidades, fecha y ropa en `rincon.v1`. El respaldo
+`GameStore.catCare` guarda necesidades, fecha, ropa y dormitorio en `rincon.v1`.
+`catCare.maru.bedroom` y `catCare.lady.bedroom` mantienen la decoración independiente;
+un guardado anterior obtiene canastita verde para Maru y camita nube rosada para Lady.
+Los valores inválidos se sustituyen por los valores iniciales de cada gato. El respaldo
 incluye también `catCare.foodInventory`, junto con las monedas descontadas por
 las compras. Firebase sincroniza el mismo payload de progreso y conserva sus
 reglas de acceso por usuario; no necesita una colección ni reglas adicionales. El respaldo
@@ -52,7 +65,9 @@ cuerpo; añadir ropa a una ranura incompatible se ignora al cargar los datos.
 ## Verificación
 
 `test/cat_care_test.dart` comprueba guardado, migración, respaldo y separación entre
-gatos. `test/cat_care_screen_test.dart` prueba doble toque, botones, arrastre de comida,
+gatos, incluyendo dormitorios y pósteres. `test/cat_bedroom_test.dart` comprueba
+personalización a 320 píxeles y las transiciones de refri y ropa.
+`test/cat_care_screen_test.dart` prueba doble toque, botones, arrastre de comida,
 baño con el dedo y una pantalla de 320 píxeles. `test/cat_clothing_test.dart` verifica
 las 40 prendas en los dibujos normales, alien y sobres, y la actualización de ropa
 sin recrear los actores animados. `test/cat_care_art_test.dart` comprueba las diez

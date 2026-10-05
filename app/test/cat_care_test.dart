@@ -5,6 +5,75 @@ import 'package:nuestro_rincon/cat_care.dart';
 import 'package:nuestro_rincon/store.dart';
 
 void main() {
+  test('Bedrooms stay independent across local and cloud restores', () async {
+    SharedPreferences.setMockInitialValues({});
+    final prefs = await SharedPreferences.getInstance();
+    final store = GameStore(prefs);
+    final maru = store.catCare.bedroom(CatKind.maru);
+    await store.catCare.decorateBedroom(
+      CatKind.lady,
+      store.catCare
+          .bedroom(CatKind.lady)
+          .copyWith(
+            palette: 'lavender',
+            bed: 'star',
+            rug: 'paw',
+            decoration: 'books',
+            poster: 6,
+            lamp: false,
+          ),
+    );
+    expect(store.catCare.bedroom(CatKind.maru).toJson(), maru.toJson());
+    final restored = GameStore(prefs);
+    expect(restored.catCare.bedroom(CatKind.lady).toJson(), {
+      'palette': 'lavender',
+      'bed': 'star',
+      'rug': 'paw',
+      'decoration': 'books',
+      'poster': 6,
+      'lamp': false,
+    });
+    final cloud = jsonDecode(jsonDecode(store.cloud.snapshot())['rincon.v1']);
+    final cloudCare = CatCare()..restore(cloud['catCare']);
+    expect(
+      cloudCare.bedroom(CatKind.lady).toJson(),
+      restored.catCare.bedroom(CatKind.lady).toJson(),
+    );
+    await restored.catCare.decorateBedroom(
+      CatKind.lady,
+      restored.catCare.bedroom(CatKind.lady).copyWith(clearPoster: true),
+    );
+    expect(GameStore(prefs).catCare.bedroom(CatKind.lady).poster, isNull);
+  });
+
+  test(
+    'Older saves and invalid room settings preserve sensible cat defaults',
+    () {
+      final care = CatCare()
+        ..restore({
+          'maru': {'food': 55},
+          'lady': {
+            'bedroom': {
+              'palette': 'missing',
+              'bed': 7,
+              'rug': null,
+              'decoration': [],
+              'poster': -6,
+              'lamp': 'yes',
+            },
+          },
+        });
+      expect(
+        care.bedroom(CatKind.maru).toJson(),
+        CatBedroom.defaults().toJson(),
+      );
+      expect(
+        care.bedroom(CatKind.lady).toJson(),
+        CatBedroom.defaults(lady: true).toJson(),
+      );
+      expect(care.needs(CatKind.maru).food, 55);
+    },
+  );
   test(
     'Food purchases deduct coins, consume stock and survive cloud snapshots',
     () async {
