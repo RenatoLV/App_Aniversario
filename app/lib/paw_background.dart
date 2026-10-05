@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 /// Quiet, non-interactive wallpaper underneath the menu content.
@@ -22,10 +23,12 @@ class PawBackground extends StatelessWidget {
 
 class PawPatternPainter extends CustomPainter {
   final double spacing, opacity, pawScale;
+  final List<Color> colors;
   const PawPatternPainter({
     this.spacing = 118,
     this.opacity = .15,
     this.pawScale = 1,
+    this.colors = const [Color(0xff93b4a1), Color(0xffc7aa89)],
   });
   @override
   void paint(Canvas canvas, Size size) {
@@ -34,9 +37,7 @@ class PawPatternPainter extends CustomPainter {
         final x = col * spacing + (row.isEven ? .237 : .737) * spacing;
         final y = row * spacing + spacing * .305;
         final ink = Paint()
-          ..color =
-              (row.isEven ? const Color(0xff93b4a1) : const Color(0xffc7aa89))
-                  .withValues(alpha: opacity);
+          ..color = colors[row % colors.length].withValues(alpha: opacity);
         canvas.save();
         canvas.translate(x, y);
         canvas.rotate((col + row).isEven ? -.38 : .32);
@@ -69,5 +70,6 @@ class PawPatternPainter extends CustomPainter {
   bool shouldRepaint(PawPatternPainter oldDelegate) =>
       oldDelegate.spacing != spacing ||
       oldDelegate.opacity != opacity ||
-      oldDelegate.pawScale != pawScale;
+      oldDelegate.pawScale != pawScale ||
+      !listEquals(oldDelegate.colors, colors);
 }

@@ -2,6 +2,7 @@ import 'bloc_drawing.dart';
 import 'bloc_board.dart';
 import 'bloc_people.dart';
 import 'paw_background.dart';
+import 'block_blaster_background.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
@@ -2493,7 +2494,7 @@ class _BlockScreenState extends State<BlockScreen>
           backgroundColor: const Color(0xff38206c),
           foregroundColor: Colors.white,
         ),
-        body: SafeArea(
+        body: BlockBlasterBackground(
           child: Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 520),
