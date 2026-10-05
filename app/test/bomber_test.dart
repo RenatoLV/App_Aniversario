@@ -6,6 +6,25 @@ import 'package:nuestro_rincon/bomber/bomber_simulation.dart';
 import 'package:nuestro_rincon/bomber/bomber_screen.dart';
 
 void main() {
+  test('Offline fire keeps the scheduled expiry after a late frame', () {
+    final sim = BomberSimulation.training(now: 0)..now = 2000;
+    sim.state['startsAt'] = 0;
+    sim.state['bombs'] = {
+      'late': {
+        'owner': 'maru',
+        'x': 1,
+        'y': 13,
+        'range': 2,
+        'createdAt': 0,
+        'explodeAt': 1000,
+      },
+    };
+    sim.resolve(2000);
+    expect(objectMap(sim.events['late'])['at'], 1000);
+    expect(objectMap(sim.events['late'])['until'], 1650);
+    expect(sim.alive('maru'), isTrue);
+    sim.dispose();
+  });
   test('A delayed bomb lets a partially overlapping cat escape', () {
     final sim = BomberSimulation.network('maru');
     final training = BomberSimulation.training(now: 0);

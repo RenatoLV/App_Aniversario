@@ -396,11 +396,13 @@ class _CatPainter extends CustomPainter {
   });
 
   bool get maru => cat == CatKind.maru;
-  Color get fur => maru ? const Color(0xff484441) : const Color(0xfffffdf7);
-  Color get dark => maru ? const Color(0xff292827) : const Color(0xff444248);
-  Color get chest => maru ? const Color(0xffa39687) : const Color(0xffffffff);
-  Color get amber => maru ? const Color(0xfff4bb42) : const Color(0xffe1b458);
-  Color get caramel => const Color(0xffc89875);
+  Color get fur => maru ? const Color(0xff797565) : const Color(0xfffbf7ee);
+  Color get dark => maru ? const Color(0xff2b302b) : const Color(0xff5e5148);
+  Color get chest => maru ? const Color(0xffd2c3a5) : const Color(0xfffffdf8);
+  Color get amber => maru ? const Color(0xffc8ce7d) : const Color(0xffc6a05c);
+  Color get caramel => const Color(0xffe4bc86);
+  Color get ladyPink => const Color(0xffe5a0a8);
+  Color get ladyMask => const Color(0xff4b4745);
 
   void ellipse(
     Canvas c,
@@ -446,6 +448,34 @@ class _CatPainter extends CustomPainter {
       ..strokeWidth = width
       ..strokeCap = StrokeCap.round,
   );
+
+  void ladyPawDetails(Canvas c, double x, {bool pads = false}) {
+    // White fur surrounds the pink skin; the sole shows when the paw turns up.
+    if (pads) {
+      final pad = Path()
+        ..moveTo(x - 4.5, 87)
+        ..quadraticBezierTo(x - 5, 83, x - 1.5, 84)
+        ..quadraticBezierTo(x, 81.5, x + 1.5, 84)
+        ..quadraticBezierTo(x + 5, 83, x + 4.5, 87)
+        ..quadraticBezierTo(x, 91, x - 4.5, 87)
+        ..close();
+      path(c, pad, ladyPink);
+      for (final dx in [-6.0, -2.0, 2.0, 6.0]) {
+        ellipse(
+          c,
+          x + dx,
+          dx.abs() > 4 ? 82.5 : 81,
+          1.4,
+          1.8,
+          const Color(0xffedb4bb),
+        );
+      }
+    } else {
+      for (final dx in [-4.0, 1.0, 6.0]) {
+        line(c, x + dx, 89, x + dx - .5, 91, const Color(0xffcfbfb1), .65);
+      }
+    }
+  }
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -499,14 +529,22 @@ class _CatPainter extends CustomPainter {
       )
       ..cubicTo(maru ? -16 : 16, -7, maru ? -7 : 7, 1, 4, 7)
       ..close();
-    path(canvas, tail, maru ? dark : const Color(0xffddd6cc));
+    path(canvas, tail, maru ? fur : caramel);
     if (maru) {
-      for (final y in [-24.0, -16.0, -8.0]) {
-        line(canvas, -23, y, -16, y + 2, const Color(0xff6c625c), 2.5);
+      canvas.save();
+      canvas.clipPath(tail);
+      for (final y in [-31.0, -22.0, -13.0, -4.0]) {
+        line(canvas, -30, y, -11, y + 4, dark, 4);
       }
+      canvas.restore();
     } else {
-      ellipse(canvas, 22, -23, 4, 5, caramel);
-      ellipse(canvas, 15, -9, 4, 5, dark);
+      canvas.save();
+      canvas.clipPath(tail);
+      for (final y in [-30.0, -16.0, -2.0]) {
+        line(canvas, 7, y, 29, y + 5, dark.withValues(alpha: .85), 7);
+      }
+      line(canvas, 16, -22, 19, -26, const Color(0xfff3dbb8), 1.3);
+      canvas.restore();
     }
     canvas.restore();
 
@@ -524,37 +562,146 @@ class _CatPainter extends CustomPainter {
       fur,
     );
     if (maru) {
-      ellipse(canvas, 50, 75, 16, 20, const Color(0xff776e66));
-      for (final y in [58.0, 69.0, 80.0]) {
-        line(canvas, 25, y, 34, y + 3, dark, 3);
-        line(canvas, 75, y, 66, y + 3, dark, 3);
+      canvas.save();
+      canvas.clipPath(
+        Path()..addOval(
+          Rect.fromCenter(
+            center: Offset(50, sleeping ? 76 : 70),
+            width: sleeping ? 64 : 56,
+            height: sleeping ? 40 : 54,
+          ),
+        ),
+      );
+      ellipse(canvas, 50, 77, 16, 19, const Color(0xffb5a88b));
+      for (final y in [57.0, 66.0, 75.0, 84.0]) {
+        for (final side in [-1.0, 1.0]) {
+          path(
+            canvas,
+            Path()
+              ..moveTo(50 + side * 29, y - 2)
+              ..quadraticBezierTo(50 + side * 21, y - 2, 50 + side * 14, y + 4)
+              ..quadraticBezierTo(50 + side * 24, y + 3, 50 + side * 29, y + 3)
+              ..close(),
+            dark,
+          );
+        }
       }
+      for (final y in [73.0, 82.0, 90.0]) {
+        path(
+          canvas,
+          Path()
+            ..moveTo(42, y - 2)
+            ..quadraticBezierTo(50, y + 4, 58, y - 2),
+          dark.withValues(alpha: .6),
+          style: PaintingStyle.stroke,
+          width: 1.5,
+        );
+      }
+      canvas.restore();
+      path(
+        canvas,
+        Path()
+          ..moveTo(33, 56)
+          ..quadraticBezierTo(50, 49, 67, 56)
+          ..lineTo(64, 63)
+          ..lineTo(60, 60)
+          ..lineTo(57, 68)
+          ..lineTo(53, 64)
+          ..lineTo(49, 70)
+          ..lineTo(46, 64)
+          ..lineTo(42, 68)
+          ..lineTo(39, 61)
+          ..lineTo(35, 64)
+          ..close(),
+        chest,
+      );
     } else {
+      canvas.save();
+      canvas.clipPath(
+        Path()..addOval(
+          Rect.fromCenter(
+            center: Offset(50, sleeping ? 76 : 70),
+            width: sleeping ? 64 : 56,
+            height: sleeping ? 40 : 54,
+          ),
+        ),
+      );
       final p1 = Path()
-        ..moveTo(62, 51)
-        ..quadraticBezierTo(85, 59, 76, 78)
-        ..quadraticBezierTo(63, 77, 61, 65)
+        ..moveTo(65, 52)
+        ..cubicTo(79, 53, 86, 63, 78, 77)
+        ..quadraticBezierTo(69, 84, 64, 72)
+        ..quadraticBezierTo(60, 63, 65, 52)
         ..close();
       final p2 = Path()
-        ..moveTo(24, 73)
-        ..quadraticBezierTo(32, 76, 33, 87)
-        ..lineTo(25, 88)
+        ..moveTo(23, 58)
+        ..cubicTo(37, 55, 39, 67, 32, 75)
+        ..quadraticBezierTo(22, 82, 20, 69)
         ..close();
       path(canvas, p1, dark);
-      path(canvas, p2, caramel);
-      ellipse(canvas, 49, 76, 15, 19, chest);
+      path(canvas, p2, dark.withValues(alpha: .9));
+      path(
+        canvas,
+        Path()
+          ..moveTo(22, 78)
+          ..quadraticBezierTo(35, 74, 35, 85)
+          ..quadraticBezierTo(31, 96, 23, 88)
+          ..close(),
+        caramel,
+      );
+      path(
+        canvas,
+        Path()
+          ..moveTo(72, 77)
+          ..quadraticBezierTo(80, 80, 75, 92)
+          ..quadraticBezierTo(67, 90, 67, 83)
+          ..close(),
+        caramel.withValues(alpha: .75),
+      );
+      ellipse(canvas, 49, 76, 17, 20, chest);
+      canvas.restore();
+      path(
+        canvas,
+        Path()
+          ..moveTo(34, 55)
+          ..quadraticBezierTo(50, 50, 66, 55)
+          ..lineTo(63, 63)
+          ..lineTo(60, 61)
+          ..lineTo(56, 68)
+          ..lineTo(53, 65)
+          ..lineTo(49, 70)
+          ..lineTo(46, 65)
+          ..lineTo(42, 68)
+          ..lineTo(39, 62)
+          ..lineTo(36, 65)
+          ..close(),
+        chest,
+      );
     }
 
     paintCatBodyClothing(canvas, outfit);
     paintCatDirt(canvas, cleanliness);
     // One foreleg reaches toward the current activity.
     ellipse(canvas, 37, 86, 12, 8, maru ? dark : fur);
+    if (maru) {
+      for (final x in [33.0, 38.0, 43.0]) {
+        line(canvas, x, 88, x - .6, 91, fur.withValues(alpha: .7), .9);
+      }
+    } else {
+      ladyPawDetails(canvas, 37, pads: sleeping);
+    }
     if (!hideWorkingPaw) {
       canvas.save();
       canvas.translate(-reach * 9, -reach * 12);
       canvas.rotate(-reach * .15);
       ellipse(canvas, 66, 86, 12, 8, maru ? dark : fur);
-      if (reach > .3) {
+      if (maru) {
+        for (final x in [62.0, 67.0, 72.0]) {
+          line(canvas, x, 88, x - .6, 91, fur.withValues(alpha: .7), .9);
+        }
+      } else {
+        ladyPawDetails(canvas, 66, pads: reach > .3 || sleeping);
+      }
+      if (reach > .3 && maru) {
         for (final x in [61.0, 66.0, 71.0]) {
           ellipse(
             canvas,
@@ -597,60 +744,227 @@ class _CatPainter extends CustomPainter {
       ..quadraticBezierTo(64, 16, 72, 9)
       ..lineTo(76, 37)
       ..close();
-    path(canvas, leftEar, maru ? dark : const Color(0xff49474b));
-    path(canvas, rightEar, maru ? dark : const Color(0xffded4cb));
+    path(canvas, leftEar, maru ? const Color(0xff8d866d) : fur);
+    path(canvas, rightEar, maru ? const Color(0xff8d866d) : fur);
+    if (maru) {
+      path(
+        canvas,
+        leftEar,
+        dark.withValues(alpha: .7),
+        style: PaintingStyle.stroke,
+        width: 1,
+      );
+      path(
+        canvas,
+        rightEar,
+        dark.withValues(alpha: .7),
+        style: PaintingStyle.stroke,
+        width: 1,
+      );
+    } else {
+      path(
+        canvas,
+        leftEar,
+        const Color(0xffdecbb6),
+        style: PaintingStyle.stroke,
+        width: .9,
+      );
+      path(
+        canvas,
+        rightEar,
+        const Color(0xffdecbb6),
+        style: PaintingStyle.stroke,
+        width: .9,
+      );
+    }
     path(
       canvas,
       Path()
         ..moveTo(31, 31)
-        ..lineTo(33, 17)
-        ..lineTo(41, 30)
+        ..lineTo(32, 14)
+        ..lineTo(43, 30)
         ..close(),
-      maru ? caramel : const Color(0xffeeb7c4),
+      maru ? const Color(0xffc7b48e) : ladyPink,
     );
     path(
       canvas,
       Path()
         ..moveTo(59, 30)
-        ..lineTo(69, 17)
+        ..lineTo(70, 14)
         ..lineTo(71, 31)
         ..close(),
-      maru ? caramel : const Color(0xffeeb7c4),
+      maru ? const Color(0xffc7b48e) : ladyPink,
     );
     if (maru) {
-      line(canvas, 30, 10, 29, 5, dark, 2);
-      line(canvas, 71, 10, 72, 5, dark, 2);
+      for (var n = 0; n < 4; n++) {
+        line(canvas, 34 + n * 1.5, 29, 32 + n * .8, 18.0 + n, chest, .85);
+        line(canvas, 67 - n * 1.5, 29, 70 - n * .8, 18.0 + n, chest, .85);
+      }
+      line(canvas, 30, 11, 29.4, 8.5, fur, 1);
+      line(canvas, 71, 11, 71.8, 8.5, fur, 1);
+    } else {
+      for (var n = 0; n < 4; n++) {
+        line(canvas, 34 + n * 1.4, 29, 32 + n * .8, 18.0 + n, chest, .65);
+        line(canvas, 67 - n * 1.4, 29, 70 - n * .8, 18.0 + n, chest, .65);
+      }
     }
     ellipse(canvas, 50, 43, 29, 23, fur);
-    ellipse(canvas, 25, 51, 9, 9, maru ? const Color(0xff706861) : fur);
-    ellipse(canvas, 75, 51, 9, 9, maru ? const Color(0xff706861) : fur);
     if (maru) {
-      final m = Path()
-        ..moveTo(36, 25)
-        ..lineTo(42, 35)
-        ..lineTo(49, 26)
-        ..lineTo(56, 35)
-        ..lineTo(63, 25);
-      path(canvas, m, dark, style: PaintingStyle.stroke, width: 3);
-      line(canvas, 27, 42, 34, 45, dark, 2.4);
-      line(canvas, 73, 42, 66, 45, dark, 2.4);
-      ellipse(canvas, 50, 52, 18, 11, const Color(0xffafa397));
+      for (final side in [-1.0, 1.0]) {
+        path(
+          canvas,
+          Path()
+            ..moveTo(50 + side * 25, 43)
+            ..lineTo(50 + side * 33, 47)
+            ..lineTo(50 + side * 29, 48)
+            ..lineTo(50 + side * 35, 53)
+            ..lineTo(50 + side * 29, 54)
+            ..lineTo(50 + side * 31, 58)
+            ..lineTo(50 + side * 23, 60)
+            ..close(),
+          const Color(0xff9b947b),
+        );
+      }
+    }
+    ellipse(canvas, 25, 51, 9, 9, maru ? const Color(0xff9b947b) : fur);
+    ellipse(canvas, 75, 51, 9, 9, maru ? const Color(0xff9b947b) : fur);
+    if (maru) {
+      // Tapered tabby markings follow the forehead and cheek contours.
+      for (final side in [-1.0, 1.0]) {
+        path(
+          canvas,
+          Path()
+            ..moveTo(50 + side * 13, 23)
+            ..quadraticBezierTo(50 + side * 15, 26, 50 + side * 8, 36)
+            ..lineTo(50 + side * 3, 29)
+            ..lineTo(50, 33)
+            ..lineTo(50 + side * 2, 24)
+            ..lineTo(50 + side * 8, 30)
+            ..close(),
+          dark,
+        );
+        for (var n = 0; n < 3; n++) {
+          final y = 43.0 + n * 5;
+          path(
+            canvas,
+            Path()
+              ..moveTo(50 + side * 29, y - 3)
+              ..quadraticBezierTo(50 + side * 24, y, 50 + side * 17, y + 1)
+              ..quadraticBezierTo(50 + side * 23, y + 4, 50 + side * 28, y)
+              ..close(),
+            dark,
+          );
+        }
+        path(
+          canvas,
+          Path()
+            ..moveTo(50 + side * 5, 44)
+            ..quadraticBezierTo(50 + side * 7, 50, 50 + side * 10, 52),
+          dark,
+          style: PaintingStyle.stroke,
+          width: 1.8,
+        );
+      }
+      path(
+        canvas,
+        Path()
+          ..moveTo(46, 35)
+          ..quadraticBezierTo(50, 32, 54, 35)
+          ..lineTo(57, 52)
+          ..quadraticBezierTo(50, 57, 43, 52)
+          ..close(),
+        const Color(0xffb99c6c),
+      );
+      ellipse(canvas, 50, 59, 10, 5, const Color(0xffece2c8));
+      ellipse(canvas, 43, 54, 11, 8, chest);
+      ellipse(canvas, 57, 54, 11, 8, chest);
+      for (final x in [38.0, 62.0]) {
+        ellipse(
+          canvas,
+          x,
+          43,
+          10,
+          sleeping ? 5 : 10.5,
+          const Color(0xffcbbb95),
+        );
+      }
+      for (final side in [-1.0, 1.0]) {
+        for (var n = 0; n < 3; n++) {
+          ellipse(
+            canvas,
+            50 + side * (9 + n % 2 * 3),
+            53 + n * 2,
+            .6,
+            .6,
+            dark,
+          );
+        }
+      }
     } else {
+      // Lady's cream crown surrounds a dark mask on both eyes, split by a white blaze.
+      canvas.save();
+      canvas.clipPath(Path()..addOval(const Rect.fromLTWH(21, 20, 58, 46)));
+      path(
+        canvas,
+        Path()
+          ..moveTo(22, 35)
+          ..quadraticBezierTo(24, 17, 48, 20)
+          ..quadraticBezierTo(73, 16, 79, 35)
+          ..lineTo(73, 44)
+          ..quadraticBezierTo(64, 42, 61, 36)
+          ..lineTo(41, 37)
+          ..quadraticBezierTo(29, 43, 22, 35)
+          ..close(),
+        caramel,
+      );
       final patch1 = Path()
-        ..moveTo(25, 31)
-        ..quadraticBezierTo(38, 19, 49, 27)
-        ..quadraticBezierTo(45, 37, 39, 42)
-        ..lineTo(28, 44)
+        ..moveTo(37, 24)
+        ..quadraticBezierTo(39, 22, 41, 24)
+        ..quadraticBezierTo(44, 22.5, 47, 25)
+        ..quadraticBezierTo(48, 33, 45, 37)
+        ..quadraticBezierTo(46, 47, 40, 49)
+        ..quadraticBezierTo(30, 50, 28, 44)
+        ..quadraticBezierTo(30, 33, 37, 24)
         ..close();
       final patch2 = Path()
-        ..moveTo(51, 26)
-        ..quadraticBezierTo(64, 18, 71, 29)
-        ..lineTo(68, 40)
-        ..quadraticBezierTo(58, 38, 51, 26)
+        ..moveTo(50, 24)
+        ..quadraticBezierTo(53, 25, 56, 23)
+        ..quadraticBezierTo(65, 24, 70, 37)
+        ..quadraticBezierTo(73, 46, 63, 50)
+        ..quadraticBezierTo(57, 49, 55, 52)
+        ..lineTo(52, 49)
+        ..quadraticBezierTo(55, 37, 50, 24)
         ..close();
-      path(canvas, patch1, dark);
-      path(canvas, patch2, caramel);
-      ellipse(canvas, 50, 52, 17, 11, const Color(0xffffffff));
+      path(canvas, patch1, ladyMask);
+      path(canvas, patch2, ladyMask);
+      path(
+        canvas,
+        Path()
+          ..moveTo(44, 25)
+          ..quadraticBezierTo(48, 23, 53, 25)
+          ..lineTo(54, 38)
+          ..lineTo(45, 38)
+          ..close(),
+        ladyMask,
+      );
+      path(
+        canvas,
+        Path()
+          ..moveTo(48, 29)
+          ..lineTo(46, 34)
+          ..lineTo(44, 36)
+          ..lineTo(47, 38)
+          ..quadraticBezierTo(46, 46, 42, 54)
+          ..quadraticBezierTo(50, 59, 57, 54)
+          ..quadraticBezierTo(53, 43, 51, 37)
+          ..lineTo(50, 33)
+          ..close(),
+        chest,
+      );
+      canvas.restore();
+      ellipse(canvas, 43, 55, 12, 8, chest);
+      ellipse(canvas, 57, 55, 12, 8, chest);
+      ellipse(canvas, 50, 60, 10, 4.5, chest);
     }
     paintCatDirt(canvas, cleanliness, head: true);
     for (final x in [38.0, 62.0]) {
@@ -658,7 +972,13 @@ class _CatPainter extends CustomPainter {
         final lid = Path()
           ..moveTo(x - 7, 43)
           ..quadraticBezierTo(x, 49, x + 7, 43);
-        path(canvas, lid, dark, style: PaintingStyle.stroke, width: 2.4);
+        path(
+          canvas,
+          lid,
+          maru ? dark : const Color(0xffb19a87),
+          style: PaintingStyle.stroke,
+          width: 2.4,
+        );
       } else {
         ellipse(canvas, x, 43, 8.5, blink ? .8 : 9, const Color(0xff282326));
       }
@@ -668,7 +988,7 @@ class _CatPainter extends CustomPainter {
           canvas,
           x + gaze * 2,
           crying ? 45 : 43,
-          2.3,
+          maru ? 4.1 : 3.4,
           crying ? 5 : 7,
           const Color(0xff211b17),
         );
@@ -689,14 +1009,38 @@ class _CatPainter extends CustomPainter {
         path(canvas, tear, const Color(0xff5bc8ff).withValues(alpha: .85));
       }
     }
-    ellipse(
-      canvas,
-      50,
-      53,
-      5,
-      3,
-      maru ? const Color(0xff7e5b55) : const Color(0xffeaa6b3),
-    );
+    if (maru) {
+      path(
+        canvas,
+        Path()
+          ..moveTo(45.4, 51.5)
+          ..quadraticBezierTo(50, 50, 54.6, 51.5)
+          ..lineTo(50, 56.4)
+          ..close(),
+        dark,
+      );
+      path(
+        canvas,
+        Path()
+          ..moveTo(46.6, 51.8)
+          ..quadraticBezierTo(50, 50.9, 53.4, 51.8)
+          ..lineTo(50, 54.3)
+          ..close(),
+        const Color(0xffb9764e),
+      );
+    } else {
+      path(
+        canvas,
+        Path()
+          ..moveTo(45.5, 51.4)
+          ..quadraticBezierTo(50, 49.8, 54.5, 51.4)
+          ..quadraticBezierTo(53, 54.6, 50, 56.5)
+          ..quadraticBezierTo(47, 54.6, 45.5, 51.4)
+          ..close(),
+        ladyPink,
+      );
+      line(canvas, 47.5, 51.5, 51, 51.2, const Color(0xffffdae0), .75);
+    }
     line(canvas, 50, 56, 50, 60, maru ? dark : const Color(0xff8b8588), 1.5);
     if (crying && !sleeping) {
       final sadMouth = Path()
@@ -724,25 +1068,44 @@ class _CatPainter extends CustomPainter {
         const Color(0xffed8ca3),
       );
     }
-    for (final dy in [-3.0, 1.0, 5.0]) {
-      line(
-        canvas,
-        36,
-        55 + dy,
-        13,
-        51 + dy * 1.2,
-        maru ? const Color(0xffe8ded3) : const Color(0xffb5abb1),
-        1,
-      );
-      line(
-        canvas,
-        64,
-        55 + dy,
-        87,
-        51 + dy * 1.2,
-        maru ? const Color(0xffe8ded3) : const Color(0xffb5abb1),
-        1,
-      );
+    if (maru) {
+      for (final dy in [-4.0, 0.0, 4.0, 7.0]) {
+        for (final side in [-1.0, 1.0]) {
+          path(
+            canvas,
+            Path()
+              ..moveTo(50 + side * 13, 55 + dy)
+              ..quadraticBezierTo(
+                50 + side * 25,
+                54 + dy,
+                50 + side * 41,
+                52 + dy * 1.7,
+              ),
+            const Color(0xfff3ead6),
+            style: PaintingStyle.stroke,
+            width: .75,
+          );
+        }
+      }
+    } else {
+      for (final dy in [-3.0, 1.0, 5.0]) {
+        for (final side in [-1.0, 1.0]) {
+          path(
+            canvas,
+            Path()
+              ..moveTo(50 + side * 13, 55 + dy)
+              ..quadraticBezierTo(
+                50 + side * 26,
+                54 + dy,
+                50 + side * 39,
+                52 + dy * 1.6,
+              ),
+            const Color(0xffc5b8a8),
+            style: PaintingStyle.stroke,
+            width: .7,
+          );
+        }
+      }
     }
     paintCatHeadClothing(canvas, outfit);
     canvas.restore();

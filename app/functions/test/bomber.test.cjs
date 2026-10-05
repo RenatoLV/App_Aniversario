@@ -65,3 +65,27 @@ test('delayed bomb uses tap cell rather than newer motion and rejects distant ce
  assert.throws(()=>E.place(other,'a','far',safe,100,'7_11'),/posición/);
  assert.throws(()=>E.place(other,'a','outside',safe,100,'0_11'),/inválida/);
 });
+
+test('late detonation never extends fire or damages after the scheduled expiry',()=>{
+ const s=match();s.board.walls={};s.board.crates={};
+ s.bombs.one={x:1,y:11,range:2,owner:'a',explodeAt:1000};
+ E.advance(s,safe,2000);
+ assert.equal(s.events.one.at,1000);assert.equal(s.events.one.until,1650);
+ assert.equal(s.players.a.alive,true);
+});
+test('fire expires exactly at its boundary and stale motion cannot cause a ghost hit',()=>{
+ for(const [time,alive] of [[1649,false],[1650,true]]) {
+  const s=match();s.events.one={cells:['1_11'],at:1000,until:1650};
+  E.advance(s,{a:{x:1.5,y:11.5,at:time}},time);
+  assert.equal(s.players.a.alive,alive);
+ }
+ const s=match();s.events.one={cells:['1_11'],at:1000,until:1650};
+ E.advance(s,{a:{x:1.5,y:11.5,at:500}},1200);
+ assert.equal(s.players.a.alive,true);
+});
+test('late chain reaction shares the initiating bomb scheduled time',()=>{
+ const s=match();s.board.walls={};s.board.crates={};
+ s.bombs={one:{x:3,y:3,range:2,owner:'a',explodeAt:1000},two:{x:4,y:3,range:2,owner:'b',explodeAt:3000}};
+ E.advance(s,safe,2000);
+ assert.equal(s.events.two.at,1000);assert.equal(s.events.two.until,1650);
+});

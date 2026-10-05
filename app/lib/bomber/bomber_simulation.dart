@@ -418,10 +418,19 @@ class BomberSimulation extends ChangeNotifier {
         items = powers;
     final queue = pending.keys
         .where((id) => valueNum(objectMap(pending[id])['explodeAt']) <= time)
+        .map(
+          (id) => (
+            id: id,
+            at: valueNum(objectMap(pending[id])['explodeAt']).toInt(),
+          ),
+        )
         .toList();
     final processed = <String>{};
     while (queue.isNotEmpty) {
-      final id = queue.removeAt(0);
+      queue.sort((a, b) => a.at.compareTo(b.at));
+      final detonation = queue.removeAt(0);
+      final id = detonation.id;
+      final detonationTime = detonation.at;
       if (!processed.add(id) || !pending.containsKey(id)) {
         continue;
       }
@@ -452,25 +461,28 @@ class BomberSimulation extends ChangeNotifier {
               'type': type,
               'x': xy[0],
               'y': xy[1],
-              'availableAt': time + 200,
+              'availableAt': detonationTime + 200,
             };
           }
         } else if (items[k] != null &&
-            valueNum(objectMap(items[k])['availableAt']) <= time) {
+            valueNum(objectMap(items[k])['availableAt']) <= detonationTime) {
           items.remove(k);
         }
         for (final other in pending.entries) {
           final v = objectMap(other.value);
           if (other.key != id &&
               cellKey((v['x'] as num).toInt(), (v['y'] as num).toInt()) == k) {
-            queue.add(other.key);
+            queue.add((
+              id: other.key,
+              at: math.min(detonationTime, valueNum(v['explodeAt']).toInt()),
+            ));
           }
         }
       }
       explosions[id] = {
         'cells': cells.toList(),
-        'at': time,
-        'until': time + BomberConfig.fire,
+        'at': detonationTime,
+        'until': detonationTime + BomberConfig.fire,
         'owner': b['owner'],
       };
       pending.remove(id);

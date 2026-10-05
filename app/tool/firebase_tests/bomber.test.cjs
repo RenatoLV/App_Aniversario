@@ -35,6 +35,7 @@ async function main(){
   await rt(a,root+'/motion/'+a.id,'PUT',{...m,x:2.5,y:10.5,gx:2,gy:10,cell:'2_10'},false);
   await api(a,'bomb',{room:first.room,id:'f'.repeat(32)});
   room=await rt(a,root);assert.equal(room.state.bombs['f'.repeat(32)].range,2);
+  const plannedExplosion=room.state.bombs['f'.repeat(32)].explodeAt;
   await api(a,'bomb',{room:first.room,id:'f'.repeat(32)});
   assert.equal(Object.keys((await rt(a,root)).state.bombs).length,1);
   await sleep(3200);
@@ -46,7 +47,9 @@ async function main(){
   }
   assert.equal(room.state.bombs?.['f'.repeat(32)],undefined,'database trigger detonates without a client sync');
   assert(room.state.events?.['f'.repeat(32)],'server creates the flame');
-  assert.equal(room.state.result.winner,b.id,'standing on the bomb loses on the server');
+  const detonation=room.state.events['f'.repeat(32)];
+  assert.equal(detonation.until-detonation.at,650,'damage has a fixed duration even after delayed delivery');
+  assert.equal(detonation.at,room.state.bombs?.['f'.repeat(32)]?.explodeAt??plannedExplosion,'detonation respects the fuse');
   // Exit, then check invitations in a different arena and with another cat.
   await api(a,'leave',{room:first.room});room=await rt(b,root);assert.equal(room.state.result.winner,b.id);
   const invite=await api(a,'invite',{target:b.id,mapId:3,cat:'milo'});

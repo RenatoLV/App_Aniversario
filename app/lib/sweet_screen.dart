@@ -426,6 +426,71 @@ class _SweetScreenState extends State<SweetScreen>
                           ),
                         ],
                       ),
+                      AnimatedBuilder(
+                        animation: widget.store,
+                        builder: (context, _) => Container(
+                          key: const ValueKey('sweet-wallet'),
+                          margin: const EdgeInsets.only(top: 8, bottom: 8),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [Color(0xfffff3c5), Color(0xffffdfa1)],
+                            ),
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(
+                              color: const Color(0xfffffff1),
+                              width: 2,
+                            ),
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Color(0x18a35c47),
+                                blurRadius: 12,
+                                offset: Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.monetization_on_rounded,
+                                color: Color(0xffc9821d),
+                                size: 28,
+                              ),
+                              const SizedBox(width: 9),
+                              const Text(
+                                'Tu monedero',
+                                style: TextStyle(
+                                  color: Color(0xff78512c),
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Align(
+                                  alignment: Alignment.centerRight,
+                                  child: FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    child: Text(
+                                      '${widget.store.coins}',
+                                      key: const ValueKey(
+                                        'sweet-wallet-balance',
+                                      ),
+                                      style: const TextStyle(
+                                        color: Color(0xff78512c),
+                                        fontSize: 21,
+                                        fontWeight: FontWeight.w900,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                       const SizedBox(height: 6),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -1198,19 +1263,141 @@ class _SweetBackground extends CustomPainter {
         ..shader = const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xfffff3e7), Color(0xffffedf5), Color(0xffe7f6f1)],
+          colors: [Color(0xffffd3e7), Color(0xfffff2e3), Color(0xffc8eee9)],
         ).createShader(Offset.zero & size),
     );
-    for (var y = 55.0; y < size.height; y += 130) {
-      for (final x in [18.0, size.width - 18]) {
-        _paintPaw(
-          canvas,
-          Offset(x, y),
-          1.5,
-          const Color(0xffc795b4).withValues(alpha: .1),
+    canvas.save();
+    canvas.clipRect(Offset.zero & size);
+    // A soft vanilla spotlight keeps the play area readable.
+    canvas.drawRect(
+      Offset.zero & size,
+      Paint()
+        ..shader = const RadialGradient(
+          center: Alignment(0, -.2),
+          radius: .85,
+          colors: [Color(0xcffffaf1), Color(0x00fffaf1)],
+        ).createShader(Offset.zero & size),
+    );
+    for (var layer = 0; layer < 3; layer++) {
+      final baseline = size.height * (.82 + layer * .06);
+      final hill = Path()..moveTo(0, baseline);
+      for (var i = 0; i < 6; i++) {
+        final left = size.width * i / 6, right = size.width * (i + 1) / 6;
+        hill.quadraticBezierTo(
+          (left + right) / 2,
+          baseline - 38 - layer * 8,
+          right,
+          baseline,
         );
       }
+      hill
+        ..lineTo(size.width, size.height)
+        ..lineTo(0, size.height)
+        ..close();
+      canvas.drawPath(
+        hill,
+        Paint()
+          ..color = const [
+            Color(0x65d3b5ec),
+            Color(0x85a4dcd4),
+            Color(0xa6ffe5c6),
+          ][layer],
+      );
     }
+    // Wrapped sweets and spiral lollipops frame the board, rather than covering it.
+    for (var n = 0; n < 8; n++) {
+      final right = n.isOdd;
+      final at = Offset(
+        right ? size.width - 12 : 12,
+        42 + (n ~/ 2) * size.height / 4,
+      );
+      final color = _sweetColors[(n + 1) % _sweetColors.length];
+      canvas.save();
+      canvas.translate(at.dx, at.dy);
+      canvas.rotate((right ? -1 : 1) * .32);
+      if (n % 3 == 0) {
+        canvas.drawLine(
+          const Offset(0, 12),
+          const Offset(0, 56),
+          Paint()
+            ..color = const Color(0xb3ffffff)
+            ..strokeWidth = 5
+            ..strokeCap = StrokeCap.round,
+        );
+        canvas.drawCircle(
+          Offset.zero,
+          23,
+          Paint()..color = color.withValues(alpha: .5),
+        );
+        final spiral = Path();
+        for (var step = 0; step <= 65; step++) {
+          final angle = step / 65 * math.pi * 5;
+          final radius = step / 65 * 18;
+          final point = Offset(math.cos(angle), math.sin(angle)) * radius;
+          if (step == 0) {
+            spiral.moveTo(point.dx, point.dy);
+          } else {
+            spiral.lineTo(point.dx, point.dy);
+          }
+        }
+        canvas.drawPath(
+          spiral,
+          Paint()
+            ..color = const Color(0xaaffffff)
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 3
+            ..strokeCap = StrokeCap.round,
+        );
+      } else {
+        final wrappers = Path()
+          ..moveTo(-16, 0)
+          ..lineTo(-29, -12)
+          ..lineTo(-29, 12)
+          ..close()
+          ..moveTo(16, 0)
+          ..lineTo(29, -12)
+          ..lineTo(29, 12)
+          ..close();
+        canvas.drawPath(wrappers, Paint()..color = color.withValues(alpha: .3));
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(
+            const Rect.fromLTWH(-18, -12, 36, 24),
+            const Radius.circular(10),
+          ),
+          Paint()..color = color.withValues(alpha: .45),
+        );
+        canvas.drawLine(
+          const Offset(-8, -7),
+          const Offset(5, -7),
+          Paint()
+            ..color = const Color(0x99ffffff)
+            ..strokeWidth = 3
+            ..strokeCap = StrokeCap.round,
+        );
+      }
+      canvas.restore();
+    }
+    for (var n = 0; n < 42; n++) {
+      final at = Offset(
+        size.width * (((n * 47) % 97) / 97),
+        size.height * (((n * 31) % 89) / 89),
+      );
+      final color = _sweetColors[n % _sweetColors.length].withValues(
+        alpha: .22,
+      );
+      canvas.drawLine(
+        at,
+        at + Offset(n.isEven ? 4 : -3, 6),
+        Paint()
+          ..color = color
+          ..strokeWidth = 2.2
+          ..strokeCap = StrokeCap.round,
+      );
+      if (n % 7 == 0) {
+        _paintPaw(canvas, at + const Offset(8, 16), 1.5, color);
+      }
+    }
+    canvas.restore();
   }
 
   @override

@@ -55,22 +55,25 @@ function finish(s,now) {
 function advance(s,motions={},now=Date.now()) {
   s.bombs||={};s.powers||={};s.events||={};s.board.crates||={};
   if(!active(s,now)) return s;
-  const due=Object.keys(s.bombs).filter(id=>s.bombs[id].explodeAt<=now).sort((a,b)=>s.bombs[a].explodeAt-s.bombs[b].explodeAt);
+  const due=Object.keys(s.bombs).filter(id=>s.bombs[id].explodeAt<=now).map(id=>({id,at:s.bombs[id].explodeAt}));
   const processed=new Set();
   while(due.length) {
-    const id=due.shift(); if(processed.has(id) || !s.bombs[id]) continue;
+    due.sort((a,b)=>a.at-b.at);
+    const {id,at}=due.shift(); if(processed.has(id) || !s.bombs[id]) continue;
     processed.add(id); const b=s.bombs[id],cells=blast(s,b.x,b.y,b.range);
     for(const k of cells) {
       if(s.board.crates[k]) { delete s.board.crates[k]; const [x,y]=k.split('_').map(Number);
-        const power=drop(s.board.seed,x,y,now); if(power) s.powers[k]=power; }
-      else if(s.powers[k] && s.powers[k].availableAt<=now) delete s.powers[k];
-      for(const [other,v] of Object.entries(s.bombs)) if(other!==id && key(v.x,v.y)===k) due.push(other);
+        const power=drop(s.board.seed,x,y,at); if(power) s.powers[k]=power; }
+      else if(s.powers[k] && s.powers[k].availableAt<=at) delete s.powers[k];
+      for(const [other,v] of Object.entries(s.bombs)) if(other!==id && key(v.x,v.y)===k) due.push({id:other,at:Math.min(at,v.explodeAt)});
     }
     delete s.bombs[id];
-    s.events[id]={cells,at:now,until:now+config.fire,owner:b.owner};
+    s.events[id]={cells,at,until:at+config.fire,owner:b.owner};
   }
   const flames=new Set(Object.values(s.events).filter(e=>e.until>now).flatMap(e=>e.cells));
-  hit(s,motions,flames,now); finish(s,now);
+  // Old motion can describe a tile the cat has already left during a network stall.
+  const fresh=Object.fromEntries(Object.entries(motions).filter(([,m])=>!Number.isFinite(m.at)||now-m.at<=250));
+  hit(s,fresh,flames,now); finish(s,now);
   for(const [id,e] of Object.entries(s.events)) if(e.until<now-30000) delete s.events[id];
   return s;
 }

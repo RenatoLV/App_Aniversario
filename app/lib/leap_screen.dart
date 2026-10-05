@@ -2132,32 +2132,106 @@ class LeapWorldPainter extends CustomPainter {
           _umbrella(canvas, Offset.zero, game.clock);
           canvas.restore();
         case LeapPickupKind.coin:
-          final w = 4 + math.sin(game.clock * 3 + pickup.x).abs() * 5;
-          canvas.drawOval(
-            Rect.fromCenter(center: at, width: w * 2, height: 22),
-            Paint()..color = const Color(0xffffcc51),
-          );
-          canvas.drawOval(
-            Rect.fromCenter(center: at, width: w * 1.3, height: 16),
+          final radius = pickup.value == 10
+              ? 15.0
+              : pickup.value == 5
+              ? 14.0
+              : 11.0;
+          final silver = pickup.value == 5;
+          final turn = .18 + .82 * math.sin(game.clock * 2 + pickup.x).abs();
+          canvas.save();
+          canvas.translate(at.dx, at.dy);
+          // The face, border and engraving turn together as one solid coin.
+          canvas.scale(turn, 1);
+          final face = Rect.fromCircle(center: Offset.zero, radius: radius);
+          canvas.drawCircle(
+            const Offset(1.2, 1),
+            radius,
             Paint()
-              ..color = const Color(0xffffed95)
+              ..color = silver
+                  ? const Color(0xff687b91)
+                  : const Color(0xffa86416),
+          );
+          canvas.drawCircle(
+            Offset.zero,
+            radius,
+            Paint()
+              ..shader = LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: silver
+                    ? const [
+                        Color(0xfff4fbff),
+                        Color(0xffb9d2e8),
+                        Color(0xff809bb8),
+                      ]
+                    : const [
+                        Color(0xfffff0a5),
+                        Color(0xffffce50),
+                        Color(0xffe99a24),
+                      ],
+              ).createShader(face),
+          );
+          canvas.drawCircle(
+            Offset.zero,
+            radius - .9,
+            Paint()
+              ..color = silver
+                  ? const Color(0xffeffaff)
+                  : const Color(0xfffff3bb)
               ..style = PaintingStyle.stroke
-              ..strokeWidth = 1.5,
+              ..strokeWidth = 1.2,
+          );
+          canvas.drawCircle(
+            Offset.zero,
+            radius - 3.3,
+            Paint()
+              ..color = silver
+                  ? const Color(0xff819bb6)
+                  : const Color(0xffc18a28)
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = .8,
+          );
+          canvas.drawArc(
+            face.deflate(2),
+            math.pi * 1.08,
+            math.pi * .58,
+            false,
+            Paint()
+              ..color = const Color(0xcfffffff)
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = 1.4
+              ..strokeCap = StrokeCap.round,
           );
           if (pickup.value > 1) {
             final label = TextPainter(
               text: TextSpan(
                 text: '${pickup.value}',
-                style: const TextStyle(
-                  color: Color(0xff644000),
-                  fontSize: 12,
+                style: TextStyle(
+                  color: silver
+                      ? const Color(0xff405b79)
+                      : const Color(0xff895614),
+                  fontSize: pickup.value == 10 ? 12 : 14,
+                  height: 1,
                   fontWeight: FontWeight.w900,
+                  shadows: const [
+                    Shadow(color: Color(0xe6fff8dc), offset: Offset(0, .9)),
+                  ],
                 ),
               ),
               textDirection: TextDirection.ltr,
             )..layout();
-            label.paint(canvas, at - Offset(label.width / 2, label.height / 2));
+            label.paint(canvas, Offset(-label.width / 2, -label.height / 2));
+          } else {
+            canvas.drawOval(
+              const Rect.fromLTWH(-2, -5, 4, 10),
+              Paint()
+                ..color = const Color(0xffc18a28)
+                ..style = PaintingStyle.stroke
+                ..strokeWidth = 1.2,
+            );
           }
+          canvas.restore();
       }
     }
     if (game.abducting || game.ufoDepartureTime > 0) {

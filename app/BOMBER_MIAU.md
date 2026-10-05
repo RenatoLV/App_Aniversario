@@ -5,6 +5,10 @@ Hay monedas personales de 5 en esos caminos y cada victoria entrega 150 monedas.
 Ganar 5 y 10 partidas desbloquea premios únicos de 500 y 1.500 monedas.
 La bomba en línea conserva la casilla al pulsar; una bomba que llega con retraso
 permite salir si el cuerpo del gato todavía toca su casilla, sin permitir reingresar.
+El fuego daña durante 650 ms desde la detonación programada, incluidas las
+reacciones en cadena. Un procesamiento tardío no reinicia esa duración.
+Las casillas peligrosas mantienen una llama visible hasta el cierre del daño;
+las posiciones de red antiguas no se usan para aplicar daño inmediato.
 
 Inicio incluye Bomber Miau. Hay cuatro arenas con colores y recorridos diferentes:
 Jardín de patitas, Azotea lunar, Dulce despensa y Templo del sol. Los bloques tienen

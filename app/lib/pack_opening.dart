@@ -283,14 +283,16 @@ class _OpeningCatChoreography extends CustomPainter {
     )!;
     final fur = cat == CatKind.maru
         ? const Color(0xff343230)
-        : const Color(0xfffffdf7);
+        : const Color(0xfffbf7ee);
     final arm = Path()
       ..moveTo(shoulder.dx, shoulder.dy)
       ..quadraticBezierTo(shoulder.dx + 13, paw.dy + 13, paw.dx, paw.dy);
     canvas.drawPath(
       arm,
       Paint()
-        ..color = const Color(0xff61564f)
+        ..color = cat == CatKind.maru
+            ? const Color(0xff61564f)
+            : const Color(0xffdecbb6)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 12
         ..strokeCap = StrokeCap.round,
@@ -307,15 +309,34 @@ class _OpeningCatChoreography extends CustomPainter {
       Rect.fromCenter(center: paw, width: 17, height: 13),
       Paint()..color = fur,
     );
-    for (var i = 0; i < 3; i++) {
-      canvas.drawCircle(
-        paw + Offset(-5 + i * 4.5, -3),
-        1.35,
-        Paint()
-          ..color = cat == CatKind.maru
-              ? const Color(0xffa38e84)
-              : const Color(0xffeab5c2),
+    if (cat == CatKind.lady) {
+      for (var i = 0; i < 4; i++) {
+        canvas.drawOval(
+          Rect.fromCenter(
+            center:
+                paw + Offset(-5.4 + i * 3.6, i == 0 || i == 3 ? -2.5 : -3.5),
+            width: 2.5,
+            height: 3,
+          ),
+          Paint()..color = const Color(0xffedb4bb),
+        );
+      }
+      canvas.drawOval(
+        Rect.fromCenter(
+          center: paw + const Offset(0, 1.7),
+          width: 8,
+          height: 5,
+        ),
+        Paint()..color = const Color(0xffe5a0a8),
       );
+    } else {
+      for (var i = 0; i < 3; i++) {
+        canvas.drawCircle(
+          paw + Offset(-5 + i * 4.5, -3),
+          1.35,
+          Paint()..color = const Color(0xffa38e84),
+        );
+      }
     }
     if (t > .3 && t < .5 && !reducedMotion) {
       final ink = Paint()

@@ -370,6 +370,8 @@ class BomberBoardPainter extends CustomPainter {
         0.0,
         1.0,
       );
+      // A tile remains visibly dangerous until its damage window closes.
+      final dangerAlpha = .65 + fade * .35;
       for (final k in (e['cells'] as List? ?? [])) {
         final xy = (k as String).split('_').map(int.parse).toList(),
             r = Rect.fromLTWH(
@@ -380,17 +382,17 @@ class BomberBoardPainter extends CustomPainter {
             ).deflate(cell * .06);
         c.drawRRect(
           RRect.fromRectAndRadius(r, Radius.circular(cell * .23)),
-          Paint()..color = Colors.orange.withValues(alpha: fade * .85),
+          Paint()..color = Colors.orange.withValues(alpha: dangerAlpha * .85),
         );
         c.drawOval(
           r.deflate(cell * .17),
-          Paint()..color = Colors.yellowAccent.withValues(alpha: fade),
+          Paint()..color = Colors.yellowAccent.withValues(alpha: dangerAlpha),
         );
         text(
           '✦',
           r.center,
           cell * .5,
-          color: Colors.white.withValues(alpha: fade),
+          color: Colors.white.withValues(alpha: dangerAlpha),
         );
       }
     }
