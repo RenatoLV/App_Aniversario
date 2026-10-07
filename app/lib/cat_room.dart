@@ -340,8 +340,8 @@ class _CatRoomState extends State<CatRoom> with TickerProviderStateMixin {
                       ),
                       if (widget.onOpenPatio != null)
                         Positioned(
-                          bottom: 20,
-                          left: (width - doorWidth) / 2,
+                          top: 27 + width * .24,
+                          right: 16 + (width * .24 - doorWidth) / 2,
                           width: doorWidth,
                           height: doorWidth * 1.5 + 18,
                           child: Semantics(
