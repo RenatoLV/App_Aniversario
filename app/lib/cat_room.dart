@@ -216,6 +216,7 @@ class _CatRoomState extends State<CatRoom> with TickerProviderStateMixin {
       child: LayoutBuilder(
         builder: (context, c) {
           final width = c.maxWidth;
+          final doorWidth = math.min(72.0, width * .20);
           // Leave room for the active cat in the middle and its companion at the side.
           final catSize = math.min(148.0, width * .30);
           final height = (width * .4 + 165).clamp(285.0, 380.0);
@@ -339,10 +340,10 @@ class _CatRoomState extends State<CatRoom> with TickerProviderStateMixin {
                       ),
                       if (widget.onOpenPatio != null)
                         Positioned(
-                          top: 34,
-                          left: width * .37,
-                          width: width * .26,
-                          height: height - 54,
+                          bottom: 20,
+                          left: (width - doorWidth) / 2,
+                          width: doorWidth,
+                          height: doorWidth * 1.5 + 18,
                           child: Semantics(
                             button: true,
                             label: 'Abrir la puerta al patio',
