@@ -29,6 +29,7 @@ class CatActor extends StatefulWidget {
   final VoidCallback? onPet;
   final CatOutfit? outfit;
   final double? cleanliness;
+  final bool? sleeping;
 
   const CatActor({
     super.key,
@@ -49,6 +50,7 @@ class CatActor extends StatefulWidget {
     this.onPet,
     this.outfit,
     this.cleanliness,
+    this.sleeping,
   });
 
   @override
@@ -67,7 +69,11 @@ class _CatActorState extends State<CatActor> with TickerProviderStateMixin {
 
   void _scheduleNap() {
     _napTimer?.cancel();
-    if (widget.action != CatAction.idle || widget.active) return;
+    if (widget.action != CatAction.idle ||
+        widget.active ||
+        widget.sleeping == true) {
+      return;
+    }
     _napTimer = Timer(
       Duration(seconds: widget.cat == CatKind.maru ? 11 : 14),
       () {
@@ -143,17 +149,23 @@ class _CatActorState extends State<CatActor> with TickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     final name = widget.cat == CatKind.maru ? 'Maru' : 'Lady';
+    final resting =
+        widget.sleeping ??
+        CatCareScope.maybeOf(context)?.resting(widget.cat) ??
+        false;
     return Transform.translate(
       offset: widget.movable ? _offset : Offset.zero,
       child: Semantics(
         button: true,
-        label: _sleeping
+        label: resting
+            ? '$name descansa con la luz apagada'
+            : _sleeping
             ? '$name está durmiendo. Tócalo para despertarlo'
             : 'Acariciar a $name${widget.movable ? ', mantener pulsado para mover, tocar dos veces para dormir' : ''}',
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
-          onTap: _wakeAndPet,
-          onDoubleTap: widget.movable
+          onTap: resting ? null : _wakeAndPet,
+          onDoubleTap: widget.movable && !resting
               ? () {
                   if (_sleeping) {
                     _wakeTimer?.cancel();
@@ -164,7 +176,7 @@ class _CatActorState extends State<CatActor> with TickerProviderStateMixin {
                   }
                 }
               : null,
-          onLongPressStart: widget.movable
+          onLongPressStart: widget.movable && !resting
               ? (_) {
                   HapticFeedback.selectionClick();
                   _dragOrigin = _offset;
@@ -173,7 +185,7 @@ class _CatActorState extends State<CatActor> with TickerProviderStateMixin {
                   _scheduleNap();
                 }
               : null,
-          onLongPressMoveUpdate: widget.movable
+          onLongPressMoveUpdate: widget.movable && !resting
               ? (details) {
                   final limit = widget.size * .18;
                   setState(() {
@@ -213,7 +225,7 @@ class _CatActorState extends State<CatActor> with TickerProviderStateMixin {
                       phase: widget.mealProgress ?? _idle.value,
                       pet: _pet.value,
                       focus: widget.focus,
-                      sleeping: _sleeping,
+                      sleeping: resting || _sleeping,
                       reaction: _reaction,
                       feeding: widget.feeding,
                       munching: widget.munching,

@@ -23,6 +23,7 @@ import 'brand_title.dart';
 import 'card_trades.dart';
 import 'sweet_screen.dart';
 import 'cat_room.dart';
+import 'patio_screen.dart';
 import 'leap_screen.dart';
 import 'card_palette.dart';
 import 'card_ar.dart';
@@ -407,6 +408,8 @@ class _RinconHomeState extends State<RinconHome>
                 ? '/sweet'
                 : screen is WordleScreen
                 ? '/wordle'
+                : screen is PatioScreen
+                ? '/patio'
                 : screen is BomberScreen
                 ? '/bomber'
                 : '/blocks',
@@ -727,6 +730,7 @@ class _RinconHomeState extends State<RinconHome>
       ),
       const SizedBox(height: 12),
       CatRoom(
+        onOpenPatio: () => _play(PatioScreen(store: s)),
         onOpenCare: () => Navigator.of(context).push(
           MaterialPageRoute<void>(builder: (_) => CatCareScreen(store: s)),
         ),

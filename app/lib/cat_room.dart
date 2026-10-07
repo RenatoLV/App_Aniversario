@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'cat_character.dart';
 import 'game_audio.dart';
 import 'house_day_cycle.dart';
+import 'patio_art.dart';
 
 enum _RoomMoment { cuddle, churu, litter, thoughts, yarn, window, food, cards }
 
@@ -12,12 +13,14 @@ class CatRoom extends StatefulWidget {
   final List<int> ownedCards;
   final Widget Function(int)? cardBuilder;
   final VoidCallback? onOpenCare;
+  final VoidCallback? onOpenPatio;
   final DateTime Function()? clock;
   const CatRoom({
     super.key,
     this.ownedCards = const [],
     this.cardBuilder,
     this.onOpenCare,
+    this.onOpenPatio,
     this.clock,
   });
   @override
@@ -334,11 +337,53 @@ class _CatRoomState extends State<CatRoom> with TickerProviderStateMixin {
                           ),
                         ),
                       ),
-                      Positioned(
-                        top: 28,
-                        left: width * .43,
-                        child: const Text('🪴', style: TextStyle(fontSize: 32)),
-                      ),
+                      if (widget.onOpenPatio != null)
+                        Positioned(
+                          top: 34,
+                          left: width * .37,
+                          width: width * .26,
+                          height: height - 54,
+                          child: Semantics(
+                            button: true,
+                            label: 'Abrir la puerta al patio',
+                            child: Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                key: const ValueKey('home-patio-door'),
+                                borderRadius: BorderRadius.circular(12),
+                                onTap: widget.onOpenPatio,
+                                child: Column(
+                                  children: [
+                                    Expanded(
+                                      child: CustomPaint(
+                                        painter: PatioDoorPainter(light: light),
+                                        child: SizedBox.expand(),
+                                      ),
+                                    ),
+                                    SizedBox(height: 4),
+                                    Text(
+                                      'Patio',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: light.text,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        )
+                      else
+                        Positioned(
+                          top: 28,
+                          left: width * .43,
+                          child: const Text(
+                            '🪴',
+                            style: TextStyle(fontSize: 32),
+                          ),
+                        ),
                       Positioned(
                         top: 4,
                         left: width * .43,
@@ -408,6 +453,9 @@ class _CatRoomState extends State<CatRoom> with TickerProviderStateMixin {
                           child: AnimatedBuilder(
                             animation: Listenable.merge([_life, _hop]),
                             builder: (context, _) {
+                              final resting =
+                                  CatCareScope.maybeOf(context)?.resting(cat) ??
+                                  false;
                               final t = _life.value;
                               final side = cat == CatKind.maru ? 1.0 : -1.0;
                               final digs =
@@ -416,10 +464,11 @@ class _CatRoomState extends State<CatRoom> with TickerProviderStateMixin {
                                   churu && (cat == CatKind.maru) == _maruTurn;
                               final munches =
                                   meal && (cat == CatKind.maru) == _maruTurn;
-                              final jump = yarn
+                              final jump = yarn && !resting
                                   ? math.sin(t * math.pi * 4).abs() * 9
                                   : 0.0;
-                              final cuddle = _moment == _RoomMoment.cuddle
+                              final cuddle =
+                                  !resting && _moment == _RoomMoment.cuddle
                                   ? math.sin(t * math.pi) * 8 * side
                                   : 0.0;
                               final baseX =
@@ -430,7 +479,10 @@ class _CatRoomState extends State<CatRoom> with TickerProviderStateMixin {
                                   ? 5.0
                                   : width - catSize - 5;
                               final position = _positions[cat] ?? Offset.zero;
-                              final hop = _hopping == cat && _dragging != cat
+                              final hop =
+                                  !resting &&
+                                      _hopping == cat &&
+                                      _dragging != cat
                                   ? math.sin(_hop.value * math.pi) * _hopHeight
                                   : 0.0;
                               return GestureDetector(

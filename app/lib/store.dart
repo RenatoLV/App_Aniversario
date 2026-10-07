@@ -173,6 +173,8 @@ class GameStore extends ChangeNotifier {
   int packsSinceLegendary = 0;
   String? lastDiscountPackDay;
   int dailyPacksOpened = 0;
+  int footballGoals = 0, footballBestStreak = 0;
+  Map<String, int> _footballClaims = {};
   String _packDay(DateTime now) => '${now.year}-${now.month}-${now.day}';
   int packPriceAt(DateTime now) => lastDiscountPackDay == _packDay(now)
       ? (20 + 5 * dailyPacksOpened).clamp(20, 70)
@@ -218,6 +220,10 @@ class GameStore extends ChangeNotifier {
       best = j['best'] as int;
       packsSinceLegendary = (j['packsSinceLegendary'] as int?) ?? 0;
       lastDiscountPackDay = j['lastDiscountPackDay'] as String?;
+      footballGoals = (j['footballGoals'] as int?) ?? 0;
+      footballBestStreak = (j['footballBestStreak'] as int?) ?? 0;
+      _footballClaims = ((j['footballClaims'] as Map<String, dynamic>?) ?? {})
+          .map((k, v) => MapEntry(k, (v as num).toInt()));
       dailyPacksOpened =
           ((j['dailyPacksOpened'] as num?)?.toInt() ??
                   (lastDiscountPackDay == null ? 0 : 1))
@@ -507,6 +513,9 @@ class GameStore extends ChangeNotifier {
     packsSinceLegendary = restored.packsSinceLegendary;
     lastDiscountPackDay = restored.lastDiscountPackDay;
     dailyPacksOpened = restored.dailyPacksOpened;
+    footballGoals = restored.footballGoals;
+    footballBestStreak = restored.footballBestStreak;
+    _footballClaims = restored._footballClaims;
     game = restored.game;
     notes = restored.notes;
     _dirtyNotes
@@ -563,6 +572,9 @@ class GameStore extends ChangeNotifier {
       'packsSinceLegendary': packsSinceLegendary,
       'lastDiscountPackDay': lastDiscountPackDay,
       'dailyPacksOpened': dailyPacksOpened,
+      'footballGoals': footballGoals,
+      'footballBestStreak': footballBestStreak,
+      'footballClaims': _footballClaims,
       'cardVariants': cardVariants,
       'tradeReceipts': _tradeReceipts,
       'cards': cards.map((k, v) => MapEntry('$k', v)),
@@ -612,6 +624,20 @@ class GameStore extends ChangeNotifier {
   Future<void> rewardGameCoins(String claimId, int amount) async {
     if (amount <= 0 || !_gameRewards.add(claimId)) return;
     coins += amount;
+    await save();
+  }
+
+  Future<void> recordFootballGoal(String claimId, int streak) async {
+    final separator = claimId.lastIndexOf(':');
+    if (separator <= 0) return;
+    final session = claimId.substring(0, separator);
+    final attempt = int.tryParse(claimId.substring(separator + 1));
+    if (attempt == null || attempt <= (_footballClaims[session] ?? 0)) return;
+    // One high-water mark per run, rather than an ever-growing ID per goal.
+    _footballClaims[session] = attempt;
+    coins += 30;
+    footballGoals++;
+    footballBestStreak = max(footballBestStreak, streak);
     await save();
   }
 

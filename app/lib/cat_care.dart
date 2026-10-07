@@ -666,6 +666,7 @@ class CatCare extends ChangeNotifier {
 
   CatNeeds needs(CatKind cat) {
     final p = _profiles[cat]!;
+    if (resting(cat)) return CatNeeds(p.food, p.clean, p.happy);
     final hours = now().difference(p.updated).inMinutes.clamp(0, 1440) / 60;
     // Gentle, capped decay: the cats never disappear or affect game difficulty.
     return CatNeeds(
@@ -678,7 +679,9 @@ class CatCare extends ChangeNotifier {
   CatOutfit outfit(CatKind cat) => _profiles[cat]!.outfit;
   CatBedroom bedroom(CatKind cat) =>
       _profiles[cat]!.bedroom ?? CatBedroom.defaults(lady: cat == CatKind.lady);
+  bool resting(CatKind cat) => !bedroom(cat).lamp;
   Future<void> decorateBedroom(CatKind cat, CatBedroom room) async {
+    if (room.lamp != bedroom(cat).lamp) _settle(cat);
     _profiles[cat]!.bedroom = CatBedroom.fromJson(
       room.toJson(),
       lady: cat == CatKind.lady,

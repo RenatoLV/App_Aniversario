@@ -27,3 +27,7 @@ suelta el control táctil al cambiar de aplicación. Ver [La casita](CAT_CARE.md
 y [cartas celestiales](CELESTIAL_CARDS.md).
 
 Los sobres cuestan 20 monedas al empezar el día y suben 5 con cada apertura exitosa hasta 70. La progresión se comparte entre Vol. 1 y Vol. 2 y se guarda con el progreso.
+
+En el dormitorio, apagar la luz congela hambre, limpieza y ánimo de ese gato, también después de cerrar la app. Encenderla reanuda el tiempo desde ese momento; salir al patio despierta a ambos. La puerta del inicio abre el patio y su fútbol de patitas: deslizar el balón, portero Maru/Lady, dificultad gradual, rebotes y 30 monedas por gol. El récord y los pagos se guardan; el último tiro pagado por sesión evita duplicados sin guardar una entrada por cada gol.
+
+El patio sigue la hora local del teléfono y consulta Open-Meteo para Coquimbo o La Serena cada 15 minutos. La elección de ciudad se guarda en el teléfono, sin permisos GPS. Con datos guardados se muestra la indicación correspondiente; sin datos, el fútbol sigue disponible.

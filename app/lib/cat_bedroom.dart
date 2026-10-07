@@ -55,7 +55,7 @@ class CatBedroomScene extends StatelessWidget {
                       style: TextStyle(
                         fontWeight: FontWeight.w800,
                         fontSize: 18,
-                        color: light.text,
+                        color: room.lamp ? light.text : Colors.white,
                       ),
                     ),
                   ),
@@ -102,8 +102,37 @@ class CatBedroomScene extends StatelessWidget {
                         showLabel: false,
                         showShadow: false,
                         movable: true,
+                        sleeping: !room.lamp,
                         onPet: () => store.catCare.pet(cat),
                       ),
+                    ),
+                  ),
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: AnimatedContainer(
+                        key: const ValueKey('bedroom-darkness'),
+                        duration: const Duration(milliseconds: 650),
+                        color: room.lamp
+                            ? Colors.transparent
+                            : const Color(0x990f142b),
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    right: 14,
+                    bottom: 14,
+                    child: FilledButton.icon(
+                      key: const ValueKey('bedroom-light-toggle'),
+                      onPressed: () => store.catCare.decorateBedroom(
+                        cat,
+                        room.copyWith(lamp: !room.lamp),
+                      ),
+                      icon: Icon(
+                        room.lamp
+                            ? Icons.bedtime_rounded
+                            : Icons.lightbulb_rounded,
+                      ),
+                      label: Text(room.lamp ? 'Apagar luz' : 'Encender luz'),
                     ),
                   ),
                 ],
@@ -201,7 +230,12 @@ class CatBedroomControls extends StatelessWidget {
         SwitchListTile(
           key: const ValueKey('room-lamp'),
           contentPadding: EdgeInsets.zero,
-          title: const Text('Lamparita encendida'),
+          title: const Text('Luz del dormitorio'),
+          subtitle: Text(
+            room.lamp
+                ? 'Apágala para que descanse.'
+                : 'Descansando: hambre y suciedad en pausa, incluso con la app cerrada.',
+          ),
           value: room.lamp,
           onChanged: (v) => choose(room.copyWith(lamp: v)),
         ),
