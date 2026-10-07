@@ -43,7 +43,7 @@ void main() {
     }
     expect(
       anniversaryCollectionV2Cards.where((id) => !isCelestialCard(id)).length,
-      90,
+      133,
     );
     expect(CardRarity.legendary.index, 2);
     expect(CardRarity.mythic.index, 5);

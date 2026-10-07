@@ -28,7 +28,7 @@ Retirar un GIF de la carpeta de origen no elimina cartas que los jugadores ya po
 Para sustituir una animación manteniendo su carta, reemplazar el archivo de origen
 conservando su nombre. Usar GIF en bucle continuo para que la animación no termine.
 La app necesita una nueva compilación para incorporar nuevos GIF; no lee Downloads
-desde el teléfono. La primera importación contiene 27 cartas: 14 en Vol. 1 y 13 en Vol. 2.
+desde el teléfono. El catálogo contiene 45 cartas: 23 en Vol. 1 y 22 en Vol. 2. Los IDs y volúmenes anteriores se conservan.
 
 ## Reproducción y guardado
 

@@ -13,7 +13,7 @@ flutter test --concurrency=1
 flutter build apk --debug
 ```
 
-Para importar memes desde la raíz: `py app/tool/import_memes.py --source "C:\ruta\a\tus\memes"`. Requiere Pillow. Hay 334 memes en dos volúmenes; el catálogo conserva IDs estables. Añadir imágenes requiere reconstruir la app; no hay todavía un catálogo descargable remoto.
+Para importar memes desde la raíz: `py app/tool/import_memes.py --source "C:\ruta\a\tus\memes"`. Requiere Pillow. Hay 377 memes en dos volúmenes; el catálogo conserva IDs estables. Añadir imágenes requiere reconstruir la app; no hay todavía un catálogo descargable remoto.
 
 APK de prueba: `build/app/outputs/flutter-apk/app-debug.apk`. No se incluye en Git.
 Los cambios en `main` generan una APK firmada en GitHub Releases. iOS y las pruebas
@@ -25,3 +25,5 @@ físico mostrado y el visor mantiene resolución original. Ascenso actualiza la
 física y el dibujo en cada frame, con menos reconstrucciones del HUD; Bomber
 suelta el control táctil al cambiar de aplicación. Ver [La casita](CAT_CARE.md)
 y [cartas celestiales](CELESTIAL_CARDS.md).
+
+Los sobres cuestan 20 monedas al empezar el día y suben 5 con cada apertura exitosa hasta 70. La progresión se comparte entre Vol. 1 y Vol. 2 y se guarda con el progreso.

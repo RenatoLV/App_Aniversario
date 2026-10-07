@@ -28,16 +28,22 @@ async function join(id,uid,kitten) {
   await database().ref(`bomberUsers/${uid}/room`).set(id);
 }
 async function settle(id,action) {
-  const ref=room(id),snapshot=(await ref.get()).val();if(!snapshot) return;
-  const now=Date.now(),motions=snapshot.motion||{};
-  return ref.child('state').transaction(s=>{
-    if(!s) return s; E.advance(s,motions,now);
+  return room(id).transaction(data=>{
+    if(!data?.state) return data;
+    const now=Date.now(),s=data.state,motions=data.motion||{};
+    E.advance(s,motions,now);
     if(s.status==='playing'&&now>=s.startsAt) {
-      const missing=Object.keys(s.players).filter(uid=>snapshot.presence?.[uid]?.online===false&&now-(snapshot.presence[uid].at||0)>E.config.grace);
+      const missing=Object.keys(s.players).filter(uid=>data.presence?.[uid]?.online===false&&now-(data.presence[uid].at||0)>E.config.grace);
       if(missing.length) {s.status='abandoned';s.result={winner:missing.length===1?Object.keys(s.players).find(u=>u!==missing[0]):'draw',at:now};}
     }
-    if(action) action(s,motions,now);return s;
+    if(action) action(s,motions,now);return data;
   });
+}
+async function finishPending(id) {
+  const pending=(await room(id).child('state/resultPending').get()).val();
+  if(!pending) return;
+  await new Promise(resolve=>setTimeout(resolve,Math.max(0,Math.min(E.config.resultGrace,pending.finalizeAt-Date.now()))));
+  await settle(id);
 }
 exports.bomberMatch=onRequest({region:'us-central1',cors:true,maxInstances:4,memory:'256MiB',timeoutSeconds:30},async(req,res)=>{
   if(req.method!=='POST') return res.status(405).json({error:'Usa POST.'});
@@ -98,13 +104,17 @@ exports.bomberMatch=onRequest({region:'us-central1',cors:true,maxInstances:4,mem
   } catch(error) {const auth=String(error.code||'').startsWith('auth/');res.status(auth?401:400).json({error:auth?'Vuelve a iniciar sesión.':error.message});}
 });
 exports.bomberBomb=onValueCreated({ref:'/bomberRooms/{room}/state/bombs/{bomb}',instance,region:'us-central1',maxInstances:6,memory:'256MiB',timeoutSeconds:30,retry:true},async event=>{
-  const bomb=event.data.val();await new Promise(resolve=>setTimeout(resolve,Math.max(0,Math.min(E.config.fuse,bomb.explodeAt-Date.now()))));await settle(event.params.room);
+  const bomb=event.data.val();await new Promise(resolve=>setTimeout(resolve,Math.max(0,Math.min(E.config.fuse,bomb.explodeAt-Date.now()))));await settle(event.params.room);await finishPending(event.params.room);
 });
 // Timestamped motion catches a cat walking into a blast after detonation,
 // including an event delivered after the short visual flame has faded.
 exports.bomberContact=onValueWritten({ref:'/bomberRooms/{room}/motion/{uid}',instance,region:'us-central1',maxInstances:6,memory:'256MiB',timeoutSeconds:30,retry:true},async event=>{
   const motion=event.data.after.val();if(!motion) return;
-  const stateRef=room(event.params.room).child('state'),s=(await stateRef.get()).val();
-  if(!s||s.status!=='playing'||!Object.values(s.events||{}).some(e=>motion.at>=e.at&&motion.at<e.until)) return;
-  await stateRef.transaction(current=>current?E.contact(current,event.params.uid,motion):current);
+  const s=(await room(event.params.room).child('state').get()).val();
+  if(!s||!['playing','settling'].includes(s.status)||!Object.values(s.events||{}).some(e=>motion.at>=e.at&&motion.at<e.until)) return;
+  await settle(event.params.room,(current,motions,now)=>{
+    E.contact(current,event.params.uid,motion,now);
+    for(const [uid,m] of Object.entries(motions)) E.contact(current,uid,m,now);
+  });
+  await finishPending(event.params.room);
 });

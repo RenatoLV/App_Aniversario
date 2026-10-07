@@ -641,6 +641,39 @@ class _BomberGameScreenState extends State<BomberGameScreen>
     paused = state != AppLifecycleState.resumed && !sim.online;
   }
 
+  bool _leaving = false, _exitCompleted = false;
+
+  Future<void> _exit() async {
+    if (_leaving) return;
+    setState(() {
+      _leaving = true;
+      message = 'Cerrando la partida…';
+    });
+    sim.input = Offset.zero;
+    keys.clear();
+    ticker.stop();
+    if (network != null) {
+      try {
+        // Release the server assignment before the menu can start another match.
+        await BomberNetwork.request('leave', room: widget.room);
+      } catch (_) {
+        if (!mounted) return;
+        setState(() {
+          _leaving = false;
+          message = 'No se pudo cerrar la sala. Intenta salir de nuevo.';
+        });
+        ticker.start();
+        return;
+      }
+      await network!.close();
+    }
+    if (!mounted) return;
+    setState(() => _exitCompleted = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) Navigator.pop(context);
+    });
+  }
+
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
@@ -648,7 +681,7 @@ class _BomberGameScreenState extends State<BomberGameScreen>
     focus.dispose();
     if (network != null) {
       unawaited(network!.close());
-      if (!sim.finished) {
+      if (!_exitCompleted && !sim.finished) {
         unawaited(
           BomberNetwork.request(
             'leave',
@@ -713,372 +746,386 @@ class _BomberGameScreenState extends State<BomberGameScreen>
         won = winner == sim.localId,
         draw = winner == 'draw';
     final rival = objectMap(sim.members[sim.rival]);
-    return KeyboardListener(
-      focusNode: focus,
-      autofocus: true,
-      onKeyEvent: keyboard,
-      child: Scaffold(
-        backgroundColor: arena.background,
-        appBar: AppBar(
+    return PopScope(
+      canPop: _exitCompleted,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) unawaited(_exit());
+      },
+      child: KeyboardListener(
+        focusNode: focus,
+        autofocus: true,
+        onKeyEvent: keyboard,
+        child: Scaffold(
           backgroundColor: arena.background,
-          foregroundColor: Colors.white,
-          title: Text(arena.name, style: const TextStyle(fontSize: 17)),
-          actions: [
-            IconButton(
-              tooltip: 'Cómo jugar',
-              icon: const Icon(Icons.help_outline),
-              onPressed: () async {
-                sim.input = Offset.zero;
-                if (!sim.online) paused = true;
-                await showDialog<void>(
-                  context: context,
-                  builder: (context) => AlertDialog(
-                    title: const Text('Escapa antes del ¡pum!'),
-                    content: const Text(
-                      'Desliza en el control izquierdo para moverte. Recoge monedas de 5 en los caminos libres; ganar entrega 150 monedas. Usa la bomba a la derecha y corre: explota en 2,8 segundos. Las paredes frenan el fuego, las cajas esconden seis poderes. En computadora: flechas o WASD y espacio.',
+          appBar: AppBar(
+            backgroundColor: arena.background,
+            foregroundColor: Colors.white,
+            title: Text(arena.name, style: const TextStyle(fontSize: 17)),
+            actions: [
+              IconButton(
+                tooltip: 'Cómo jugar',
+                icon: const Icon(Icons.help_outline),
+                onPressed: () async {
+                  sim.input = Offset.zero;
+                  if (!sim.online) paused = true;
+                  await showDialog<void>(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: const Text('Escapa antes del ¡pum!'),
+                      content: const Text(
+                        'Desliza en el control izquierdo para moverte. Recoge monedas de 5 en los caminos libres; ganar entrega 150 monedas. Usa la bomba a la derecha y corre: explota en 2,8 segundos. Las paredes frenan el fuego, las cajas esconden seis poderes. En computadora: flechas o WASD y espacio.',
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text('Listo'),
+                        ),
+                      ],
                     ),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(context),
-                        child: const Text('Listo'),
+                  );
+                  if (mounted) paused = false;
+                },
+              ),
+            ],
+          ),
+          body: SafeArea(
+            top: false,
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 6,
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.pets, color: Colors.white70, size: 18),
+                      const SizedBox(width: 7),
+                      Expanded(
+                        child: Text(
+                          sim.online
+                              ? (rival['name'] == null
+                                    ? 'Buscando rival…'
+                                    : 'vs. ${rival['name']}')
+                              : 'vs. Michi IA',
+                          style: const TextStyle(color: Colors.white70),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      Text(
+                        '${sim.remaining ~/ 60}:${(sim.remaining % 60).toString().padLeft(2, '0')}',
+                        style: TextStyle(
+                          color: arena.accent,
+                          fontSize: 23,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
                     ],
                   ),
-                );
-                if (mounted) paused = false;
-              },
-            ),
-          ],
-        ),
-        body: SafeArea(
-          top: false,
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 6,
                 ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.pets, color: Colors.white70, size: 18),
-                    const SizedBox(width: 7),
-                    Expanded(
-                      child: Text(
-                        sim.online
-                            ? (rival['name'] == null
-                                  ? 'Buscando rival…'
-                                  : 'vs. ${rival['name']}')
-                            : 'vs. Michi IA',
-                        style: const TextStyle(color: Colors.white70),
-                        overflow: TextOverflow.ellipsis,
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Wrap(
+                    alignment: WrapAlignment.center,
+                    spacing: 14,
+                    runSpacing: 4,
+                    children: [
+                      Text(
+                        '🪙 ${sim.coins}',
+                        style: const TextStyle(color: Color(0xffffd45c)),
                       ),
-                    ),
-                    Text(
-                      '${sim.remaining ~/ 60}:${(sim.remaining % 60).toString().padLeft(2, '0')}',
-                      style: TextStyle(
-                        color: arena.accent,
-                        fontSize: 23,
-                        fontWeight: FontWeight.w800,
+                      Text(
+                        'Bombas ${stats['maxBombs'] ?? 1}',
+                        style: const TextStyle(color: Colors.white),
                       ),
-                    ),
-                  ],
+                      Text(
+                        'Alcance ${stats['range'] ?? 2}',
+                        style: const TextStyle(color: Colors.white),
+                      ),
+                      Text(
+                        '${valueNum(stats['speed'], 1).toStringAsFixed(2)}×',
+                        style: const TextStyle(color: Colors.white),
+                      ),
+                      if (stats['paw'] == true)
+                        const Icon(Icons.pets, color: Colors.white, size: 18),
+                      if (valueNum(stats['shieldUntil']) > sim.now)
+                        const Text(
+                          'Escudo',
+                          style: TextStyle(color: Colors.white),
+                        ),
+                      if (valueNum(stats['boxUntil']) > sim.now)
+                        const Text(
+                          'Fantasma',
+                          style: TextStyle(color: Colors.white),
+                        ),
+                    ],
+                  ),
                 ),
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Wrap(
-                  alignment: WrapAlignment.center,
-                  spacing: 14,
-                  runSpacing: 4,
-                  children: [
-                    Text(
-                      '🪙 ${sim.coins}',
-                      style: const TextStyle(color: Color(0xffffd45c)),
-                    ),
-                    Text(
-                      'Bombas ${stats['maxBombs'] ?? 1}',
-                      style: const TextStyle(color: Colors.white),
-                    ),
-                    Text(
-                      'Alcance ${stats['range'] ?? 2}',
-                      style: const TextStyle(color: Colors.white),
-                    ),
-                    Text(
-                      '${valueNum(stats['speed'], 1).toStringAsFixed(2)}×',
-                      style: const TextStyle(color: Colors.white),
-                    ),
-                    if (stats['paw'] == true)
-                      const Icon(Icons.pets, color: Colors.white, size: 18),
-                    if (valueNum(stats['shieldUntil']) > sim.now)
-                      const Text(
-                        'Escudo',
-                        style: TextStyle(color: Colors.white),
-                      ),
-                    if (valueNum(stats['boxUntil']) > sim.now)
-                      const Text(
-                        'Fantasma',
-                        style: TextStyle(color: Colors.white),
-                      ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 10),
-              Expanded(
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    final width = math.min(
-                      constraints.maxWidth - 20,
-                      constraints.maxHeight * sim.columns / sim.rows,
-                    );
-                    return Center(
-                      child: SizedBox(
-                        width: width,
-                        height: width * sim.rows / sim.columns,
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(16),
-                          child: Stack(
-                            fit: StackFit.expand,
-                            children: [
-                              CustomPaint(painter: BomberBoardPainter(sim)),
-                              if (sim.state.isEmpty ||
-                                  sim.status == 'waiting' ||
-                                  sim.status == 'ready' ||
-                                  sim.countdown > 0)
-                                Container(
-                                  color: arena.background.withValues(alpha: .7),
-                                  child: Center(
-                                    child: Padding(
-                                      padding: const EdgeInsets.all(20),
-                                      child: Column(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          const Icon(
-                                            Icons.pets,
-                                            color: Colors.white,
-                                            size: 40,
-                                          ),
-                                          const SizedBox(height: 12),
-                                          Text(
-                                            sim.countdown > 0 &&
-                                                    sim.status == 'playing'
-                                                ? '${sim.countdown}'
-                                                : sim.status == 'waiting'
-                                                ? 'Esperando a otro gatito…'
-                                                : 'Preparando la arena…',
-                                            textAlign: TextAlign.center,
-                                            style: TextStyle(
-                                              fontSize: sim.countdown > 0
-                                                  ? 50
-                                                  : 22,
-                                              color: arena.accent,
-                                              fontWeight: FontWeight.bold,
+                const SizedBox(height: 10),
+                Expanded(
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final width = math.min(
+                        constraints.maxWidth - 20,
+                        constraints.maxHeight * sim.columns / sim.rows,
+                      );
+                      return Center(
+                        child: SizedBox(
+                          width: width,
+                          height: width * sim.rows / sim.columns,
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(16),
+                            child: Stack(
+                              fit: StackFit.expand,
+                              children: [
+                                CustomPaint(painter: BomberBoardPainter(sim)),
+                                if (sim.state.isEmpty ||
+                                    sim.status == 'waiting' ||
+                                    sim.status == 'ready' ||
+                                    sim.status == 'settling' ||
+                                    sim.countdown > 0)
+                                  Container(
+                                    color: arena.background.withValues(
+                                      alpha: .7,
+                                    ),
+                                    child: Center(
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(20),
+                                        child: Column(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            const Icon(
+                                              Icons.pets,
+                                              color: Colors.white,
+                                              size: 40,
                                             ),
-                                          ),
-                                          if (sim.status == 'waiting')
-                                            const Padding(
-                                              padding: EdgeInsets.only(top: 12),
-                                              child: Text(
-                                                'La búsqueda dura hasta un minuto. Puedes cancelar con la flecha de volver.',
-                                                textAlign: TextAlign.center,
-                                                style: TextStyle(
-                                                  color: Colors.white70,
-                                                  fontSize: 13,
-                                                ),
+                                            const SizedBox(height: 12),
+                                            Text(
+                                              sim.countdown > 0 &&
+                                                      sim.status == 'playing'
+                                                  ? '${sim.countdown}'
+                                                  : sim.status == 'waiting'
+                                                  ? 'Esperando a otro gatito…'
+                                                  : sim.status == 'settling'
+                                                  ? 'Resolviendo la explosión…'
+                                                  : 'Preparando la arena…',
+                                              textAlign: TextAlign.center,
+                                              style: TextStyle(
+                                                fontSize: sim.countdown > 0
+                                                    ? 50
+                                                    : 22,
+                                                color: arena.accent,
+                                                fontWeight: FontWeight.bold,
                                               ),
                                             ),
-                                        ],
+                                            if (sim.status == 'waiting')
+                                              const Padding(
+                                                padding: EdgeInsets.only(
+                                                  top: 12,
+                                                ),
+                                                child: Text(
+                                                  'La búsqueda dura hasta un minuto. Puedes cancelar con la flecha de volver.',
+                                                  textAlign: TextAlign.center,
+                                                  style: TextStyle(
+                                                    color: Colors.white70,
+                                                    fontSize: 13,
+                                                  ),
+                                                ),
+                                              ),
+                                          ],
+                                        ),
                                       ),
                                     ),
                                   ),
-                                ),
-                              if (sim.finished)
-                                Container(
-                                  color: arena.background.withValues(
-                                    alpha: .85,
-                                  ),
-                                  child: Center(
-                                    child: Padding(
-                                      padding: const EdgeInsets.all(22),
-                                      child: Column(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Icon(
-                                            draw
-                                                ? Icons.handshake_rounded
-                                                : won
-                                                ? Icons.emoji_events_rounded
-                                                : Icons.favorite_rounded,
-                                            size: 62,
-                                            color: arena.accent,
-                                          ),
-                                          const SizedBox(height: 14),
-                                          Text(
-                                            draw
-                                                ? '¡Empate de patitas!'
-                                                : won
-                                                ? '¡Miau victoria! +150 monedas'
-                                                : '¡Una escapada más!',
-                                            textAlign: TextAlign.center,
-                                            style: TextStyle(
+                                if (sim.finished)
+                                  Container(
+                                    color: arena.background.withValues(
+                                      alpha: .85,
+                                    ),
+                                    child: Center(
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(22),
+                                        child: Column(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(
+                                              draw
+                                                  ? Icons.handshake_rounded
+                                                  : won
+                                                  ? Icons.emoji_events_rounded
+                                                  : Icons.favorite_rounded,
+                                              size: 62,
                                               color: arena.accent,
-                                              fontSize: 25,
-                                              fontWeight: FontWeight.w800,
                                             ),
-                                          ),
-                                          const SizedBox(height: 12),
-                                          const Text(
-                                            'Cada bomba enseña un camino nuevo.',
-                                            textAlign: TextAlign.center,
-                                            style: TextStyle(
-                                              color: Colors.white70,
+                                            const SizedBox(height: 14),
+                                            Text(
+                                              draw
+                                                  ? '¡Empate de patitas!'
+                                                  : won
+                                                  ? '¡Miau victoria! +150 monedas'
+                                                  : '¡Una escapada más!',
+                                              textAlign: TextAlign.center,
+                                              style: TextStyle(
+                                                color: arena.accent,
+                                                fontSize: 25,
+                                                fontWeight: FontWeight.w800,
+                                              ),
                                             ),
-                                          ),
-                                          const SizedBox(height: 22),
-                                          FilledButton.icon(
-                                            onPressed: () =>
-                                                Navigator.pop(context),
-                                            icon: const Icon(Icons.pets),
-                                            label: const Text(
-                                              'Elegir otra arena',
+                                            const SizedBox(height: 12),
+                                            const Text(
+                                              'Cada bomba enseña un camino nuevo.',
+                                              textAlign: TextAlign.center,
+                                              style: TextStyle(
+                                                color: Colors.white70,
+                                              ),
                                             ),
-                                          ),
-                                        ],
+                                            const SizedBox(height: 22),
+                                            FilledButton.icon(
+                                              onPressed: _leaving
+                                                  ? null
+                                                  : _exit,
+                                              icon: const Icon(Icons.pets),
+                                              label: const Text(
+                                                'Elegir otra arena',
+                                              ),
+                                            ),
+                                          ],
+                                        ),
                                       ),
                                     ),
                                   ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                if (network != null)
+                  ValueListenableBuilder(
+                    valueListenable: network!.connection,
+                    builder: (context, value, _) => value.isEmpty
+                        ? const SizedBox(height: 4)
+                        : Padding(
+                            padding: const EdgeInsets.all(4),
+                            child: Text(
+                              value,
+                              style: const TextStyle(
+                                color: Colors.amber,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                  ),
+                if (message.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Text(
+                      message,
+                      style: const TextStyle(color: Colors.amber, fontSize: 12),
+                    ),
+                  ),
+                if (!sim.finished)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 6, 16, 12),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        BomberJoystick(
+                          onChanged: (v) => sim.input = v,
+                          color: arena.accent,
+                        ),
+                        Expanded(
+                          child: Column(
+                            children: [
+                              Text(
+                                'Escapa del fuego',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: arena.accent,
+                                  fontSize: 11,
                                 ),
+                              ),
+                              const SizedBox(height: 4),
+                              const Text(
+                                '2,8 segundos',
+                                style: TextStyle(
+                                  color: Colors.white54,
+                                  fontSize: 11,
+                                ),
+                              ),
                             ],
                           ),
                         ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-              if (network != null)
-                ValueListenableBuilder(
-                  valueListenable: network!.connection,
-                  builder: (context, value, _) => value.isEmpty
-                      ? const SizedBox(height: 4)
-                      : Padding(
-                          padding: const EdgeInsets.all(4),
-                          child: Text(
-                            value,
-                            style: const TextStyle(
-                              color: Colors.amber,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ),
-                ),
-              if (message.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Text(
-                    message,
-                    style: const TextStyle(color: Colors.amber, fontSize: 12),
-                  ),
-                ),
-              if (!sim.finished)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 6, 16, 12),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      BomberJoystick(
-                        onChanged: (v) => sim.input = v,
-                        color: arena.accent,
-                      ),
-                      Expanded(
-                        child: Column(
-                          children: [
-                            Text(
-                              'Escapa del fuego',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                color: arena.accent,
-                                fontSize: 11,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            const Text(
-                              '2,8 segundos',
-                              style: TextStyle(
-                                color: Colors.white54,
-                                fontSize: 11,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Semantics(
-                        button: true,
-                        label: 'Colocar bomba',
-                        child: Listener(
-                          onPointerDown: (_) => bomb(),
-                          child: Container(
-                            key: const ValueKey('bomber-bomb'),
-                            width: 88,
-                            height: 88,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              gradient: LinearGradient(
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                                colors: sim.canBomb(sim.localId)
-                                    ? [
-                                        arena.accent,
-                                        Color.lerp(
+                        Semantics(
+                          button: true,
+                          label: 'Colocar bomba',
+                          child: Listener(
+                            onPointerDown: (_) => bomb(),
+                            child: Container(
+                              key: const ValueKey('bomber-bomb'),
+                              width: 88,
+                              height: 88,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                gradient: LinearGradient(
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                  colors: sim.canBomb(sim.localId)
+                                      ? [
                                           arena.accent,
-                                          Colors.orange,
-                                          .5,
-                                        )!,
-                                      ]
-                                    : [
-                                        Colors.blueGrey,
-                                        Colors.blueGrey.shade700,
-                                      ],
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: arena.accent.withValues(alpha: .14),
-                                  blurRadius: 20,
-                                  offset: const Offset(0, 5),
+                                          Color.lerp(
+                                            arena.accent,
+                                            Colors.orange,
+                                            .5,
+                                          )!,
+                                        ]
+                                      : [
+                                          Colors.blueGrey,
+                                          Colors.blueGrey.shade700,
+                                        ],
                                 ),
-                              ],
-                              border: Border.all(
-                                color: Colors.white30,
-                                width: 3,
-                              ),
-                            ),
-                            child: const Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                SizedBox(
-                                  width: 34,
-                                  height: 34,
-                                  child: CustomPaint(
-                                    painter: BomberBombSymbol(),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: arena.accent.withValues(alpha: .14),
+                                    blurRadius: 20,
+                                    offset: const Offset(0, 5),
                                   ),
+                                ],
+                                border: Border.all(
+                                  color: Colors.white30,
+                                  width: 3,
                                 ),
-                                Text(
-                                  'BOMBA',
-                                  style: TextStyle(
-                                    color: Color(0xff293341),
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w900,
+                              ),
+                              child: const Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  SizedBox(
+                                    width: 34,
+                                    height: 34,
+                                    child: CustomPaint(
+                                      painter: BomberBombSymbol(),
+                                    ),
                                   ),
-                                ),
-                              ],
+                                  Text(
+                                    'BOMBA',
+                                    style: TextStyle(
+                                      color: Color(0xff293341),
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

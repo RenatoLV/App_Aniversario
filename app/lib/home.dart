@@ -1274,7 +1274,7 @@ class _RinconHomeState extends State<RinconHome>
       Text(
         s.packPrice == 20
             ? 'Tu primer sobre del día: 20 monedas'
-            : 'Sobres: 50 monedas · mañana vuelve el primero a 20',
+            : 'Cada sobre sube 5 monedas · máximo 70 · mañana vuelve a 20',
         textAlign: TextAlign.center,
         style: const TextStyle(fontSize: 12, color: green),
       ),

@@ -172,9 +172,11 @@ class GameStore extends ChangeNotifier {
   CardFinish lastOpenedFinish = CardFinish.normal;
   int packsSinceLegendary = 0;
   String? lastDiscountPackDay;
+  int dailyPacksOpened = 0;
   String _packDay(DateTime now) => '${now.year}-${now.month}-${now.day}';
-  int packPriceAt(DateTime now) =>
-      lastDiscountPackDay == _packDay(now) ? 50 : 20;
+  int packPriceAt(DateTime now) => lastDiscountPackDay == _packDay(now)
+      ? (20 + 5 * dailyPacksOpened).clamp(20, 70)
+      : 20;
   int get packPrice => packPriceAt(DateTime.now());
   Map<String, int> cardVariants = {};
   Map<String, dynamic> _tradeReceipts = {};
@@ -216,6 +218,10 @@ class GameStore extends ChangeNotifier {
       best = j['best'] as int;
       packsSinceLegendary = (j['packsSinceLegendary'] as int?) ?? 0;
       lastDiscountPackDay = j['lastDiscountPackDay'] as String?;
+      dailyPacksOpened =
+          ((j['dailyPacksOpened'] as num?)?.toInt() ??
+                  (lastDiscountPackDay == null ? 0 : 1))
+              .clamp(0, 10);
       _tradeReceipts = Map<String, dynamic>.from(j['tradeReceipts'] ?? {});
       cardVariants = ((j['cardVariants'] as Map<String, dynamic>?) ?? {}).map(
         (k, v) => MapEntry(k, v as int),
@@ -500,6 +506,7 @@ class GameStore extends ChangeNotifier {
     _tradeReceipts = restored._tradeReceipts;
     packsSinceLegendary = restored.packsSinceLegendary;
     lastDiscountPackDay = restored.lastDiscountPackDay;
+    dailyPacksOpened = restored.dailyPacksOpened;
     game = restored.game;
     notes = restored.notes;
     _dirtyNotes
@@ -555,6 +562,7 @@ class GameStore extends ChangeNotifier {
       'best': best,
       'packsSinceLegendary': packsSinceLegendary,
       'lastDiscountPackDay': lastDiscountPackDay,
+      'dailyPacksOpened': dailyPacksOpened,
       'cardVariants': cardVariants,
       'tradeReceipts': _tradeReceipts,
       'cards': cards.map((k, v) => MapEntry('$k', v)),
@@ -662,7 +670,12 @@ class GameStore extends ChangeNotifier {
     final variant = '$id:${lastOpenedRarity.name}:${lastOpenedFinish.name}';
     cardVariants[variant] = (cardVariants[variant] ?? 0) + 1;
     coins -= price;
-    if (price == 20) lastDiscountPackDay = _packDay(day);
+    dailyPacksOpened =
+        (lastDiscountPackDay == _packDay(day) ? dailyPacksOpened + 1 : 1).clamp(
+          0,
+          10,
+        );
+    lastDiscountPackDay = _packDay(day);
     cards[id] = (cards[id] ?? 0) + 1;
     cardOpeners.putIfAbsent(id, () => opener.index);
     cardCollections.putIfAbsent(id, () => collectionId);

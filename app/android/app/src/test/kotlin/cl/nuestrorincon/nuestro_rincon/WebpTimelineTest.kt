@@ -8,9 +8,28 @@ class WebpTimelineTest {
     @Test fun everyOptimizedCardHasReadableLosslessFramesAndAnExactLoop() {
         val assets = listOf(File("../assets/celestials"), File("../../assets/celestials"))
             .first { it.isDirectory }
-        val expected = mapOf(10000 to 34, 10002 to 16, 10003 to 50, 10006 to 64,
-            10007 to 29, 10009 to 115, 10010 to 79, 10015 to 73, 10018 to 301,
-            10020 to 186, 10022 to 145)
+        val expected = mapOf(10000 to 34,
+            10002 to 16,
+            10003 to 50,
+            10006 to 64,
+            10007 to 29,
+            10009 to 115,
+            10010 to 79,
+            10015 to 73,
+            10018 to 301,
+            10020 to 186,
+            10022 to 145,
+            10027 to 121,
+            10028 to 25,
+            10030 to 151,
+            10031 to 25,
+            10033 to 84,
+            10034 to 57,
+            10035 to 97,
+            10037 to 42,
+            10038 to 59,
+            10039 to 65,
+            10043 to 64)
         for ((id, count) in expected) {
             val animation = WebpTimeline(File(assets, "celestial_$id.webp").readBytes())
             assertEquals(count, animation.frames.size)

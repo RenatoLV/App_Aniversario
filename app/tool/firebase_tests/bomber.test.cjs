@@ -67,6 +67,25 @@ async function main(){
   for(let n=0;n<20;n++){room=await rt(a,contactRoot);if(room.state.result)break;await sleep(100);}
   assert.equal(room.state.result?.winner,b.id,'motion trigger catches contact with an existing flame');
   await api(b,'leave',{room:invite.room});await api(a,'leave',{room:invite.room});
+  const duelA=await api(a,'find',{mapId:2}),duelB=await api(b,'find',{mapId:2});
+  assert.equal(duelA.room,duelB.room);
+  const duelRoot='bomberRooms/'+duelA.room;
+  await api(a,'ready',{room:duelA.room});await api(b,'ready',{room:duelA.room});
+  await rt('admin',duelRoot+'/state/startsAt','PUT',Date.now()-1000);
+  room=await rt(a,duelRoot);
+  const simultaneousAt=Date.now();
+  await rt('admin',duelRoot+'/state/events/tie','PUT',{cells:[room.motion[a.id].cell,room.motion[b.id].cell],at:simultaneousAt,until:simultaneousAt+650});
+  await Promise.all([a,b].map(u=>rt(u,duelRoot+'/motion/'+u.id,'PUT',{...room.motion[u.id],at:{'.sv':'timestamp'}})));
+  await api(a,'sync',{room:duelA.room});
+  for(let n=0;n<60;n++){room=await rt(a,duelRoot);if(room.state.result)break;await sleep(100);}
+  assert.equal(room.state.result?.winner,'draw','two timestamped flame contacts resolve together');
+  await api(a,'leave',{room:duelA.room});await api(b,'leave',{room:duelA.room});
+  const restarted=await api(a,'find',{mapId:2});
+  assert.notEqual(restarted.room,duelA.room,'a restart cannot reuse the completed arena');
+  await api(a,'leave',{room:restarted.room});
+  const restartedAgain=await api(a,'find',{mapId:2});
+  assert.notEqual(restartedAgain.room,restarted.room,'leaving a waiting arena completes before restarting');
+  await api(a,'leave',{room:restartedAgain.room});
   const declined=await api(a,'invite',{target:c.id,mapId:2,cat:'lady'});
   await api(c,'decline',{room:declined.room});assert.equal(await rt(c,'bomberInvites/'+c.id+'/'+declined.room),null);
   await api(a,'leave',{room:declined.room});

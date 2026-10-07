@@ -1,5 +1,5 @@
 'use strict';
-const config = {columns:13,rows:15,speed:2.6,fuse:2800,fire:650,match:180000,grace:10000,
+const config = {columns:13,rows:15,speed:2.6,fuse:2800,fire:650,match:180000,grace:10000,resultGrace:650,tieWindow:250,
   maxRange:5,maxBombs:3,maxSpeed:1.5,drop:30};
 const key=(x,y)=>`${x}_${y}`;
 function hash(seed,x,y) { return ((seed ^ Math.imul(x+17,73856093) ^ Math.imul(y+31,19349663)) >>> 0); }
@@ -46,14 +46,23 @@ function hit(s,motions,cells,now) {
     } else p.alive=false;
   }
 }
-function finish(s,now) {
+function finish(s,now,deathAt=now) {
+  if(!['playing','settling'].includes(s.status)) return;
   const alive=Object.keys(s.players).filter(u=>s.players[u].alive);
-  if(Object.keys(s.players).length===2 && (alive.length<2 || now-s.startsAt>=config.match)) {
-    s.status='finished'; s.result={winner:alive.length===1?alive[0]:'draw',at:now};
+  if(Object.keys(s.players).length!==2) return;
+  if(alive.length===1 && !s.resultPending) {
+    s.status='settling';s.resultPending={cutoffAt:deathAt+config.tieWindow,finalizeAt:now+config.resultGrace};
+  }
+  if(alive.length===0 || (s.resultPending && now>=s.resultPending.finalizeAt) || (!s.resultPending && now-s.startsAt>=config.match)) {
+    s.status='finished';s.result={winner:alive.length===1?alive[0]:'draw',at:now};delete s.resultPending;
   }
 }
 function advance(s,motions={},now=Date.now()) {
   s.bombs||={};s.powers||={};s.events||={};s.board.crates||={};
+  if(s.status==='settling') {
+    for(const [uid,m] of Object.entries(motions)) contact(s,uid,m,now,false);
+    finish(s,now);return s;
+  }
   if(!active(s,now)) return s;
   const due=Object.keys(s.bombs).filter(id=>s.bombs[id].explodeAt<=now).map(id=>({id,at:s.bombs[id].explodeAt}));
   const processed=new Set();
@@ -108,10 +117,12 @@ function pickup(s,uid,k,motions,now=Date.now()) {
   }
   delete s.powers[k];return s;
 }
-function contact(s,uid,motion,now=Date.now()) {
-  if (s.status !== 'playing' || !motion || !s.players[uid]?.alive) return s;
+function contact(s,uid,motion,now=Date.now(),finalize=true) {
+  if (!['playing','settling'].includes(s.status) || !motion || !s.players[uid]?.alive) return s;
+  if(!Number.isFinite(motion.at) || motion.at<s.startsAt || (s.resultPending && motion.at>s.resultPending.cutoffAt)) return s;
   const at=motion.at, flames=new Set(Object.values(s.events||{})
     .filter(e=>at>=e.at && at<e.until).flatMap(e=>e.cells));
-  hit(s,{[uid]:motion},flames,at);finish(s,now);return s;
+  hit(s,{[uid]:motion},flames,at);
+  if(finalize) finish(s,now,at);return s;
 }
 module.exports={config,key,hash,board,player,create,blast,advance,place,pickup,drop,contact};

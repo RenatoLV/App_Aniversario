@@ -19,6 +19,7 @@ class BomberNetwork {
   bool writing = false, syncing = false, connected = false, closed = false;
   int lastWrite = 0, lastSync = 0;
   Future<void>? pendingMotion;
+  Future<void>? _closing;
   final pendingPowers = <String>{};
   static Future<Map<String, dynamic>> request(
     String action, {
@@ -58,6 +59,7 @@ class BomberNetwork {
       FirebaseDatabase.instance.ref('.info/connected').onValue.listen((
         e,
       ) async {
+        if (closed) return;
         connected = e.snapshot.value == true;
         connection.value = connected ? '' : 'Reconectando… · 10 s de margen';
         if (!connected || closed) {
@@ -112,7 +114,7 @@ class BomberNetwork {
   Future<void> _writeMotion() async {
     if (closed ||
         !connected ||
-        !sim.playing ||
+        (!sim.playing && sim.status != 'settling') ||
         !sim.alive(sim.localId) ||
         writing) {
       return;
@@ -193,7 +195,9 @@ class BomberNetwork {
     await request('bomb', room: id, extra: {'id': nonce, 'cell': cell});
   }
 
-  Future<void> close() async {
+  Future<void> close() => _closing ??= _close();
+
+  Future<void> _close() async {
     closed = true;
     timer?.cancel();
     for (final s in subscriptions) {

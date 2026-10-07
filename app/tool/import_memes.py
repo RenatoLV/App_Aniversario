@@ -2,6 +2,7 @@
 import argparse
 import json
 import re
+import shutil
 from pathlib import Path
 from PIL import Image, ImageOps, ImageDraw
 
@@ -43,6 +44,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", type=Path, default=Path.home() / "Downloads" / "memes")
     parser.add_argument("--volume", type=int, default=1)
+    parser.add_argument("--preserve-quality", action="store_true", help="Copy original images at full resolution without recompression")
     args = parser.parse_args()
     if not args.source.is_dir():
         parser.error(f"Carpeta no encontrada: {args.source}")
@@ -55,11 +57,15 @@ def main():
     for source in files:
         if source.stem.casefold() in known:
             continue
-        with Image.open(source) as original:
-            image = ImageOps.exif_transpose(original).convert("RGB")
-            image.thumbnail((960, 960), Image.Resampling.LANCZOS)
-            asset = f"assets/memes/meme_{len(catalog):02d}.webp"
-            image.save(ROOT / asset, "WEBP", quality=83, method=6)
+        if args.preserve_quality:
+            asset = f"assets/memes/meme_{len(catalog):02d}{source.suffix.lower() or '.png'}"
+            shutil.copyfile(source, ROOT / asset)
+        else:
+            with Image.open(source) as original:
+                image = ImageOps.exif_transpose(original).convert("RGB")
+                image.thumbnail((960, 960), Image.Resampling.LANCZOS)
+                asset = f"assets/memes/meme_{len(catalog):02d}.webp"
+                image.save(ROOT / asset, "WEBP", quality=83, method=6)
         catalog.append({"name": source.stem, "asset": asset, "volume": args.volume})
         known.add(source.stem.casefold())
         added.append(source.stem)

@@ -34,7 +34,7 @@ test('six powers apply once and stack only up to their caps',()=>{
 });
 test('walking into a lingering flame is lethal even when motion delivery is delayed',()=>{
   const s=match();s.events.one={cells:['1_11'],at:1000,until:1650};
-  E.contact(s,'a',{x:1.5,y:11.5,at:1400},2500);assert.equal(s.players.a.alive,false);assert.equal(s.result.winner,'b');
+  E.contact(s,'a',{x:1.5,y:11.5,at:1400},2500);assert.equal(s.players.a.alive,false);assert.equal(s.status,'settling');E.advance(s,{},3150);assert.equal(s.result.winner,'b');
   const untouched=match();untouched.events.one=s.events.one;E.contact(untouched,'a',{x:1.5,y:11.5,at:900},2500);assert.equal(untouched.players.a.alive,true);
 });
 test('shield absorbs a hit, grants recovery and clears only once',()=>{
@@ -88,4 +88,24 @@ test('late chain reaction shares the initiating bomb scheduled time',()=>{
  s.bombs={one:{x:3,y:3,range:2,owner:'a',explodeAt:1000},two:{x:4,y:3,range:2,owner:'b',explodeAt:3000}};
  E.advance(s,safe,2000);
  assert.equal(s.events.two.at,1000);assert.equal(s.events.two.until,1650);
+});
+
+test('separately delivered simultaneous deaths settle to a draw in either order',()=>{
+ for(const order of [['a','b'],['b','a']]) {
+  const s=match();s.events.one={cells:['1_11','9_1'],at:1000,until:1650};
+  E.contact(s,order[0],{...safe[order[0]],at:1400},2000);
+  assert.equal(s.status,'settling');assert.equal(s.result,undefined);
+  E.contact(s,order[1],{...safe[order[1]],at:1410},2200);
+  assert.equal(s.result.winner,'draw');
+  E.advance(s,{},3000);assert.equal(s.result.winner,'draw');
+ }
+});
+test('settlement checks both latest motions and rejects late or expired flame contacts',()=>{
+ const s=match();s.events.one={cells:['1_11','9_1'],at:1000,until:1650};
+ E.contact(s,'a',{...safe.a,at:1400},2000);
+ E.advance(s,{b:{...safe.b,at:1410}},2650);assert.equal(s.result.winner,'draw');
+ const winner=match();winner.events.one=s.events.one;
+ E.contact(winner,'a',{...safe.a,at:1400},2000);
+ E.contact(winner,'b',{...safe.b,at:1650},2200);
+ E.advance(winner,{},2650);assert.equal(winner.result.winner,'b');
 });

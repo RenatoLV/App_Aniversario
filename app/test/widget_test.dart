@@ -95,7 +95,7 @@ void main() {
       final store = GameStore(prefs)..coins = 600;
       expect(
         anniversaryCollectionV2Cards.where((id) => !isCelestialCard(id)).length,
-        90,
+        133,
       );
       expect(
         anniversaryCollectionCards.toSet().intersection(
