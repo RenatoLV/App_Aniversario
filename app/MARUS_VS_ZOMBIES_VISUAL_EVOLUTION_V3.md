@@ -1044,3 +1044,5 @@ Se reproduce y corrige la recarga musical tras pausa prolongada: se conserva fue
 Base V4: 314 pruebas aprobadas, diez omitidas. Suite final completa: **322 aprobadas, once omitidas y cero fallidas**. Capturas/perfil optativos V4: ocho aprobadas en su ejecución; análisis final sin incidencias. Entrega remota y detalles en **`MARUS_VS_ZOMBIES_V4_FINAL.md`**. Perfil CPU final saturado: 12,216 ms/dibujo frente a 12,528, +0,313 ms (~2,6 %) con rangos solapados. No mide GPU/FPS ni teléfonos.
 
 Capturas: ocho del jefe y seis transiciones en `build/previews/`. Verificada integridad SHA-256 de diez originales V3.6. No se certifica autorización pública para los MP3 aportados por el propietario. **No se realizaron compilaciones ni empaquetados durante V4.0.**
+
+Código V4 publicado y hash remoto verificado: `4d8419ab34194f778b1a6687bdc0730443601a3d`, rama `codex/marus-zombies-audio` de `RenatoLV/App_Aniversario`. El cierre documental se confirma después en un commit independiente.

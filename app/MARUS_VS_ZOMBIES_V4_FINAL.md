@@ -120,6 +120,8 @@ Pendientes para la posterior prueba en celular: tacto y notch reales, legibilida
 
 ## Entrega a GitHub
 
-Commit de implementación: **pendiente de consignar tras crear el commit**.
+Commit de implementación: **`4d8419ab34194f778b1a6687bdc0730443601a3d`**, `feat(marus): finalize V4 polish, campaign audit and audio lifecycle fixes`.
 
-Push: **pendiente de verificar**. El resultado real se registra después de confirmar `git push` y comparar HEAD remoto. No se utiliza force-push ni se publica en `main`.
+Push de implementación **confirmado** a `origin/codex/marus-zombies-audio` el 2026-10-10. `git ls-remote origin refs/heads/codex/marus-zombies-audio` devolvió exactamente ese hash. Este cierre documental se registra en un commit posterior, para no pretender incluir en un archivo el hash de su propio commit.
+
+No se utiliza force-push ni se publica en `main`. No se creó un PR ni se fusionó la rama. Previews, perfiles y registros locales de `build/` están excluidos; el documento y las pruebas permiten regenerarlos.
