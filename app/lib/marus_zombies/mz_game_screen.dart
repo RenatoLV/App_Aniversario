@@ -18,6 +18,7 @@ import 'mz_result.dart';
 import 'mz_card_reveal.dart';
 import 'mz_almanac.dart';
 import 'mz_world_transition.dart';
+import 'mz_field_guide.dart';
 
 class MzGameScreen extends StatefulWidget {
   const MzGameScreen({super.key, required this.sim, required this.progress});
@@ -65,8 +66,12 @@ class _MzGameScreenState extends State<MzGameScreen>
       return sim.notice.replaceAll('Dr. Cat-trófico', MzEnemy.boss.label);
     }
     if (dragging != null) return 'Suelta el gato en la casilla iluminada.';
-    if (tool == 'shovel') return 'Pala: toca el gato que quieres retirar.';
-    if (tool == 'tuna') return 'Atún: toca un gato para potenciarlo.';
+    if (tool == 'shovel') {
+      return 'Pala: toca un gato. Desactiva la pala para recoger hierba.';
+    }
+    if (tool == 'tuna') {
+      return 'Atún: toca un gato. Desactiva el atún para recoger hierba.';
+    }
     if (tool == 'human') return '${power!.label}: toca el área de la horda.';
     if (selected != null) {
       return '${mzCats[selected]!.name}: toca una casilla libre.';
@@ -360,7 +365,18 @@ class _MzGameScreenState extends State<MzGameScreen>
       return;
     }
     final narrow = MediaQuery.sizeOf(context).width < 600;
-    if (narrow && !confirm && tool != 'tuna') {
+    if (tool.isEmpty && selected == null) return;
+    if (tool == 'tuna' &&
+        (sim.at(row, col) == null || sim.at(row, col)!.kind == MzCat.bomb)) {
+      sim.say(
+        sim.at(row, col) == null
+            ? 'Toca un gato para darle atún.'
+            : 'Gatitos bomba explota solo; no necesita atún.',
+      );
+      setState(() => preview = null);
+      return;
+    }
+    if (narrow && !confirm) {
       setState(() => preview = (row, col));
       return;
     }
@@ -393,7 +409,9 @@ class _MzGameScreenState extends State<MzGameScreen>
   void _tap(Offset position, Size size) {
     if (saving || sim.paused || sim.ended) return;
     final g = MzBoardGeometry(size);
-    final p = mzPickupAt(sim, size, position);
+    // An explicitly selected tool targets the board. Enlarged pickup targets
+    // must not silently intercept a tuna, shovel or cart action.
+    final p = tool.isEmpty ? mzPickupAt(sim, size, position) : null;
     if (p != null) {
       final center = g.point(p.row, p.x).translate(0, -g.ch * .14);
       if (sim.collect(p.id)) {
@@ -671,21 +689,35 @@ class _MzGameScreenState extends State<MzGameScreen>
                                   style: const TextStyle(
                                     fontSize: 12,
                                     fontWeight: FontWeight.w800,
+                                    color: Color(0xfffff6df),
                                   ),
                                 ),
                                 TextButton(
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: const Color(0xffffe39c),
+                                    minimumSize: const Size(48, 48),
+                                  ),
                                   onPressed: () =>
                                       setState(() => preview = null),
                                   child: const Text('Cancelar'),
                                 ),
                                 FilledButton(
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: const Color(0xffffcd6a),
+                                    foregroundColor: const Color(0xff302e22),
+                                    minimumSize: const Size(48, 48),
+                                  ),
                                   onPressed: () => _cell(
                                     preview!.$1,
                                     preview!.$2,
                                     confirm: true,
                                   ),
                                   child: Text(
-                                    tool == 'shovel' ? 'Retirar' : 'Colocar',
+                                    tool == 'shovel'
+                                        ? 'Retirar'
+                                        : tool == 'tuna'
+                                        ? 'Potenciar'
+                                        : 'Colocar',
                                   ),
                                 ),
                               ],
@@ -1113,6 +1145,7 @@ class _MzGameScreenState extends State<MzGameScreen>
                             ),
                           ),
                         ],
+                        if (!sim.ended) MzFieldGuide(level: sim.level),
                       ],
                     ),
                   ),

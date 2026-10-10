@@ -125,3 +125,7 @@ Commit de implementación: **`4d8419ab34194f778b1a6687bdc0730443601a3d`**, `feat
 Push de implementación **confirmado** a `origin/codex/marus-zombies-audio` el 2026-10-10. `git ls-remote origin refs/heads/codex/marus-zombies-audio` devolvió exactamente ese hash. Este cierre documental se registra en un commit posterior, para no pretender incluir en un archivo el hash de su propio commit.
 
 No se utiliza force-push ni se publica en `main`. No se creó un PR ni se fusionó la rama. Previews, perfiles y registros locales de `build/` están excluidos; el documento y las pruebas permiten regenerarlos.
+
+## Continuidad V4.1
+
+La auditoría posterior, correcciones de guardado rechazado y prioridad táctil, diagnóstico de 540 partidas, ayuda contextual y pendientes de Android/licencias se documentan en `MARUS_VS_ZOMBIES_V41_AUDIT.md` y `MARUS_VS_ZOMBIES_V41_QUALITY_REVIEW.md`. Los resultados históricos V4 de este documento no se sustituyen por los de V4.1. Sigue sin realizarse una compilación de aplicación en esta continuación.

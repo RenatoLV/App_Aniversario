@@ -62,6 +62,10 @@ class _Snapshot {
 }
 
 class MzVisualFeedback {
+  /// Read-only diagnostics; no history of dead actor IDs is exposed/retained.
+  int get trackedActors => _previous.length;
+  int get trailCount => _trails.length;
+  int get trailSamples => _trails.values.fold(0, (n, p) => n + p.length);
   final _previous = <int, _Snapshot>{};
   final _attacks = <int, double>{}, _hits = <int, double>{};
   final _performances = <int, double>{};

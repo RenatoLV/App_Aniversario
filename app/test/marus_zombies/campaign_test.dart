@@ -9,14 +9,13 @@ void main() {
   test('all sixty campaign missions can be cleared without paid powers', () {
     final failed = <String>[];
     for (final level in mzCampaign) {
-      final id = level.id;
       final cats = [
         MzCat.launcher,
         MzCat.sunflower,
         MzCat.barrier,
         MzCat.ice,
         if (level.world == MzWorld.west) MzCat.mine else MzCat.bomb,
-        id >= 40 ? MzCat.laser : MzCat.catapult,
+        level.world == MzWorld.future ? MzCat.laser : MzCat.catapult,
       ].where(level.allowed.contains).toList();
       final s = MzSimulation(level, deck: cats)..autoCollect = true;
       for (var tick = 0; tick < 1800 && !s.ended; tick++) {
@@ -72,7 +71,7 @@ void main() {
       }
       if (!s.won) {
         failed.add(
-          'level $id: ${s.lost ? 'lost' : 'timeout'} at ${s.time.round()}s, ${s.kills} kills, ${s.defenders.length} defenders',
+          'level ${level.id}: ${s.lost ? 'lost' : 'timeout'} at ${s.time.round()}s, ${s.kills} kills, ${s.defenders.length} defenders',
         );
       }
     }

@@ -147,6 +147,8 @@ class MzServiceAisle {
 /// Cached scenery avoids rebuilding static grass and props on every combat tick.
 /// Two pictures preserve the existing background/entity/foreground paint order.
 class MzSceneryCache {
+  /// Diagnostics only: two scene pictures at most, regardless of navigation.
+  int get pictureCount => (_back == null ? 0 : 1) + (_front == null ? 0 : 1);
   ui.Picture? _back, _front;
   Size? _size;
   Rect? _board;

@@ -1046,3 +1046,15 @@ Base V4: 314 pruebas aprobadas, diez omitidas. Suite final completa: **322 aprob
 Capturas: ocho del jefe y seis transiciones en `build/previews/`. Verificada integridad SHA-256 de diez originales V3.6. No se certifica autorización pública para los MP3 aportados por el propietario. **No se realizaron compilaciones ni empaquetados durante V4.0.**
 
 Código V4 publicado y hash remoto verificado: `4d8419ab34194f778b1a6687bdc0730443601a3d`, rama `codex/marus-zombies-audio` de `RenatoLV/App_Aniversario`. El cierre documental se confirma después en un commit independiente.
+
+## V4.1 · Auditoría jugable y controles (2026-10-10)
+
+Se conserva el arte y audio V3–V4. Se reprodujeron dos P0: un checkpoint/debito rechazado permanecía en la caché de SharedPreferences y podía reaparecer al reabrir el módulo; un recurso superpuesto interceptaba el destino de pala/atún seleccionados. Corregidos recargando el backend al fallar y dando prioridad a la herramienta explícita. Sin migración, cambios de estadísticas, economía o simulación.
+
+Atún usa confirmación en pantallas estrechas; cancelación sin gasto y mensajes para bomba/objetivo vacío. Se mejora el contraste de fila/casilla y los botones de confirmación (mínimo 48×48). Ayuda plegable en preparación/pausa para controles y seis mundos; requisito corto del Gran León ahora indica terminar Piratas. No se añaden ventanas de tutorial ni registros nuevos.
+
+Diagnóstico reproducible: 540 partidas legales, nueve políticas y 60 misiones. Referencia y equipo del mundo ganan 60/60; sin atún 31/60 y respuesta tardía 34/60. Derrotas conservadas; no certifica diversión ni balance humano. Se corrige la elección de Catapulta/Láser por mundo en el smoke test, que confundía los IDs del Cementerio con Futuro. Tabla completa y métricas: `docs/mz-v41-gameplay.md` / `.csv`; regenerador `tool/report_mz_v41.py`.
+
+Sondeos separados de pintura CPU legal/extrema, observadores, cachés y creación de pantallas; no FPS de Android. Getters read-only permiten comprobar límites y limpieza. Cinco ejecuciones secuenciales del mezclador pasan. Capturas antes/después y de confirmación/ayuda en `build/previews/`, no assets nuevos. No se compila una aplicación ni se genera APK.
+
+Resultados finales, matriz de teléfono físico, auditoría de progresión y bloqueos de licencias se consignan en `MARUS_VS_ZOMBIES_V41_QUALITY_REVIEW.md`. No consta permiso público/comercial para los dos MP3 aportados: distribución pendiente, aunque sus selecciones se conservan. La experiencia física, el entretenimiento y el rendimiento GPU/memoria de Android permanecen por validar.

@@ -10,6 +10,7 @@ import 'mz_widgets.dart';
 import 'mz_art_style.dart';
 import 'mz_menu_art.dart';
 import 'mz_almanac.dart';
+import 'mz_field_guide.dart';
 
 const mzCream = Color(0xfffff6df), mzGreen = Color(0xff385d45);
 
@@ -192,6 +193,10 @@ class _MarusZombiesScreenState extends State<MarusZombiesScreen> {
                   ),
                   const SizedBox(height: 12),
                   Text(level.world.rule),
+                  MzFieldGuide(
+                    level: level,
+                    initiallyExpanded: level.id == 0 && progress.highest == 0,
+                  ),
                   const SizedBox(height: 12),
                   Text(
                     'Enemigos: ${level.enemies.map((e) => e.label).join(', ')}',

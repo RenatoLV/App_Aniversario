@@ -499,7 +499,7 @@ class _MzAlmanacScreenState extends State<MzAlmanacScreen>
             button: true,
             selected: _selected.ancestral,
             label:
-                'Gran León Maru, ancestral. ${p.lion ? 'Desbloqueado' : 'Requiere 100 mentitas y 30 niveles completados'}',
+                'Gran León Maru, ancestral. ${p.lion ? 'Desbloqueado' : 'Requiere 100 mentitas y completar Piratas'}',
             child: InkWell(
               key: const ValueKey('almanac-lion'),
               onTap: () => _select(_lion),
@@ -513,7 +513,7 @@ class _MzAlmanacScreenState extends State<MzAlmanacScreen>
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        'Gran León · Maru\nAncestral · ${p.lion ? 'Desbloqueado' : '100 mentitas + 30 niveles'}',
+                        'Gran León · Maru\nAncestral · ${p.lion ? 'Desbloqueado' : '100 mentitas + completar Piratas'}',
                         style: const TextStyle(
                           color: _ink,
                           fontWeight: FontWeight.w900,

@@ -80,8 +80,20 @@ class MzProgress {
   Future<void> _write(Map<String, dynamic> Function() update) {
     final task = _pending.then((_) async {
       final next = update();
-      if (!await prefs.setString(key, jsonEncode(next))) {
-        throw StateError('No se pudo guardar la partida.');
+      try {
+        if (!await prefs.setString(key, jsonEncode(next))) {
+          throw StateError('No se pudo guardar la partida.');
+        }
+      } catch (_) {
+        // SharedPreferences updates its local cache before the backend accepts
+        // the write. Reopening the module must read the committed snapshot,
+        // not an uncommitted paid action left in that cache.
+        try {
+          await prefs.reload();
+        } catch (_) {
+          // Preserve the original write error if the backend is also unreadable.
+        }
+        rethrow;
       }
       _data = next;
     });
