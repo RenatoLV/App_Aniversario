@@ -19,6 +19,16 @@ enum GameSfx {
   marusBite('marus_bite.wav', .22, 260),
   marusArmor('marus_armor.wav', .38, 100),
   marusDefeat('marus_defeat.wav', .30, 220),
+  marusSun('marus_sun.wav', .32, 300),
+  marusSunTuna('marus_sun_tuna.wav', .42, 600),
+  marusIceShot('marus_ice_shot.wav', .23, 140),
+  marusIceHit('marus_ice_hit.wav', .28, 160),
+  marusFreeze('marus_freeze.wav', .34, 400),
+  marusCatapult('marus_catapult.wav', .30, 220),
+  marusCroquette('marus_croquette.wav', .30, 180),
+  marusLaserStart('marus_laser_start.wav', .24, 400),
+  marusLaserBeam('marus_laser_beam.wav', .12, 0),
+  marusLaserEnd('marus_laser_end.wav', .20, 400),
   place('place.wav', .35, 90),
   clear('clear.wav', .48, 180),
   coin('coin.wav', .35, 100),
@@ -51,12 +61,28 @@ class CombatSfxLimiter {
   final _priorities = List<int>.filled(4, -1);
   final _last = <GameSfx, int>{};
   final _starts = <int>[];
+  bool beamReserved = false;
+  void reserveBeam(bool value) {
+    beamReserved = value;
+    _ends[3] = 0;
+    _priorities[3] = -1;
+  }
+
   static const priorities = {
     GameSfx.marusLauncher: 0,
     GameSfx.marusBite: 1,
     GameSfx.marusArmor: 2,
     GameSfx.marusDefeat: 3,
     GameSfx.marusHarvest: 4,
+    GameSfx.marusSun: 2,
+    GameSfx.marusSunTuna: 4,
+    GameSfx.marusIceShot: 0,
+    GameSfx.marusIceHit: 2,
+    GameSfx.marusFreeze: 3,
+    GameSfx.marusCatapult: 0,
+    GameSfx.marusCroquette: 2,
+    GameSfx.marusLaserStart: 1,
+    GameSfx.marusLaserEnd: 1,
   };
   static const durations = {
     GameSfx.marusLauncher: 293,
@@ -64,6 +90,15 @@ class CombatSfxLimiter {
     GameSfx.marusBite: 273,
     GameSfx.marusArmor: 243,
     GameSfx.marusDefeat: 779,
+    GameSfx.marusSun: 500,
+    GameSfx.marusSunTuna: 800,
+    GameSfx.marusIceShot: 350,
+    GameSfx.marusIceHit: 300,
+    GameSfx.marusFreeze: 600,
+    GameSfx.marusCatapult: 480,
+    GameSfx.marusCroquette: 220,
+    GameSfx.marusLaserStart: 300,
+    GameSfx.marusLaserEnd: 300,
   };
   List<CombatVoiceRequest> select(
     Iterable<GameSfx> events,
@@ -81,10 +116,17 @@ class CombatSfxLimiter {
     for (final cue in ordered) {
       if (accepted.length >= 2 || _starts.length >= 10) break;
       if (now - (_last[cue] ?? -10000) < cue.cooldownMs) continue;
-      var slot = _ends.indexWhere((end) => end <= now);
+      final voiceCount = beamReserved ? 3 : 4;
+      var slot = -1;
+      for (var i = 0; i < voiceCount; i++) {
+        if (_ends[i] <= now) {
+          slot = i;
+          break;
+        }
+      }
       if (slot < 0) {
         slot = 0;
-        for (var i = 1; i < 4; i++) {
+        for (var i = 1; i < voiceCount; i++) {
           if (_priorities[i] < _priorities[slot]) slot = i;
         }
         if (_priorities[slot] >= priorities[cue]!) continue;
@@ -101,6 +143,7 @@ class CombatSfxLimiter {
   }
 
   void reset() {
+    beamReserved = false;
     _ends.fillRange(0, 4, 0);
     _priorities.fillRange(0, 4, -1);
     _last.clear();
@@ -125,6 +168,7 @@ class GameAudio with WidgetsBindingObserver {
   final Map<GameSfx, AudioPlayer> _effects = {};
   final _combatLimiter = CombatSfxLimiter();
   final _combatVoices = <int, _CombatVoice>{};
+  bool _laserActive = false;
   final Map<GameSfx, int> _lastEffect = {};
   final Map<String, List<String>> _tracks = {};
   final Map<String, int> _trackIndex = {};
@@ -223,11 +267,39 @@ class GameAudio with WidgetsBindingObserver {
   }
 
   void stopCombat() {
+    _laserActive = false;
     _combatLimiter.reset();
     for (final v in _combatVoices.values) {
       v.revision++;
       v.queue = v.queue.then((_) => _safe(v.player.stop));
     }
+  }
+
+  /// One shared beam for all firing lasers, occupying one of the four voices.
+  /// Called with observed firing state; unchanged states never restart audio.
+  void updateCombatLaser(bool firing) {
+    final active = firing && combatAudible;
+    if (active == _laserActive) return;
+    _laserActive = active;
+    _combatLimiter.reserveBeam(active);
+    final voice = _combatVoices.putIfAbsent(3, _CombatVoice.new);
+    final revision = ++voice.revision;
+    voice.gain = GameSfx.marusLaserBeam.gain;
+    voice.queue = voice.queue.then(
+      (_) => _safe(() async {
+        if (revision != voice.revision) return;
+        await voice.player.stop();
+        if (!active || !combatAudible) return;
+        await voice.player.setReleaseMode(ReleaseMode.loop);
+        await voice.player.setSource(
+          AssetSource('audio/${GameSfx.marusLaserBeam.file}'),
+        );
+        await voice.player.setVolume(effectsVolume * voice.gain);
+        if (revision == voice.revision && combatAudible) {
+          await voice.player.resume();
+        }
+      }),
+    );
   }
 
   void play(GameSfx effect) {

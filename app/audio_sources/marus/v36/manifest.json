@@ -1,0 +1,72 @@
+[
+  {
+    "file": "v36/shimmer.flac",
+    "author": "The Berklee College of Music",
+    "license": "CC-BY-3.0",
+    "url": "https://opengameart.org/content/shimmer-glitter-magic",
+    "sha256": "b6802e6ef22189058a4406ae5c7bda9a54c47e908fad3fd6212650c1aa0170af"
+  },
+  {
+    "file": "v36/ice01.flac",
+    "author": "Iwan qubodup Gabovitch",
+    "license": "CC-BY-3.0",
+    "url": "https://opengameart.org/content/ice-electricity-magic",
+    "sha256": "7fa1b626d12bac9c83c2347f115e6b27fa49b4797aef81ac0c77300e32de6122"
+  },
+  {
+    "file": "v36/ice02.flac",
+    "author": "Iwan qubodup Gabovitch",
+    "license": "CC-BY-3.0",
+    "url": "https://opengameart.org/content/ice-electricity-magic",
+    "sha256": "582dbad281d44c102eaf0f790f65707e9b83d90d9429d38df757bcba85ca4298"
+  },
+  {
+    "file": "v36/ice03.flac",
+    "author": "Iwan qubodup Gabovitch",
+    "license": "CC-BY-3.0",
+    "url": "https://opengameart.org/content/ice-electricity-magic",
+    "sha256": "29a459232ba678b391c5c4b7b14c0ffa60c165cfd63172470a14de5efe81f224"
+  },
+  {
+    "file": "v36/wood-light.ogg",
+    "author": "Kenney",
+    "license": "CC0-1.0",
+    "url": "https://kenney.nl/assets/impact-sounds",
+    "sha256": "eb45e35b4bed784d3f120de4afec4b0d6ac09d9e143cce8cfcb7d739e1b1f3c3"
+  },
+  {
+    "file": "v36/soft-impact.ogg",
+    "author": "Kenney",
+    "license": "CC0-1.0",
+    "url": "https://kenney.nl/assets/impact-sounds",
+    "sha256": "7d3ba0bb5e60a11b5d3e558c141303dcf494256675fbf753c0d252d2cf0481e3"
+  },
+  {
+    "file": "v36/laser-small.ogg",
+    "author": "Kenney",
+    "license": "CC0-1.0",
+    "url": "https://opengameart.org/content/sci-fi-sounds",
+    "sha256": "72b589eadd41781257ac859e4f4d030222e623390e4a1a83f6d05329a6e026f1"
+  },
+  {
+    "file": "v36/engine.ogg",
+    "author": "Kenney",
+    "license": "CC0-1.0",
+    "url": "https://opengameart.org/content/sci-fi-sounds",
+    "sha256": "8ab85f9fa85e9e692287f98acb36b9ac3ba15313b007c039055e286b736f4e3a"
+  },
+  {
+    "file": "v36/field.ogg",
+    "author": "Kenney",
+    "license": "CC0-1.0",
+    "url": "https://opengameart.org/content/sci-fi-sounds",
+    "sha256": "c2916f2a062c8ddd1aca2826d134fe90847037db31342726ffb0f9097afe339c"
+  },
+  {
+    "file": "v36/bow.ogg",
+    "author": "dorkster; underlying samples by qubodup",
+    "license": "CC-BY-SA-3.0",
+    "url": "https://opengameart.org/content/bow-arrow-shot",
+    "sha256": "ac3e1f9868946cfd2fdfe00f65d7170d1e30d66ec626ba7767a5370dacedaba6"
+  }
+]

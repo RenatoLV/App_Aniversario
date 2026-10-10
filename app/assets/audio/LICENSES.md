@@ -36,3 +36,16 @@ outside the Flutter asset bundle.
 `music/marus/zombies-on-your-lawn.mp3` (Laura Shigihara) and
 `marus_card_victory.mp3` were supplied by the project owner; no CC0 license
 is asserted for these tracks.
+
+## V3.6 defender candidate sources and adaptations
+
+- Girasol (`marus_sun*.wav`, `marus_sun_tuna*.wav`): **Shimmer glitter magic / shimmer_1**, The Berklee College of Music (submitted by qubodup), CC BY 3.0. https://opengameart.org/content/shimmer-glitter-magic
+- Siberiano (`marus_ice_shot*.wav`, `marus_ice_hit*.wav`, `marus_freeze*.wav`): **Ice and Electricity Magic**, Iwan 'qubodup' Gabovitch, CC BY 3.0. https://opengameart.org/content/ice-electricity-magic
+- Catapulta (`marus_catapult*.wav`): **Bow & Arrow Shot**, dorkster, underlying samples by qubodup, CC BY-SA 3.0. https://opengameart.org/content/bow-arrow-shot . The adapted catapult recordings remain CC BY-SA 3.0; the added wood sample is CC0 by Kenney.
+- Croquette impact and wood prefix: **Impact Sounds**, Kenney, CC0. https://kenney.nl/assets/impact-sounds
+- Laser onset, beam and release: **Sci-Fi Sounds**, Kenney, CC0. https://opengameart.org/content/sci-fi-sounds
+
+CC BY 3.0: https://creativecommons.org/licenses/by/3.0/
+CC BY-SA 3.0: https://creativecommons.org/licenses/by-sa/3.0/
+
+Adaptations: mono conversion, shortening, peak normalization, fades and ±3% pitch variants. Girasol tuna layers three chime onsets; catapult combines a wood prefix with bow release; beam uses a shortened engine texture with seam fades. These are provisional listening candidates, not acoustically approved selections. Original selected sources, authors, source URLs and SHA-256 appear in `audio_sources/marus/v36/manifest.json`; processed mappings appear in `defender_selection_v36.json`. No authors endorse the game.

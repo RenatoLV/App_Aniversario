@@ -1,0 +1,258 @@
+[
+  {
+    "event": "sun",
+    "sources": [
+      "v36/shimmer.flac"
+    ],
+    "asset": "marus_sun.wav",
+    "durationMs": 500,
+    "sha256": "94e44b103f48bcbc506d605a88bfadce06d825ef2713b18b093775f90907fb08",
+    "reason": "Bell/chime source, brief production accent",
+    "sourcesMetadata": [
+      {
+        "file": "v36/shimmer.flac",
+        "author": "The Berklee College of Music",
+        "license": "CC-BY-3.0",
+        "url": "https://opengameart.org/content/shimmer-glitter-magic",
+        "sha256": "b6802e6ef22189058a4406ae5c7bda9a54c47e908fad3fd6212650c1aa0170af"
+      }
+    ],
+    "variants": [
+      "marus_sun.wav",
+      "marus_sun_low.wav",
+      "marus_sun_high.wav"
+    ],
+    "review": "Provisional technical candidates; no listening performed."
+  },
+  {
+    "event": "sun_tuna",
+    "sources": [
+      "v36/shimmer.flac"
+    ],
+    "asset": "marus_sun_tuna.wav",
+    "durationMs": 800,
+    "sha256": "8727c2a5681b9268c20c0911bcc691a3821e4d5d822c0781547c9d1d06f969c9",
+    "reason": "Layered chime source for actual tuna activation",
+    "sourcesMetadata": [
+      {
+        "file": "v36/shimmer.flac",
+        "author": "The Berklee College of Music",
+        "license": "CC-BY-3.0",
+        "url": "https://opengameart.org/content/shimmer-glitter-magic",
+        "sha256": "b6802e6ef22189058a4406ae5c7bda9a54c47e908fad3fd6212650c1aa0170af"
+      }
+    ],
+    "variants": [
+      "marus_sun_tuna.wav",
+      "marus_sun_tuna_low.wav",
+      "marus_sun_tuna_high.wav"
+    ],
+    "review": "Provisional technical candidates; no listening performed."
+  },
+  {
+    "event": "ice_shot",
+    "sources": [
+      "v36/ice01.flac"
+    ],
+    "asset": "marus_ice_shot.wav",
+    "durationMs": 350,
+    "sha256": "076028a0471e8e16ce1141ccdd289bbc23bf468a2ded404bd1f0e216e32320ed",
+    "reason": "Ice spell source, shortened release",
+    "sourcesMetadata": [
+      {
+        "file": "v36/ice01.flac",
+        "author": "Iwan qubodup Gabovitch",
+        "license": "CC-BY-3.0",
+        "url": "https://opengameart.org/content/ice-electricity-magic",
+        "sha256": "7fa1b626d12bac9c83c2347f115e6b27fa49b4797aef81ac0c77300e32de6122"
+      }
+    ],
+    "variants": [
+      "marus_ice_shot.wav",
+      "marus_ice_shot_low.wav",
+      "marus_ice_shot_high.wav"
+    ],
+    "review": "Provisional technical candidates; no listening performed."
+  },
+  {
+    "event": "ice_hit",
+    "sources": [
+      "v36/ice02.flac"
+    ],
+    "asset": "marus_ice_hit.wav",
+    "durationMs": 300,
+    "sha256": "219cce259ef9276d99b83bb98f65d2f850f9b0d5c92afb62574bf253d701fd4b",
+    "reason": "Separate ice damage source for contact",
+    "sourcesMetadata": [
+      {
+        "file": "v36/ice02.flac",
+        "author": "Iwan qubodup Gabovitch",
+        "license": "CC-BY-3.0",
+        "url": "https://opengameart.org/content/ice-electricity-magic",
+        "sha256": "582dbad281d44c102eaf0f790f65707e9b83d90d9429d38df757bcba85ca4298"
+      }
+    ],
+    "variants": [
+      "marus_ice_hit.wav",
+      "marus_ice_hit_low.wav",
+      "marus_ice_hit_high.wav"
+    ],
+    "review": "Provisional technical candidates; no listening performed."
+  },
+  {
+    "event": "freeze",
+    "sources": [
+      "v36/ice03.flac"
+    ],
+    "asset": "marus_freeze.wav",
+    "durationMs": 600,
+    "sha256": "ec4792b57dee8ac9e2889c5f0f07cb1615246ec60a1cb7cef42cfb6c28a6e118",
+    "reason": "Longer ice spell source for actual freeze only",
+    "sourcesMetadata": [
+      {
+        "file": "v36/ice03.flac",
+        "author": "Iwan qubodup Gabovitch",
+        "license": "CC-BY-3.0",
+        "url": "https://opengameart.org/content/ice-electricity-magic",
+        "sha256": "29a459232ba678b391c5c4b7b14c0ffa60c165cfd63172470a14de5efe81f224"
+      }
+    ],
+    "variants": [
+      "marus_freeze.wav",
+      "marus_freeze_low.wav",
+      "marus_freeze_high.wav"
+    ],
+    "review": "Provisional technical candidates; no listening performed."
+  },
+  {
+    "event": "catapult",
+    "sources": [
+      "v36/bow.ogg",
+      "v36/wood-light.ogg"
+    ],
+    "asset": "marus_catapult.wav",
+    "durationMs": 480,
+    "sha256": "6aed9cce1841318a727544570b40b2e0137a35ba06a9054537f2faa510502ee4",
+    "reason": "Bow/slingshot release with wooden prefix",
+    "sourcesMetadata": [
+      {
+        "file": "v36/bow.ogg",
+        "author": "dorkster; underlying samples by qubodup",
+        "license": "CC-BY-SA-3.0",
+        "url": "https://opengameart.org/content/bow-arrow-shot",
+        "sha256": "ac3e1f9868946cfd2fdfe00f65d7170d1e30d66ec626ba7767a5370dacedaba6"
+      },
+      {
+        "file": "v36/wood-light.ogg",
+        "author": "Kenney",
+        "license": "CC0-1.0",
+        "url": "https://kenney.nl/assets/impact-sounds",
+        "sha256": "eb45e35b4bed784d3f120de4afec4b0d6ac09d9e143cce8cfcb7d739e1b1f3c3"
+      }
+    ],
+    "variants": [
+      "marus_catapult.wav",
+      "marus_catapult_low.wav",
+      "marus_catapult_high.wav"
+    ],
+    "review": "Provisional technical candidates; no listening performed."
+  },
+  {
+    "event": "croquette",
+    "sources": [
+      "v36/soft-impact.ogg"
+    ],
+    "asset": "marus_croquette.wav",
+    "durationMs": 220,
+    "sha256": "5ef914d894df1f9b4bc22985ca3492354dc0586f1b59113f87abbc21f0c1d9c7",
+    "reason": "Foley soft impact instead of digital tone",
+    "sourcesMetadata": [
+      {
+        "file": "v36/soft-impact.ogg",
+        "author": "Kenney",
+        "license": "CC0-1.0",
+        "url": "https://kenney.nl/assets/impact-sounds",
+        "sha256": "7d3ba0bb5e60a11b5d3e558c141303dcf494256675fbf753c0d252d2cf0481e3"
+      }
+    ],
+    "variants": [
+      "marus_croquette.wav",
+      "marus_croquette_low.wav",
+      "marus_croquette_high.wav"
+    ],
+    "review": "Provisional technical candidates; no listening performed."
+  },
+  {
+    "event": "laser_start",
+    "sources": [
+      "v36/laser-small.ogg"
+    ],
+    "asset": "marus_laser_start.wav",
+    "durationMs": 300,
+    "sha256": "ec260eacff5ca3a0ae7e41c74c297c78b2d643687d7fad0725abc0418d7cfaca",
+    "reason": "Modern sci-fi weapon source; excludes retro clips",
+    "sourcesMetadata": [
+      {
+        "file": "v36/laser-small.ogg",
+        "author": "Kenney",
+        "license": "CC0-1.0",
+        "url": "https://opengameart.org/content/sci-fi-sounds",
+        "sha256": "72b589eadd41781257ac859e4f4d030222e623390e4a1a83f6d05329a6e026f1"
+      }
+    ],
+    "variants": [
+      "marus_laser_start.wav",
+      "marus_laser_start_low.wav",
+      "marus_laser_start_high.wav"
+    ],
+    "review": "Provisional technical candidates; no listening performed."
+  },
+  {
+    "event": "laser_beam",
+    "sources": [
+      "v36/engine.ogg"
+    ],
+    "asset": "marus_laser_beam.wav",
+    "durationMs": 600,
+    "sha256": "3e2e46f9ef75bbc08beb2350d7c218c57e913e7e0c281ed0380dd606d082de8d",
+    "reason": "Engine texture for one shared continuous channel",
+    "sourcesMetadata": [
+      {
+        "file": "v36/engine.ogg",
+        "author": "Kenney",
+        "license": "CC0-1.0",
+        "url": "https://opengameart.org/content/sci-fi-sounds",
+        "sha256": "8ab85f9fa85e9e692287f98acb36b9ac3ba15313b007c039055e286b736f4e3a"
+      }
+    ],
+    "variants": [
+      "marus_laser_beam.wav"
+    ],
+    "review": "Provisional technical candidates; no listening performed."
+  },
+  {
+    "event": "laser_end",
+    "sources": [
+      "v36/field.ogg"
+    ],
+    "asset": "marus_laser_end.wav",
+    "durationMs": 300,
+    "sha256": "975b33ec8a3c867279314586c8c599220c96fc5b238ecc3406a805d9d9f7a7d6",
+    "reason": "Sci-fi field texture with shortened fade",
+    "sourcesMetadata": [
+      {
+        "file": "v36/field.ogg",
+        "author": "Kenney",
+        "license": "CC0-1.0",
+        "url": "https://opengameart.org/content/sci-fi-sounds",
+        "sha256": "c2916f2a062c8ddd1aca2826d134fe90847037db31342726ffb0f9097afe339c"
+      }
+    ],
+    "variants": [
+      "marus_laser_end.wav",
+      "marus_laser_end_low.wav",
+      "marus_laser_end_high.wav"
+    ],
+    "review": "Provisional technical candidates; no listening performed."
+  }
+]

@@ -121,7 +121,13 @@ void main() {
   );
   test('voice limits, priorities, small variation and silent states', () {
     final mix = CombatSfxLimiter(random: Random(5));
-    final all = CombatSfxLimiter.priorities.keys;
+    const all = [
+      GameSfx.marusLauncher,
+      GameSfx.marusHarvest,
+      GameSfx.marusBite,
+      GameSfx.marusArmor,
+      GameSfx.marusDefeat,
+    ];
     var count = 0;
     for (var ms = 0; ms < 1000; ms += 10) {
       final accepted = mix.select([...all, ...all, ...all], ms);

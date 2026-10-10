@@ -726,10 +726,54 @@ El usuario considera adecuados los sonidos actuales y entregó `Laura Shigihara 
 - Se conservan controles independientes de música/efectos, pausa, ciclo de vida y transiciones del mezclador existente. Sin cambios en combate, progreso, recompensas ni dependencias.
 
 Validación: análisis sin incidencias; suite del módulo con 93 pruebas aprobadas y cinco optativas omitidas. La prueba de canales nativos verifica la fuente MP3, modo bucle, pausa/reanudación y que mover el volumen no vuelve a cargar la canción. Los canales se emulan: no certifican escucha física, latencia o mezcla en un dispositivo real. El entorno sigue sin entrada auditiva; el usuario revisó los efectos actuales, mientras que la mezcla con esta nueva OST deberá escucharse durante la partida.
-`nBuild web aprobado; MP3 de Patio verificado en el bundle generado. Los hashes de simulación, progreso, catálogo y niveles permanecen intactos.
+
+Build web aprobado; MP3 de Patio verificado en el bundle generado. Los hashes de simulación, progreso, catálogo y niveles permanecen intactos.
 
 ## Selección sonora confirmada y preparación de GitHub
 
 Se conservan las voces zombis de V3.5 por decisión del usuario: los dos maullidos locales y las dos alternativas externas se rechazaron. No se descargaron ni integraron estas últimas. V3.6 (cuatro habilidades con sonidos propios) sigue pendiente; esta entrega no afirma haberla implementado.
 
 Se actualizan la presentación del Patio y el README para reflejar seis mundos y 60 misiones, y los créditos de audio distinguen los efectos CC0 de los MP3 entregados por el usuario. Las previsualizaciones y compilaciones en `build/` permanecen excluidas de Git.
+
+## V3.6 · Identidad sonora de cuatro defensores (2026-10-10)
+
+### Integración real
+
+Se extiende `MzCombatAudio` como observador antes/después del avance y de `feed()`, sin escribir en la simulación. La selección de V3.5 y los MP3 del Patio y de revelación permanecen intactos.
+
+- Girasol: evento `sun` para producción; `tuna` de ese defensor para la habilidad de 15 recursos. Producir no reproduce recogida. La recogida real conserva el efecto anterior.
+- Siberiano: incremento real de temporizador tras lanzar; evento `ice` para contacto; congelación solo al aumentar `frozenUntil` tras atún de Siberiano. Su disparo normal **ralentiza**, no congela. La inmunidad existente impide repetir la señal de congelación.
+- Catapulta: temporizador real o nuevos proyectiles de arco para lanzamiento; proyectil dirigido consumido y contacto `hit` con su objetivo para impacto. La tensión y liberación son un único clip iniciado en el lanzamiento real; no se anticipa un ataque ficticio ni se cambia su momento. Atún agrupa la ráfaga en una voz breve.
+- Láser: nuevos efectos `laser` indican actividad real. Un canal compartido reproduce el haz en bucle, con activación y cierre como transitorios. Se reserva la cuarta voz del mezclador mientras el haz está activo; quedan tres para transitorios. El estado invariable no recarga ni reinicia el audio. Atún reproduce activación al potenciar el defensor. Pausa, volumen cero, salida y ciclo de vida detienen/cancelan las voces.
+
+Las cuatro familias funcionan en todos los mundos donde se usan; los cinco efectos V3.5 conservan su alcance Patio. Se reutilizan las poses, estelas, impactos y efectos de atún vectoriales existentes. No se añadieron cambios de arte ni dependencias. El sonido genérico de activación de atún se omite cuando la transacción ya emite un efecto específico.
+
+### Selección y corrección solicitada
+
+Se revisó el banco original de 89 archivos y se preparó una primera selección Digital Audio, con originales y variantes. **El usuario la rechazó por sonar a 8 bits**. Se reemplazaron esos candidatos por fuentes nuevas de campanillas, magia de hielo, arco y foley de impactos, junto con texturas Sci-Fi distintas del banco Digital Audio. No se sustituyeron las voces zombis aprobadas.
+
+Fuentes y licencias:
+
+- Shimmer glitter magic: The Berklee College of Music / qubodup, CC BY 3.0.
+- Ice & Electricity Magic: Iwan qubodup Gabovitch, CC BY 3.0.
+- Bow & Arrow Shot: dorkster (muestras originales qubodup), CC BY-SA 3.0; los derivados de Catapulta mantienen esa licencia.
+- Impact Sounds y Sci-Fi Sounds: Kenney, CC0.
+
+Diez originales seleccionados fuera del bundle en `audio_sources/marus/v36/`; autores, enlaces y hashes en su `manifest.json`. Créditos y modificaciones en `assets/audio/LICENSES.md`. Diez clips preparados: nueve transitorios con variantes ±3 % y un bucle base, **28 WAV / 537.986 bytes**. Las ganancias son deliberadamente contenidas; el haz usa 0,12 antes del volumen global. `defender_selection_v36.json` registra asignación, presupuesto temporal, fuentes y hashes. `tool/prepare_marus_defender_audio.py` reproduce preparación y comparaciones con Python estándar y el ffmpeg existente, sin requerirlos para ejecutar el juego.
+
+**No hubo escucha por el agente**: el entorno no admite audio de entrada. Las nuevas fuentes son candidatos pendientes de validación auditiva del usuario; no se declara aprobada su calidad, timbre, ausencia de costuras audibles ni mezcla física. La sustitución está integrada y es revisable/reversible.
+
+### Validación obtenida
+
+- 123 pruebas aprobadas, seis optativas omitidas, incluyendo las regresiones del módulo, acceso desde Patio, sincronización y funciones generales.
+- Prueba optativa de transacciones/perfil: siete pruebas aprobadas al habilitar `RENDER_DEFENDER_AUDIO=true`.
+- Análisis sin incidencias y compilación web aprobada.
+- Producción frente a recogida, atún, ralentización frente a congelación, inmunidad, lanzamiento/contacto/caducidad, bordes del haz, reserva de voces y volumen cero verificados. El canal nativo emulado comprueba que 100 actualizaciones de haz activo no recargan la fuente y que pausa y silencio bloquean reproducción. No son pruebas de altavoces o decodificación real.
+- Comparación de checkpoints durante 180 transacciones a x2 para los cuatro defensores: simulación observada y control idénticos. Código de simulación, catálogo, niveles y progreso sin cambios; quince WAV de V3.5 y ambos MP3 sin cambios de bytes.
+- Cinco rondas de 120 pasos con 100 invasores: mediana CPU por paso 0,03481 ms sin observador y 0,04602 ms con observador/selección; sobrecoste ~0,01121 ms. `mz-defender-audio-profile.json`. Excluye reproductores, decodificación, altavoces y GPU; no permite afirmar FPS o latencia en móviles.
+
+`build/previews/mz-defender-audio-v36.html` reúne originales, variantes y candidatos digitales rechazados. Incluye ocho pares de mezclas offline de cinco segundos, normal/atún para cada defensor, derivados de eventos reales del test y con la misma ganancia. Sin música para escuchar los efectos; no son grabaciones del dispositivo. Ledger: `mz-defender-audio-ledger.json`. Los archivos de `build/` continúan ignorados por Git y se regeneran con la prueba optativa y el script.
+
+### GitHub
+
+La base previa quedó en el commit local `a1cd0df` de la rama `codex/marus-zombies-audio`. No se ha publicado ni empujado al remoto; la preparación mantiene la nueva selección sonora pendiente de revisión auditiva.

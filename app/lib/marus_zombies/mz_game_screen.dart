@@ -102,7 +102,9 @@ class _MzGameScreenState extends State<MzGameScreen>
     final beforeEffects = sim.effects.toSet();
     combatAudio.capture(sim);
     sim.advance(math.min(dt, 5 * MzSimulation.step) * speed);
-    GameAudio.instance.playCombat(combatAudio.events(sim));
+    final audioEvents = combatAudio.events(sim);
+    GameAudio.instance.updateCombatLaser(combatAudio.laserActive);
+    GameAudio.instance.playCombat(audioEvents);
     visuals.observe(sim);
     if (sim.effects.any(
       (f) => f.type == 'boom' && !beforeEffects.contains(f),
@@ -318,16 +320,26 @@ class _MzGameScreenState extends State<MzGameScreen>
       return;
     }
     var success = false;
+    var specificTunaSound = false;
     if (tool == 'shovel') {
       success = sim.remove(row, col);
     } else if (tool == 'tuna') {
+      combatAudio.capture(sim);
       success = sim.feed(row, col);
+      final cues = combatAudio.events(sim);
+      specificTunaSound = cues.isNotEmpty;
+      GameAudio.instance.playCombat(cues);
+      if (success && cues.isNotEmpty) visuals.observe(sim);
     } else if (selected != null) {
       success = sim.place(selected!, row, col);
     }
     if (success) {
       HapticFeedback.lightImpact();
-      GameAudio.instance.play(tool == 'tuna' ? GameSfx.reveal : GameSfx.place);
+      if (tool != 'tuna') {
+        GameAudio.instance.play(GameSfx.place);
+      } else if (!specificTunaSound) {
+        GameAudio.instance.play(GameSfx.reveal);
+      }
     }
     setState(() => preview = null);
   }

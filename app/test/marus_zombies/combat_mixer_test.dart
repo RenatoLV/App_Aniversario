@@ -136,6 +136,61 @@ void main() {
       );
       audio.stopEffect(GameSfx.marusCardVictory);
       await drain();
+      audio.updateCombatLaser(true);
+      await drain();
+      final beamSource = calls.lastWhere((c) => c.method == 'setSourceUrl');
+      expect(beamSource.arguments['url'], contains('marus_laser_beam.wav'));
+      final beamId = beamSource.arguments['playerId'];
+      final beamSources = calls.where((c) => c.method == 'setSourceUrl').length;
+      for (var i = 0; i < 100; i++) {
+        audio.updateCombatLaser(true);
+      }
+      await drain();
+      expect(
+        calls.where((c) => c.method == 'setSourceUrl').length,
+        beamSources,
+      );
+      audio.playCombat([GameSfx.marusIceShot, GameSfx.marusSun]);
+      await drain();
+      expect(
+        calls
+            .where(
+              (c) => c.method == 'create' && c.arguments['playerId'] != cardId,
+            )
+            .length,
+        lessThanOrEqualTo(4),
+      );
+      audio.pauseGame(true);
+      await drain();
+      final mutedSources = calls
+          .where((c) => c.method == 'setSourceUrl')
+          .length;
+      audio.updateCombatLaser(true);
+      await drain();
+      expect(
+        calls.where((c) => c.method == 'setSourceUrl').length,
+        mutedSources,
+      );
+      expect(
+        calls.any(
+          (c) => c.method == 'stop' && c.arguments['playerId'] == beamId,
+        ),
+        true,
+      );
+      audio.pauseGame(false);
+      audio.configure(sfxGain: 0);
+      audio.updateCombatLaser(true);
+      await drain();
+      expect(
+        calls.where((c) => c.method == 'setSourceUrl').length,
+        mutedSources,
+      );
+      audio.configure(sfxGain: .4);
+      audio.updateCombatLaser(true);
+      await drain();
+      audio.updateCombatLaser(false);
+      await drain();
+      audio.stopCombat();
       // The supplied Patio OST loops, resumes after pause and keeps its source
       // when the music slider changes. SFX and card players remain separate.
       audio.enter('marus-zombies-patio');
