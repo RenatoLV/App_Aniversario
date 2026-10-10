@@ -22,7 +22,7 @@
       "marus_sun_low.wav",
       "marus_sun_high.wav"
     ],
-    "review": "Provisional technical candidates; no listening performed."
+    "review": "Approved by project owner after audition on 2026-10-10. Agent audio input unavailable; no hardware listening measurement claimed."
   },
   {
     "event": "sun_tuna",
@@ -47,7 +47,7 @@
       "marus_sun_tuna_low.wav",
       "marus_sun_tuna_high.wav"
     ],
-    "review": "Provisional technical candidates; no listening performed."
+    "review": "Approved by project owner after audition on 2026-10-10. Agent audio input unavailable; no hardware listening measurement claimed."
   },
   {
     "event": "ice_shot",
@@ -72,7 +72,7 @@
       "marus_ice_shot_low.wav",
       "marus_ice_shot_high.wav"
     ],
-    "review": "Provisional technical candidates; no listening performed."
+    "review": "Approved by project owner after audition on 2026-10-10. Agent audio input unavailable; no hardware listening measurement claimed."
   },
   {
     "event": "ice_hit",
@@ -97,7 +97,7 @@
       "marus_ice_hit_low.wav",
       "marus_ice_hit_high.wav"
     ],
-    "review": "Provisional technical candidates; no listening performed."
+    "review": "Approved by project owner after audition on 2026-10-10. Agent audio input unavailable; no hardware listening measurement claimed."
   },
   {
     "event": "freeze",
@@ -122,7 +122,7 @@
       "marus_freeze_low.wav",
       "marus_freeze_high.wav"
     ],
-    "review": "Provisional technical candidates; no listening performed."
+    "review": "Approved by project owner after audition on 2026-10-10. Agent audio input unavailable; no hardware listening measurement claimed."
   },
   {
     "event": "catapult",
@@ -155,7 +155,7 @@
       "marus_catapult_low.wav",
       "marus_catapult_high.wav"
     ],
-    "review": "Provisional technical candidates; no listening performed."
+    "review": "Approved by project owner after audition on 2026-10-10. Agent audio input unavailable; no hardware listening measurement claimed."
   },
   {
     "event": "croquette",
@@ -180,7 +180,7 @@
       "marus_croquette_low.wav",
       "marus_croquette_high.wav"
     ],
-    "review": "Provisional technical candidates; no listening performed."
+    "review": "Approved by project owner after audition on 2026-10-10. Agent audio input unavailable; no hardware listening measurement claimed."
   },
   {
     "event": "laser_start",
@@ -205,7 +205,7 @@
       "marus_laser_start_low.wav",
       "marus_laser_start_high.wav"
     ],
-    "review": "Provisional technical candidates; no listening performed."
+    "review": "Approved by project owner after audition on 2026-10-10. Agent audio input unavailable; no hardware listening measurement claimed."
   },
   {
     "event": "laser_beam",
@@ -228,7 +228,7 @@
     "variants": [
       "marus_laser_beam.wav"
     ],
-    "review": "Provisional technical candidates; no listening performed."
+    "review": "Approved by project owner after audition on 2026-10-10. Agent audio input unavailable; no hardware listening measurement claimed."
   },
   {
     "event": "laser_end",
@@ -253,6 +253,6 @@
       "marus_laser_end_low.wav",
       "marus_laser_end_high.wav"
     ],
-    "review": "Provisional technical candidates; no listening performed."
+    "review": "Approved by project owner after audition on 2026-10-10. Agent audio input unavailable; no hardware listening measurement claimed."
   }
 ]

@@ -1,0 +1,17 @@
+{
+  "approvedBy": "project owner",
+  "date": "2026-10-10",
+  "statement": "si mejor aplica esos sonidos y sube a github",
+  "assets": {
+    "marus_sun.wav": "94e44b103f48bcbc506d605a88bfadce06d825ef2713b18b093775f90907fb08",
+    "marus_sun_tuna.wav": "8727c2a5681b9268c20c0911bcc691a3821e4d5d822c0781547c9d1d06f969c9",
+    "marus_ice_shot.wav": "076028a0471e8e16ce1141ccdd289bbc23bf468a2ded404bd1f0e216e32320ed",
+    "marus_ice_hit.wav": "219cce259ef9276d99b83bb98f65d2f850f9b0d5c92afb62574bf253d701fd4b",
+    "marus_freeze.wav": "ec4792b57dee8ac9e2889c5f0f07cb1615246ec60a1cb7cef42cfb6c28a6e118",
+    "marus_catapult.wav": "6aed9cce1841318a727544570b40b2e0137a35ba06a9054537f2faa510502ee4",
+    "marus_croquette.wav": "5ef914d894df1f9b4bc22985ca3492354dc0586f1b59113f87abbc21f0c1d9c7",
+    "marus_laser_start.wav": "ec260eacff5ca3a0ae7e41c74c297c78b2d643687d7fad0725abc0418d7cfaca",
+    "marus_laser_beam.wav": "3e2e46f9ef75bbc08beb2350d7c218c57e913e7e0c281ed0380dd606d082de8d",
+    "marus_laser_end.wav": "975b33ec8a3c867279314586c8c599220c96fc5b238ecc3406a805d9d9f7a7d6"
+  }
+}

@@ -761,7 +761,7 @@ Fuentes y licencias:
 
 Diez originales seleccionados fuera del bundle en `audio_sources/marus/v36/`; autores, enlaces y hashes en su `manifest.json`. Créditos y modificaciones en `assets/audio/LICENSES.md`. Diez clips preparados: nueve transitorios con variantes ±3 % y un bucle base, **28 WAV / 537.986 bytes**. Las ganancias son deliberadamente contenidas; el haz usa 0,12 antes del volumen global. `defender_selection_v36.json` registra asignación, presupuesto temporal, fuentes y hashes. `tool/prepare_marus_defender_audio.py` reproduce preparación y comparaciones con Python estándar y el ffmpeg existente, sin requerirlos para ejecutar el juego.
 
-**No hubo escucha por el agente**: el entorno no admite audio de entrada. Las nuevas fuentes son candidatos pendientes de validación auditiva del usuario; no se declara aprobada su calidad, timbre, ausencia de costuras audibles ni mezcla física. La sustitución está integrada y es revisable/reversible.
+**No hubo escucha por el agente**: el entorno no admite audio de entrada. El usuario escuchó la nueva selección y la aprobó el 10-10-2026, solicitando aplicarla y subirla a GitHub. Se considera aprobada por el responsable del proyecto; no se atribuye escucha al agente ni mediciones de latencia, costuras o mezcla en altavoces reales. La selección aprobada ya está conectada a los eventos de combate.
 
 ### Validación obtenida
 
@@ -776,4 +776,9 @@ Diez originales seleccionados fuera del bundle en `audio_sources/marus/v36/`; au
 
 ### GitHub
 
-La base previa quedó en el commit local `a1cd0df` de la rama `codex/marus-zombies-audio`. No se ha publicado ni empujado al remoto; la preparación mantiene la nueva selección sonora pendiente de revisión auditiva.
+Rama de entrega: `codex/marus-zombies-audio`, remoto `origin` (`RenatoLV/App_Aniversario`). Base del módulo: `a1cd0df`; integración V3.6: `e0471e5`. La aprobación del usuario y los hashes exactos de los diez clips base quedan registrados en `audio_sources/marus/v36/approval.json`. El script conserva esa aprobación únicamente si el hash del archivo regenerado coincide, evitando aprobar futuras sustituciones automáticamente.
+
+
+### Entrega aprobada · resumen V3.6
+
+Selección nueva aplicada a Girasol, Siberiano, Catapulta y Láser; audición aceptada por el usuario. Se conservan las voces zombis V3.5, la OST de los diez niveles del Patio y el MP3 de revelación. Sin modificaciones de simulación, economía, progresión, estadísticas ni dependencias. Resultados funcionales y perfil CPU son los descritos arriba: 123 pruebas aprobadas, seis optativas omitidas; perfil optativo aprobado, análisis limpio y build web aprobado. No se repiten pruebas por un cambio exclusivo de estado de aprobación y documentación. Los resultados no certifican latencia, mezcla física ni FPS en móviles.

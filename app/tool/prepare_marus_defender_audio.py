@@ -35,6 +35,8 @@ def main(ffmpeg):
     PREVIEWS.mkdir(parents=True, exist_ok=True)
     metadata, articles = [], []
     provenance = {x['file']: x for x in json.loads((SOURCES / 'v36/manifest.json').read_text(encoding='utf-8'))}
+    approval_path = SOURCES / 'v36/approval.json'
+    approved = json.loads(approval_path.read_text(encoding='utf-8')) if approval_path.exists() else {}
     rejected_dir = PREVIEWS / 'mz-rejected-digital'
     rejected_dir.mkdir(exist_ok=True)
     for choice_index, (event, source, duration, reason) in enumerate(CHOICES):
@@ -75,10 +77,13 @@ def main(ffmpeg):
                 subprocess.run([ffmpeg, '-v', 'error', '-y', '-i', str(ASSETS / asset),
                     '-af', f'asetrate={22050 * factor},aresample=22050', str(ASSETS / variant)], check=True)
                 variants.append(variant)
+        digest = hashlib.sha256((ASSETS / asset).read_bytes()).hexdigest()
+        review = ('Approved by project owner after audition on ' + approved['date'] +
+                  '. Agent audio input unavailable; no hardware listening measurement claimed.') if approved.get('assets', {}).get(asset) == digest else 'Provisional technical candidates; no listening performed.'
         metadata.append(dict(event=event, sources=sources, asset=asset, durationMs=duration,
-            sha256=hashlib.sha256((ASSETS / asset).read_bytes()).hexdigest(),
+            sha256=digest,
             reason=reason, sourcesMetadata=[provenance[s] for s in sources], variants=variants,
-            review='Provisional technical candidates; no listening performed.'))
+            review=review))
         controls = ''.join(f'<p>{v}</p><audio controls preload="none" src="../../assets/audio/{v}"></audio>' for v in variants)
         originals = ''.join(f'<p>Original: {s}</p><audio controls preload="none" src="../../audio_sources/marus/{s}"></audio>' for s in sources)
         rejected = f'<p>Candidato digital rechazado:</p><audio controls preload="none" src="mz-rejected-digital/{asset}"></audio>'
@@ -88,6 +93,10 @@ def main(ffmpeg):
     <style>body{font:18px system-ui;background:#18382b;color:#ffedba;padding:24px;max-width:950px;margin:auto}article{padding:20px;margin:16px 0;background:#285840;border:3px solid #b58949;border-radius:18px}audio{width:100%}a{color:#ffce75}</style>
     <h1>Defensores · candidatos V3.6</h1><p>Sin escucha verificada: valida carácter y volumen. Versiones base y ±3 % de tono; originales al final de cada sección. El haz comparte un solo bucle entre todos los Láser.</p>
     <p><a href="mz-combat-audio-v35.html">Comparación V3.5 conservada</a> · <a href="../../audio_sources/marus/audition.html">Banco completo</a></p>'''
+    if all(item['review'].startswith('Approved') for item in metadata):
+        html = html.replace('Defensores · candidatos V3.6', 'Defensores · selección aprobada V3.6').replace(
+            'Sin escucha verificada: valida carácter y volumen.',
+            'Selección aprobada por el usuario tras escucharla. El agente no dispone de entrada auditiva.')
     (PREVIEWS / 'mz-defender-audio-v36.html').write_text(html + ''.join(articles), encoding='utf-8')
     ledger = PREVIEWS / 'mz-defender-audio-ledger.json'
     if ledger.exists():

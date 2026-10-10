@@ -16,5 +16,5 @@ Los candidatos del banco Digital Audio se rechazaron por su carácter de 8 bits.
 Las nuevas fuentes seleccionadas se encuentran en `v36/`, con autores, licencias
 CC0/CC BY/CC BY-SA, enlaces y hashes en `v36/manifest.json`. Los derivados y
 sus créditos están documentados en `assets/audio/LICENSES.md` y
-`defender_selection_v36.json`. Siguen pendientes de aprobación auditiva.
+`defender_selection_v36.json`. Selección aprobada por el usuario tras escucharla el 10-10-2026; hashes exactos registrados en `v36/approval.json`.
 El banco original de 89 archivos conserva sus grabaciones y la selección V3.5.
