@@ -1060,3 +1060,11 @@ Sondeos separados de pintura CPU legal/extrema, observadores, cachés y creació
 Resultados finales, matriz de teléfono físico, auditoría de progresión y bloqueos de licencias se consignan en `MARUS_VS_ZOMBIES_V41_QUALITY_REVIEW.md`. No consta permiso público/comercial para los dos MP3 aportados: distribución pendiente, aunque sus selecciones se conservan. La experiencia física, el entretenimiento y el rendimiento GPU/memoria de Android permanecen por validar.
 
 Suite completa final V4.1: **339 aprobadas, 14 optativas omitidas, cero fallidas**; análisis sin incidencias. Implementación publicada en `origin/codex/marus-zombies-audio`, hash **`42c95aa2eb6b64b317340122299381623807fdd1`**, comprobado con `git ls-remote`. El cierre documental se añade después.
+
+## Release Android 1.9.2 · compilación 1028 (2026-10-10)
+
+Posteriormente, a petición expresa del propietario, se ejecutó el proceso existente de publicación Android desde `codex/marus-zombies-audio`, sin modificar main ni sustituir la firma. Commit de la APK: `55a48aa6de68617313e7538b82421e663d35a7f0`. [GitHub Actions 38090906331](https://github.com/RenatoLV/App_Aniversario/actions/runs/38090906331) terminó con éxito: Firebase/multijugador, intercambio de cartas, análisis sin incidencias, **339 pruebas aprobadas y 14 omitidas**, APK release ARM64 y pruebas Android Gradle.
+
+[Release v1.9.2-build1028](https://github.com/RenatoLV/App_Aniversario/releases/tag/v1.9.2-build1028) publicada y comprobada como latest. Archivos: `Anivermaru-1.9.2-1028-arm64.apk` (220.116.666 bytes), `update.json` y `SHA256SUMS.txt`. Descarga APK responde HTTP 200; versión/código/nombre del metadata correctos. SHA-256 declarado coincide con el checksum descargado y el digest del asset en GitHub: `455954e69be3337bf203929c5df519ac54088a33e14f532243d4f6fdd5b6fb0d`. No se descargó la APK completa para una segunda comprobación local.
+
+Esta publicación no equivale a pruebas en teléfono físico ni resuelve los permisos de música pendientes. La ausencia de compilación indicada en las etapas V4/V4.1 anteriores describe aquellas etapas; esta release posterior sí compiló y publicó la aplicación. [Notas de versión](docs/release-1.9.2.md).

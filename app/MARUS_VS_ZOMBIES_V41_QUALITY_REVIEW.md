@@ -140,3 +140,9 @@ Sólo se publican código, tests y documentación de esta entrega. No build/, ca
 Implementación V4.1: **`42c95aa2eb6b64b317340122299381623807fdd1`**, `fix(marus): audit V4.1 gameplay and protect saves and touch tools`.
 
 `git push origin HEAD:refs/heads/codex/marus-zombies-audio` terminó correctamente. `git ls-remote origin refs/heads/codex/marus-zombies-audio` devolvió ese mismo hash el 2026-10-10; árbol limpio tras el commit. Esta confirmación se registra en un cierre documental posterior, sin inventar el hash de su propio archivo. Los 20 archivos de implementación incluyen código, pruebas, informes y generador; ningún temporal de build/ ni asset nuevo. Sin force-push, main, PR ni merge.
+
+## Publicación posterior solicitada por el propietario
+
+El 2026-10-10 se publicó [Anivermaru 1.9.2, build 1028](https://github.com/RenatoLV/App_Aniversario/releases/tag/v1.9.2-build1028), a partir de `55a48aa6de68617313e7538b82421e663d35a7f0`, mediante el workflow Android existente y la firma preservada. [Ejecución 38090906331](https://github.com/RenatoLV/App_Aniversario/actions/runs/38090906331) completada con éxito: análisis sin incidencias, 339 pruebas Flutter aprobadas/14 omitidas, Firebase/multijugador, intercambio, compilación ARM64 y pruebas Android Gradle. Se comprobó latest, metadata 1.9.2/1028, descarga APK HTTP 200 y coherencia entre SHA256SUMS, update.json y digest GitHub. La release incluye APK, metadata y checksum.
+
+Las notas y el documento V3 registran esta etapa posterior; la afirmación de que no se compiló durante la auditoría V4.1 sigue describiendo esa auditoría. No hubo instalación ni medición física, cambios de firma, merge a main o validación adicional de derechos musicales. Los límites y permisos pendientes anteriores permanecen vigentes. [Notas de versión](docs/release-1.9.2.md).
