@@ -195,7 +195,7 @@ void main() {
       // when the music slider changes. SFX and card players remain separate.
       audio.enter('marus-zombies-patio');
       audio.configure(music: true);
-      await Future<void>.delayed(const Duration(milliseconds: 850));
+      await audio.musicSettled;
       final source = calls.lastWhere((c) => c.method == 'setSourceUrl');
       expect(source.arguments['url'], contains('zombies-on-your-lawn.mp3'));
       final musicId = source.arguments['playerId'];
@@ -226,7 +226,25 @@ void main() {
         true,
       );
       audio.pauseGame(false);
+      await audio.musicSettled;
+      expect(
+        calls.where((c) => c.method == 'setSourceUrl').length,
+        sourceCount,
+      );
+      // A sustained pause must retain the same track and playback position.
+      audio.pauseGame(true);
+      audio.configure(music: true);
       await Future<void>.delayed(const Duration(milliseconds: 850));
+      audio.pauseGame(false);
+      await audio.musicSettled;
+      expect(
+        calls.where((c) => c.method == 'setSourceUrl').length,
+        sourceCount,
+      );
+      audio.didChangeAppLifecycleState(AppLifecycleState.paused);
+      await audio.musicSettled;
+      audio.didChangeAppLifecycleState(AppLifecycleState.resumed);
+      await audio.musicSettled;
       expect(
         calls.where((c) => c.method == 'setSourceUrl').length,
         sourceCount,

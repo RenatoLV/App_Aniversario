@@ -8,8 +8,8 @@ import 'package:nuestro_rincon/marus_zombies/mz_simulation.dart';
 void main() {
   test('all sixty campaign missions can be cleared without paid powers', () {
     final failed = <String>[];
-    for (final id in List.generate(50, (i) => i)) {
-      final level = MzLevel(id);
+    for (final level in mzCampaign) {
+      final id = level.id;
       final cats = [
         MzCat.launcher,
         MzCat.sunflower,

@@ -1,6 +1,7 @@
 // Ground shadows remain fixed while the cutout character bobs above them.
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'mz_catalog.dart';
 import 'mz_simulation.dart';
 import 'mz_scenery.dart';
@@ -9,9 +10,28 @@ import 'mz_character_art.dart';
 import 'mz_visual_feedback.dart';
 import 'mz_art_style.dart';
 import 'mz_combat_art.dart';
+import 'mz_threat_feedback.dart';
+import 'mz_threat_art.dart';
 
 const mzInk = MzArt.ink;
 const mzPalette = MzArt.accents;
+
+/// Tactile target is at least 48 logical pixels across; closest pickup wins.
+MzPickup? mzPickupAt(MzSimulation sim, Size size, Offset pointer) {
+  final g = MzBoardGeometry(size),
+      radius = math.max(24, size.width * .785 / 9 * .25);
+  MzPickup? nearest;
+  var distance = double.infinity;
+  for (final p in sim.pickups.reversed) {
+    final d =
+        (g.point(p.row, p.x).translate(0, -g.ch * .14) - pointer).distance;
+    if (d <= radius && d < distance) {
+      nearest = p;
+      distance = d;
+    }
+  }
+  return nearest;
+}
 
 class MzBoardGeometry {
   MzBoardGeometry(Size size)
@@ -127,6 +147,10 @@ void mzDrawCat(
   double hurt = 0,
   double prepare = 0,
   double performance = 0,
+  double power = 0,
+  bool specialStyle = true,
+  bool finalDefenders = true,
+  bool refinedBoss = true,
   bool walking = true,
 }) => mzPaintCharacter(
   canvas,
@@ -141,6 +165,10 @@ void mzDrawCat(
   hurt: hurt,
   prepare: prepare,
   performance: performance,
+  power: power,
+  specialStyle: specialStyle,
+  finalDefenders: finalDefenders,
+  refinedBoss: refinedBoss,
   walking: walking,
 );
 
@@ -179,13 +207,50 @@ class MzBoardPainter extends CustomPainter {
     this.reducedMotion = false,
     this.scenery,
     this.visuals,
+    this.threats,
+    this.enhancedPowers = true,
+    this.secondStagePowers = true,
+    this.finalDefenderPowers = true,
+    this.refinedBoss = true,
   });
   final MzSimulation sim;
   final MzCat? selected;
   final (int, int)? focusCell;
   final bool reducedMotion;
+
+  /// Render comparison switch; gameplay always uses the improved presentation.
+  final bool enhancedPowers;
+  final bool secondStagePowers;
+  final bool finalDefenderPowers;
+  final bool refinedBoss;
   final MzSceneryCache? scenery;
   final MzVisualFeedback? visuals;
+  final MzThreatFeedback? threats;
+  @override
+  SemanticsBuilderCallback? get semanticsBuilder => threats == null
+      ? null
+      : (size) {
+          final alert = threats!.announcement(sim.time);
+          final label =
+              alert ??
+              (threats!.hasBoss
+                  ? '${MzEnemy.boss.label}: ${threats!.bossHp.ceil()} de ${threats!.bossMaximum.ceil()} de vida'
+                  : null);
+          if (label == null || sim.ended) return [];
+          final board = MzBoardGeometry(size).board;
+          return [
+            CustomPainterSemantics(
+              rect: Rect.fromLTWH(board.left, 0, board.width, board.top),
+              properties: SemanticsProperties(
+                label: label,
+                textDirection: TextDirection.ltr,
+                liveRegion: alert != null,
+              ),
+            ),
+          ];
+        };
+  @override
+  bool shouldRebuildSemantics(MzBoardPainter oldDelegate) => true;
   @override
   void paint(Canvas c, Size size) {
     c.save();
@@ -374,6 +439,16 @@ class MzBoardPainter extends CustomPainter {
       }
     }
     final phase = reducedMotion ? 0.0 : sim.time;
+    if (threats != null) {
+      mzPaintThreatGround(
+        c,
+        b,
+        threats!,
+        sim.time,
+        reducedMotion,
+        refinedBoss: refinedBoss,
+      );
+    }
     final entities =
         <(int, double, MzDefender?, MzInvader?, MzVisualEvent?)>[
           for (final d in sim.defenders) (d.row, d.col + .5, d, null, null),
@@ -394,12 +469,34 @@ class MzBoardPainter extends CustomPainter {
           g.cw,
           g.ch,
           g.point(entity.$1, entity.$2),
+          refinedBoss: refinedBoss,
         );
         continue;
       }
       final d = entity.$3;
       if (d != null) {
         final pos = g.point(d.row, d.col + .5);
+        var energy = enhancedPowers ? visuals?.power(d.id, sim.time) ?? 0 : 0.0;
+        final copy = secondStagePowers
+            ? visuals?.copyPulse(d.id, sim.time) ?? 0
+            : 0.0;
+        if (secondStagePowers && d.kind == MzCat.launcher && d.burstLeft > 0) {
+          energy = math.max(energy, .8);
+        }
+        energy = math.max(energy, copy);
+        if (energy > 0) {
+          mzPaintTunaAura(
+            c,
+            pos,
+            d.kind,
+            energy,
+            g.cw,
+            g.ch,
+            reducedMotion: reducedMotion,
+            secondStage: secondStagePowers,
+            protected: d.armor > 0,
+          );
+        }
         mzDrawCat(
           c,
           pos,
@@ -409,6 +506,9 @@ class MzBoardPainter extends CustomPainter {
           attack: reducedMotion ? 0 : visuals?.attack(d.id, sim.time) ?? 0,
           hurt: reducedMotion ? 0 : visuals?.hurt(d.id, sim.time) ?? 0,
           prepare: reducedMotion ? 0 : visuals?.prepare(d, sim) ?? 0,
+          power: reducedMotion ? 0 : energy,
+          specialStyle: secondStagePowers,
+          finalDefenders: finalDefenderPowers,
           armor: d.armor > 0,
           armed: d.armed,
         );
@@ -430,14 +530,18 @@ class MzBoardPainter extends CustomPainter {
             pos,
             g.cw * 1.55,
             enemy: MzEnemy.boss,
-            phase: phase,
+            phase: reducedMotion ? 0 : phase,
+            refinedBoss: refinedBoss,
+            performance: reducedMotion
+                ? 0
+                : visuals?.performance(e.id, sim.time) ?? 0,
             hurt: reducedMotion ? 0 : visuals?.hurt(e.id, sim.time) ?? 0,
           );
           _health(
             c,
             pos.translate(0, -g.ch * .8),
             g.cw * 1.5,
-            e.hp / 12000,
+            e.hp / e.kind.health,
             false,
           );
         } else {
@@ -466,7 +570,9 @@ class MzBoardPainter extends CustomPainter {
             Paint()..color = const Color(0xffd3ff98),
           );
         }
-        if (e.slowUntil > sim.time || e.frozenUntil > sim.time) {
+        if (enhancedPowers && e.frozenUntil > sim.time) {
+          mzPaintFrozenCrown(c, pos, g.cw, g.ch);
+        } else if (e.slowUntil > sim.time || e.frozenUntil > sim.time) {
           c.drawCircle(
             pos,
             g.cw * .35,
@@ -489,7 +595,18 @@ class MzBoardPainter extends CustomPainter {
           .point(p.row, p.x)
           .translate(0, p.arc ? -g.ch * .25 : -g.ch * .07);
       if (!reducedMotion && visuals != null) {
-        mzPaintProjectileTrail(c, p, visuals!, sim.time, g.cw, g.ch, g.point);
+        mzPaintProjectileTrail(
+          c,
+          p,
+          visuals!,
+          sim.time,
+          g.cw,
+          g.ch,
+          g.point,
+          enhancedPowers: enhancedPowers,
+          secondStage: secondStagePowers,
+          finalDefenders: finalDefenderPowers,
+        );
       }
       _projectile(c, pos, g.cw * .1, p);
     }
@@ -507,6 +624,22 @@ class MzBoardPainter extends CustomPainter {
       }
     }
     for (final f in beams.values) {
+      double? powerX;
+      if (enhancedPowers) {
+        for (final d in sim.defenders) {
+          if (d.kind != MzCat.laser ||
+              d.row != f.row ||
+              d.powerUntil <= sim.time) {
+            continue;
+          }
+          final x = d.col + .8;
+          if (sim.effects.any(
+            (e) => e.type == 'laser' && e.row == d.row && (e.x - x).abs() < .01,
+          )) {
+            powerX = powerX == null ? x : math.min(powerX, x);
+          }
+        }
+      }
       mzPaintCombatEffect(
         c,
         f,
@@ -515,10 +648,15 @@ class MzBoardPainter extends CustomPainter {
         g.ch,
         g.point,
         reducedMotion: reducedMotion,
+        powered: powerX != null,
+        powerX: powerX,
       );
     }
     for (final f in sim.effects) {
-      if (f.type == 'laser') continue;
+      if (f.type == 'laser' ||
+          (enhancedPowers && f.type == 'tuna' && visuals != null)) {
+        continue;
+      }
       mzPaintCombatEffect(
         c,
         f,
@@ -527,13 +665,36 @@ class MzBoardPainter extends CustomPainter {
         g.ch,
         g.point,
         reducedMotion: reducedMotion,
+        bombBurst: secondStagePowers && (visuals?.bombExplosion(f) ?? false),
+        finalDefenders:
+            finalDefenderPowers && (visuals?.lightningEffect(f) ?? false),
       );
     }
     if (!reducedMotion && visuals != null) {
-      mzPaintVisualEvents(c, visuals!, sim.time, g.cw, g.ch, g.point);
+      mzPaintVisualEvents(
+        c,
+        visuals!,
+        sim.time,
+        g.cw,
+        g.ch,
+        g.point,
+        enhancedPowers: enhancedPowers,
+      );
     }
     for (final p in sim.pickups) {
       final pos = g.point(p.row, p.x).translate(0, -g.ch * .14);
+      final birth = enhancedPowers ? visuals?.resourceBirth(p.id) : null;
+      c.save();
+      if (birth != null && !p.tuna) {
+        mzPaintTunaResource(
+          c,
+          pos,
+          g.cw,
+          sim.time - birth,
+          p.id,
+          reducedMotion: reducedMotion,
+        );
+      }
       c.drawCircle(pos, g.cw * .23, Paint()..color = const Color(0x66fff7a6));
       if (p.tuna) {
         mzBox(
@@ -546,6 +707,7 @@ class MzBoardPainter extends CustomPainter {
       } else {
         mzPaintCatnip(c, pos, g.cw * .36);
       }
+      c.restore();
     }
     final drift = reducedMotion ? 0.0 : math.sin(sim.time * .5) * 2;
     for (final side in sim.level.world == MzWorld.patio ? [0, 1] : <int>[]) {
@@ -558,6 +720,9 @@ class MzBoardPainter extends CustomPainter {
       c.drawOval(Rect.fromLTWH(-10 + drift, -32, 48, 18), leaves);
       c.drawOval(Rect.fromLTWH(-6, -56 + drift, 23, 42), leaves);
       c.restore();
+    }
+    if (threats != null && !sim.ended) {
+      mzPaintThreatHeader(c, b, threats!, sim.time, reducedMotion);
     }
     c.restore();
   }

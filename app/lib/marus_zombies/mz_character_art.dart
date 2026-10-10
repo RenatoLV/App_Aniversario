@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'mz_art_style.dart';
 import 'mz_catalog.dart';
@@ -30,6 +31,10 @@ void mzPaintCharacter(
   double hurt = 0,
   double prepare = 0,
   double performance = 0,
+  double power = 0,
+  bool specialStyle = true,
+  bool finalDefenders = true,
+  bool refinedBoss = true,
   bool walking = true,
 }) {
   c.save();
@@ -59,6 +64,39 @@ void mzPaintCharacter(
   );
   mzArtOval(c, shadow, const Color(0x38233623), stroke: 0);
   // A brief event-driven recoil affects only the drawing, never the logical cell.
+  if (cat != null && power > 0) {
+    c.translate(50, 98);
+    final reaction = math.sin((1 - power) * math.pi * 2) * power;
+    switch (cat) {
+      case MzCat.launcher:
+        if (specialStyle) {
+          c.translate(-power * 3, 0);
+          c.scale(1 + power * .08, 1 - power * .045);
+        }
+      case MzCat.barrier:
+        if (specialStyle) {
+          c.scale(1 + reaction * .10, 1 - reaction * .06);
+        }
+      case MzCat.mine:
+        if (specialStyle) {
+          c.rotate(reaction * .07);
+          c.translate(0, -math.sin((1 - power) * math.pi) * power * 6);
+        }
+      case MzCat.sunflower:
+        c.scale(1 - reaction * .07, 1 + reaction * .09);
+      case MzCat.ice:
+        c.rotate(-reaction * .055);
+        c.scale(1 + reaction * .06, 1 - reaction * .04);
+      case MzCat.catapult:
+        c.rotate(reaction * .07);
+      case MzCat.laser:
+        c.translate(-power * 2.5, 0);
+        c.scale(1 + power * .05, 1 - power * .035);
+      default:
+        break;
+    }
+    c.translate(-50, -98);
+  }
   c.translate(-attack * 3 + hurt * (enemy == null ? 3 : -3), 0);
   {
     c.translate(50, 98);
@@ -71,7 +109,7 @@ void mzPaintCharacter(
   }
   if (enemy != null) {
     if (enemy == MzEnemy.boss) {
-      _boss(c, phase, hurt);
+      _boss(c, phase, hurt, performance: performance, refined: refinedBoss);
     } else {
       c.translate(100, 0);
       c.scale(-1, 1); // Invaders face the home at the left.
@@ -97,6 +135,13 @@ void mzPaintCharacter(
       attack,
       hurt,
       prepare: prepare,
+      power:
+          specialStyle ||
+              ![MzCat.launcher, MzCat.barrier, MzCat.mine].contains(cat)
+          ? power
+          : 0,
+      specialStyle: specialStyle,
+      finalDefenders: finalDefenders,
     );
   }
   c.restore();
@@ -738,7 +783,7 @@ void _face(
   }
 }
 
-void _petals(Canvas c, double phase) {
+void _petals(Canvas c, double phase, [double power = 0]) {
   for (var i = 0; i < 12; i++) {
     c.save();
     c.translate(51, 53);
@@ -750,7 +795,11 @@ void _petals(Canvas c, double phase) {
         ..cubicTo(-13, -43, 9, -44, 7, -26)
         ..quadraticBezierTo(1, -19, -6, -23)
         ..close(),
-      i.isEven ? const Color(0xffffdc68) : const Color(0xffeeb13c),
+      Color.lerp(
+        i.isEven ? const Color(0xffffdc68) : const Color(0xffeeb13c),
+        const Color(0xfffff5b1),
+        power * .9,
+      )!,
       stroke: 1.6,
     );
     c.restore();
@@ -766,12 +815,37 @@ void _defender(
   double attack,
   double hurt, {
   double prepare = 0,
+  double power = 0,
+  bool specialStyle = true,
+  bool finalDefenders = true,
 }) {
+  final evolved =
+      finalDefenders &&
+      [MzCat.boomerang, MzCat.spring, MzCat.lightning].contains(kind);
+  final pulse = evolved ? math.max(attack, power) : 0.0;
+  if (evolved) {
+    c.translate(50, 98);
+    if (kind == MzCat.boomerang) {
+      c.rotate(prepare * -.09 + pulse * .12);
+      c.translate(-prepare * 3 + pulse * 4, 0);
+    } else if (kind == MzCat.lightning) {
+      c.scale(1 + pulse * .10, 1 - pulse * .07);
+      c.rotate(math.sin((1 - power) * math.pi * 4) * power * .035);
+    }
+    c.translate(-50, -98);
+  }
   if (kind == MzCat.bomb) {
     // The cherry pair is represented by both protagonists, not one recoloured cat.
     for (var i = 0; i < 2; i++) {
       c.save();
       c.translate(i == 0 ? 1 : 39, i == 0 ? 28 : 22);
+      if (specialStyle && prepare > 0) {
+        c.translate(
+          i == 0 ? -prepare * 3 : prepare * 3,
+          -math.sin(prepare * math.pi) * 5,
+        );
+        c.rotate((i == 0 ? -1 : 1) * prepare * .13);
+      }
       c.scale(.62);
       _cat(
         c,
@@ -780,7 +854,7 @@ void _defender(
         phase + i,
         attack: attack,
         hurt: hurt,
-        prepare: prepare,
+        prepare: specialStyle ? prepare * 1.35 : prepare,
       );
       c.restore();
     }
@@ -796,9 +870,9 @@ void _defender(
     return;
   }
   if (kind == MzCat.mine) {
-    _box(c, armed);
+    _box(c, armed, specialStyle ? power : 0);
     c.save();
-    c.translate(10, armed ? 13 : 33);
+    c.translate(10, (armed ? 13 : 33) - (specialStyle ? power * 8 : 0));
     c.scale(.78);
     _face(
       c,
@@ -858,7 +932,11 @@ void _defender(
       prepare: prepare,
     );
     c.restore();
-    _catapultArm(c, attack - prepare * .55);
+    // The burst already launched: this is recoil/recovery, never a delayed shot.
+    _catapultArm(
+      c,
+      attack - prepare * .55 + math.sin((1 - power) * math.pi * 3) * power * .9,
+    );
     return;
   }
   if (kind == MzCat.spring) {
@@ -868,7 +946,22 @@ void _defender(
       const Color(0xffa4a8b2),
       material: MzMaterial.metal,
     );
-    final lift = -attack * 6 + prepare * 3;
+    final elastic = math.sin((1 - pulse) * math.pi * 3) * pulse;
+    final lift = evolved
+        ? -pulse * 17 + elastic * 4 + prepare * 7
+        : -attack * 6 + prepare * 3;
+    if (evolved) {
+      mzArtBox(
+        c,
+        const Rect.fromLTWH(24, 89, 54, 8),
+        const Color(0xff697e85),
+        radius: 4,
+        material: MzMaterial.metal,
+      );
+      for (final x in [31.0, 70.0]) {
+        mzArtOval(c, Rect.fromLTWH(x, 91, 4, 4), MzArt.paper, stroke: .8);
+      }
+    }
     final coil = Path()..moveTo(30, 73 + lift);
     for (var i = 0; i < 4; i++) {
       coil
@@ -877,6 +970,21 @@ void _defender(
     }
     mzArtLine(c, coil, MzArt.ink, 4);
     mzArtLine(c, coil, const Color(0xffd9e0dc), 2);
+    if (evolved) {
+      mzArtLine(
+        c,
+        coil.shift(const Offset(-1, -1)),
+        const Color(0xfff6ffff),
+        .8,
+      );
+      mzArtOval(
+        c,
+        Rect.fromLTWH(27, 70 + lift, 49, 8),
+        const Color(0xffbccfd1),
+        material: MzMaterial.metal,
+        stroke: 1.4,
+      );
+    }
     c.save();
     c.translate(9, -9 + lift);
     c.scale(.84);
@@ -888,6 +996,7 @@ void _defender(
       attack: attack,
       hurt: hurt,
       prepare: prepare,
+      power: evolved ? power : 0,
     );
     c.restore();
     return;
@@ -901,6 +1010,8 @@ void _defender(
     attack: attack,
     hurt: hurt,
     prepare: prepare,
+    power: power,
+    finalDefenders: finalDefenders,
   );
 }
 
@@ -913,6 +1024,8 @@ void _cat(
   double attack = 0,
   double hurt = 0,
   double prepare = 0,
+  double power = 0,
+  bool finalDefenders = true,
 }) {
   final accent = MzArt.accent(kind), heavy = kind == MzCat.barrier;
   final lean = kind == MzCat.launcher || kind == MzCat.boomerang;
@@ -934,7 +1047,9 @@ void _cat(
   c.scale(1, 1 + bob * .009);
   c.translate(-50, -97);
   _body(c, muse, fur, heavy: heavy || kind == MzCat.sunflower, lean: lean);
-  if (kind == MzCat.sunflower) _petals(c, phase + prepare * .6 - attack * .3);
+  if (kind == MzCat.sunflower) {
+    _petals(c, phase + prepare * .6 - attack * .3, power);
+  }
   if (kind == MzCat.lightning) {
     mzArtShape(
       c,
@@ -1007,6 +1122,28 @@ void _cat(
         ? _FacePersona.hunter
         : _FacePersona.familiar,
   );
+  if ((kind == MzCat.launcher && power > 0) ||
+      (finalDefenders &&
+          kind == MzCat.boomerang &&
+          math.max(attack, power) > 0)) {
+    // Brow gesture and headband belong to the active burst, not a new unit.
+    mzArtLine(
+      c,
+      Path()
+        ..moveTo(30, 35)
+        ..lineTo(43, 38),
+      MzArt.ink,
+      2.2,
+    );
+    mzArtLine(
+      c,
+      Path()
+        ..moveTo(62, 38)
+        ..lineTo(75, 35),
+      MzArt.ink,
+      2.2,
+    );
+  }
   if (kind == MzCat.launcher || kind == MzCat.boomerang) {
     mzArtShape(
       c,
@@ -1045,6 +1182,19 @@ void _cat(
       const Color(0xffdbe8e4),
       radius: 2,
     );
+    if (heavy && power > 0) {
+      mzArtLine(
+        c,
+        Path()
+          ..moveTo(30, 19)
+          ..lineTo(68, 16),
+        MzArt.paper,
+        3,
+      );
+      for (final x in [30.0, 71.0]) {
+        mzArtOval(c, Rect.fromLTWH(x, 22, 4, 4), MzArt.gold, stroke: .8);
+      }
+    }
   }
   c.restore();
   if (kind == MzCat.ice) {
@@ -1136,6 +1286,12 @@ void _cat(
       MzArt.ladyFur,
     );
   } else if (kind == MzCat.boomerang) {
+    c.save();
+    if (finalDefenders) {
+      c.translate(80, 74);
+      c.rotate(-prepare * .5 + math.max(attack, power) * .7);
+      c.translate(-80, -74);
+    }
     _fish(
       c,
       Offset(82 - prepare * 5, 70 - prepare * 3),
@@ -1143,7 +1299,45 @@ void _cat(
       const Color(0xffe9c56b),
     );
     _paw(c, const Rect.fromLTWH(68, 78, 22, 10), MzArt.ladyFur);
+    c.restore();
   } else if (kind == MzCat.lightning) {
+    final charge = finalDefenders ? math.max(attack, power) : 0.0;
+    if (charge > 0) {
+      for (final x in [38.0, 67.0]) {
+        mzArtOval(
+          c,
+          Rect.fromCenter(center: Offset(x, 43), width: 9, height: 5),
+          MzArt.gold.withValues(alpha: charge * .7),
+          stroke: 0,
+        );
+        mzArtOval(
+          c,
+          Rect.fromCenter(center: Offset(x, 42), width: 3, height: 2),
+          MzArt.paper,
+          stroke: 0,
+        );
+      }
+      mzArtLine(
+        c,
+        Path()
+          ..moveTo(23, 61)
+          ..lineTo(15, 68)
+          ..lineTo(24, 70)
+          ..lineTo(17, 80),
+        MzArt.gold.withValues(alpha: charge),
+        2.5,
+      );
+      mzArtLine(
+        c,
+        Path()
+          ..moveTo(80, 56)
+          ..lineTo(88, 65)
+          ..lineTo(81, 69)
+          ..lineTo(90, 76),
+        MzArt.paper.withValues(alpha: charge),
+        1.5,
+      );
+    }
     _bolt(c, const Offset(53, 79), 12);
     mzArtShape(
       c,
@@ -1193,7 +1387,7 @@ void _cat(
   c.restore();
 }
 
-void _box(Canvas c, bool armed) {
+void _box(Canvas c, bool armed, [double power = 0]) {
   mzArtShape(
     c,
     Path()
@@ -1210,8 +1404,8 @@ void _box(Canvas c, bool armed) {
     c,
     Path()
       ..moveTo(15, 63)
-      ..lineTo(3, armed ? 50 : 67)
-      ..lineTo(38, armed ? 41 : 59)
+      ..lineTo(3, (armed ? 50 : 67) - power * 14)
+      ..lineTo(38, (armed ? 41 : 59) - power * 10)
       ..lineTo(49, 52)
       ..close(),
     MzArt.woodLight,
@@ -1221,8 +1415,8 @@ void _box(Canvas c, bool armed) {
     c,
     Path()
       ..moveTo(49, 52)
-      ..lineTo(77, armed ? 39 : 57)
-      ..lineTo(99, armed ? 51 : 68)
+      ..lineTo(77, (armed ? 39 : 57) - power * 10)
+      ..lineTo(99, (armed ? 51 : 68) - power * 14)
       ..lineTo(88, 65)
       ..close(),
     MzArt.woodLight,
@@ -1944,7 +2138,71 @@ void _leaf(Canvas c, Offset p, double radius) => mzArtShape(
   stroke: 1.2,
 );
 
-void _boss(Canvas c, double phase, double hurt) {
+ui.Picture? _cachedBossArm;
+ui.Picture get _bossArmPicture {
+  if (_cachedBossArm != null) return _cachedBossArm!;
+  final recorder = ui.PictureRecorder(), c = Canvas(recorder);
+  mzArtBox(
+    c,
+    const Rect.fromLTWH(0, -2, 15, 28),
+    const Color(0xff536d77),
+    radius: 5,
+    material: MzMaterial.metal,
+    stroke: 2.3,
+  );
+  mzArtOval(
+    c,
+    const Rect.fromLTWH(-7, -9, 14, 14),
+    const Color(0xffa2b5b9),
+    material: MzMaterial.metal,
+    stroke: 1.7,
+  );
+  mzArtLine(
+    c,
+    Path()
+      ..moveTo(5, 6)
+      ..lineTo(5, 22),
+    MzArt.paper,
+    2,
+  );
+  mzArtBox(
+    c,
+    const Rect.fromLTWH(-2, 22, 24, 18),
+    const Color(0xff8aa4a2),
+    radius: 5,
+    material: MzMaterial.metal,
+  );
+  for (var i = 0; i < 3; i++) {
+    mzArtLine(
+      c,
+      Path()
+        ..moveTo(2 + i * 6.0, 28)
+        ..lineTo(2 + i * 6.0, 35),
+      const Color(0xff496168),
+      1.2,
+    );
+  }
+  return _cachedBossArm = recorder.endRecording();
+}
+
+void _boss(
+  Canvas c,
+  double phase,
+  double hurt, {
+  double performance = 0,
+  bool refined = true,
+}) {
+  if (refined) {
+    // Hydraulic arms orbit fixed shoulder pivots; no collision geometry changes.
+    for (final side in [-1.0, 1.0]) {
+      c.save();
+      c.translate(side < 0 ? 14 : 87, 56);
+      c.rotate(side * (.13 + math.sin(phase * 1.8) * .06 - performance * .32));
+      if (side < 0) c.scale(-1, 1);
+      c.drawPicture(_bossArmPicture);
+      c.restore();
+    }
+  }
   // Bulldog chassis and the small Maru scientist share the same material rules.
   mzArtShape(
     c,
@@ -2050,6 +2308,44 @@ void _boss(Canvas c, double phase, double hurt) {
         ..lineTo(39 + i * 7.0, 82),
       const Color(0xffa7d8c3),
       2,
+    );
+  }
+  if (refined) {
+    mzArtBox(
+      c,
+      const Rect.fromLTWH(38, 74, 24, 9),
+      const Color(0xfff2b75f),
+      radius: 3,
+      material: MzMaterial.metal,
+      stroke: 1.3,
+    );
+    mzArtOval(
+      c,
+      const Rect.fromLTWH(46, 74, 9, 9),
+      hurt > 0 ? MzArt.paper : const Color(0xffffe0a0),
+      stroke: 1,
+    );
+    for (final x in [19.0, 78.0]) {
+      mzArtOval(c, Rect.fromLTWH(x, 64, 4, 4), MzArt.paper, stroke: .8);
+      mzArtLine(
+        c,
+        Path()
+          ..moveTo(x, 75)
+          ..lineTo(x + 4, 78)
+          ..lineTo(x, 81),
+        const Color(0xff374e5e),
+        1.5,
+      );
+    }
+    mzArtLine(
+      c,
+      Path()
+        ..moveTo(23, 31)
+        ..lineTo(43, 35)
+        ..moveTo(59, 34)
+        ..lineTo(78, 29),
+      const Color(0xff3f515b),
+      3,
     );
   }
   c.save();

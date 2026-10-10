@@ -782,3 +782,265 @@ Rama de entrega: `codex/marus-zombies-audio`, remoto `origin` (`RenatoLV/App_Ani
 ### Entrega aprobada · resumen V3.6
 
 Selección nueva aplicada a Girasol, Siberiano, Catapulta y Láser; audición aceptada por el usuario. Se conservan las voces zombis V3.5, la OST de los diez niveles del Patio y el MP3 de revelación. Sin modificaciones de simulación, economía, progresión, estadísticas ni dependencias. Resultados funcionales y perfil CPU son los descritos arriba: 123 pruebas aprobadas, seis optativas omitidas; perfil optativo aprobado, análisis limpio y build web aprobado. No se repiten pruebas por un cambio exclusivo de estado de aprobación y documentación. Los resultados no certifican latencia, mezcla física ni FPS en móviles.
+
+## V3.7 · Grandes oleadas y jefe final (2026-10-10)
+
+### Auditoría y alcance
+
+El motor ya programa grupos de cinco Marus Banderón en un mismo instante. Esa señal real se reutiliza para identificar las oleadas importantes, sin crear un calendario alternativo. Patio 10 corresponde al identificador estable 9; Cyber-Gatos 2099, misión 60, al identificador 49, porque Cementerio se insertó en el orden de campaña conservando los identificadores anteriores. La llegada del jefe sucede diez segundos después del grupo de banderas de esa misión.
+
+Ya existía una barra pequeña encima del jefe. Se conserva y su divisor procede ahora de `e.kind.health`, con el mismo valor anterior de 12000. Se añade una barra más legible en la franja del escenario situada encima del tablero, ligada al invasor real.
+
+Primero se probaron y capturaron los dos pilotos con `MzThreatFeedback()`; después se habilitó `allWorlds: true` en la pantalla. Los demás mundos anuncian únicamente los grupos con bandera realmente programados. No se inventan avisos para las primeras misiones sin banderas ni para Supervivencia.
+
+### Cambios implementados
+
+- **Aviso de oleada:** «¡Se acerca una gran oleada!» cuatro segundos de simulación antes del grupo. Cartel cálido, degradado, contorno, letras Fredoka con borde oscuro y huellas. Entrada breve, oscilación ligera y salida por opacidad; duración 3,2 segundos. Cada umbral se reconoce una sola vez durante la partida.
+- **Entrada de horda:** polvo vectorial de 0,55 segundos por cada invasor nuevo observado. Hasta ocho llegadas activas; cinco pequeñas motas por llegada. Si la coordenada de aparición está fuera de pantalla, solo el polvo se proyecta al borde de entrada para que no desaparezca tras la vegetación. No se adelanta, duplica ni desplaza al enemigo. Se conservan sus sombras y movimientos anteriores.
+- **Jefe:** su aparición real activa durante 2,4 segundos anillos y luz tecnológica bajo el robot existente, el cartel con su nombre y una respuesta háptica ligera. No se representa un segundo jefe ni se interrumpe el combate. La barra superior permanece mientras ese invasor siga vivo, con fracción y cifras de su HP actual; desaparece al morir.
+- **Defensa en peligro:** una línea coral y una huella en el margen izquierdo del carril cuando un invasor vivo tiene `x < 1.5`. La señal utiliza su posición actual y desaparece cuando deja de existir esa amenaza. No cubre casillas ni captura pulsaciones.
+- **Audio:** la llegada real del jefe solicita una vez `GameSfx.marusLaserStart`, ya aprobado en V3.6, dentro del mismo lote de `playCombat()` que los eventos existentes. Se mantienen sus prioridades, límite de voces y deduplicación. El aviso de oleada usa presentación y háptica, sin añadir una voz sonora que compita con el combate. Música, voces zombis, efectos anteriores y revelación de cartas permanecen intactos.
+- **Accesibilidad:** el aviso y la vida del jefe se exponen mediante semántica de CustomPainter. Movimiento reducido conserva cartel, vida y señal de peligro estática; omite oscilación, desplazamiento, polvo, anillos y la nueva vibración. Las animaciones siguen `sim.time`: pausa las detiene y x2 acelera su recorrido, sin modificar el paso fijo.
+
+Restaurar una partida establece una referencia de enemigos/umbrales ya existentes: no reproduce presentaciones antiguas; un jefe vivo conserva su barra. Reintentar borra el estado visual para permitir los nuevos eventos de esa partida.
+
+### Archivos
+
+| Archivo | Responsabilidad |
+| --- | --- |
+| `lib/marus_zombies/mz_threat_feedback.dart` | Observación de horarios, apariciones, vida y amenaza; no escribe en el motor |
+| `lib/marus_zombies/mz_threat_art.dart` | Carteles, barra, huellas, polvo y anillos mediante Canvas |
+| `lib/marus_zombies/mz_painter.dart` | Orden de dibujo, integración y semántica |
+| `lib/marus_zombies/mz_game_screen.dart` | Observación tras avance real, reinicio, mezclador y háptica |
+| `test/marus_zombies/threat_feedback_test.dart` | Eventos, pausa/x2, restauración, regresión, capturas y perfil |
+
+No se modifican `mz_levels.dart`, `mz_simulation.dart`, catálogo, modelos, progreso, colisiones, estadísticas, economía ni dependencias. Tampoco se cambian archivos de audio. Las cachés del escenario siguen reutilizándose; los añadidos son temporales, sin filtros de desenfoque ni `saveLayer`.
+
+### Validación y capturas
+
+Suite del módulo más acceso desde Patio, sincronización y funciones generales: **130 pruebas aprobadas y siete optativas omitidas**. Prueba optativa `RENDER_THREATS=true`: **ocho pruebas aprobadas**, incluidas generación de capturas y perfil. Análisis sin incidencias y compilación web aprobada.
+
+Se comprueba el aviso antes de las cinco banderas reales, ausencia de enemigos ficticios, activación única, pausa, x2, reinicio, restauración, umbrales finales de los seis mundos, ausencia de avisos artificiales en Supervivencia, daño y muerte del jefe. Durante 240 avances de 2/60 segundos, los checkpoints y RNG de la simulación observada coinciden exactamente con el control.
+
+El renderizado del cartel se verifica a 320×640, 844×390 y 1440×900, con y sin movimiento reducido: ningún píxel del cartel ocupa la cuadrícula. Estas comprobaciones no sustituyen pruebas táctiles o de lectores de pantalla en dispositivos físicos.
+
+`build/previews/mz-threats-v37.html` reúne cinco pares antes/después a 960×540: aviso de Patio, entrada de banderas, peligro junto a la defensa, llegada del jefe y vida tras recibir 4200 de daño. Cada par usa el mismo estado de simulación, activando/desactivando la nueva capa. Son capturas Canvas de fixtures con oleadas anteriores ya despejadas; no son grabaciones de partidas completas. Revisadas visualmente las posiciones del cartel, la barra, las huellas y la entrada. Las previsualizaciones siguen excluidas de Git.
+
+Regeneración:
+
+```powershell
+flutter test test/marus_zombies/threat_feedback_test.dart --no-pub --dart-define=RENDER_THREATS=true
+```
+
+### Coste medido y límites
+
+Perfil CPU de grabación de instrucciones Canvas/Picture: mismo escenario cacheado a 960×540, veinte invasores comunes y el jefe, cinco rondas de treinta dibujos después de una ronda de calentamiento. Mediana base **2,604 ms/dibujo**, con presentación **2,705 ms/dibujo**: incremento de muestra **0,101 ms (~3,9 %)**. Rangos solapados (base 2,372–3,054 ms; nuevo 2,574–2,960 ms); la variación entre rondas impide afirmar un sobrecoste estable o significativo. Datos completos en `build/previews/mz-v37-profile.json`.
+
+La medida excluye rasterización GPU, reconstrucción/semántica de widgets, reproductor nativo, háptica y dispositivos Android/iOS. No certifica 60 FPS ni la mezcla auditiva de la entrada del jefe. Los límites de voces tienen regresiones automatizadas existentes; queda pendiente comprobar el conjunto en una partida y hardware reales. No se declara escucha física por el agente.
+
+## V3.8 · Presentación de habilidades de atún (2026-10-10)
+
+### Auditoría y dirección
+
+Ya existían anticipación, retroceso, estelas de proyectiles, impactos, brillo de recursos y tres capas de láser. El atún producía un efecto `tuna` genérico, aunque sus resultados eran muy distintos: quince recursos para Girasol, daño y congelación del carril para Siberiano, hasta doce arcos dirigidos para Catapulta y tres segundos de potenciación real para Láser. Se evoluciona esa presentación; no se crea un segundo sistema de ataques.
+
+Los cuatro poderes comparten una aureola de contacto y un pulso breve de 0,9 segundos, con lenguaje propio: dorado y estrellas para Girasol, azul y cristales para Siberiano, naranja y fragmentos de croqueta para Catapulta, menta y marcas tecnológicas para Láser. En la revisión de capturas se amplió el contorno del aura: su primera proporción quedaba demasiado escondida detrás de los personajes.
+
+### Cambios realmente implementados
+
+| Defensor | Presentación |
+| --- | --- |
+| Girasol | Pétalos aclarados durante el poder, respiración/rebote corporal especial, aureola dorada y estrellas. Los quince recursos **realmente añadidos** reciben un anillo de aparición, un destello y un rebote de escala con pequeño desfase por ID. Los recursos anteriores, la producción normal y la recogida no reciben esa marca. |
+| Siberiano | Pulso azul expansivo, seis cristales alrededor del gato y reacción corporal inclinada. Un destello de contacto representa el incremento real de `frozenUntil`; tres cristales de estado permanecen junto a los enemigos mientras estén congelados. La ralentización normal conserva su señal anterior. Inmunes, enemigos muertos y otros carriles no reciben falsas congelaciones. |
+| Catapulta | Reacción del cuerpo, tensión/liberación y recuperación breve del brazo después de la activación, pulso naranja y fragmentos. Solo los arcos añadidos por la transacción reciben estelas estrelladas especiales. Los contactos de arcos dirigidos tienen un impacto más grande y cálido; retirar un proyectil porque desapareció su objetivo no genera un impacto. |
+| Láser | Contracción/reacción corporal, halo tecnológico y marcas alrededor del equipo. El haz real potenciado tiene halo y núcleo más anchos, con tres destellos de energía sobre su recorrido. Su intensidad sigue `powerUntil`, incluso después de terminar el pulso inicial. Un poder sin blancos no dibuja un haz ficticio. |
+
+La Catapulta lanza sus proyectiles inmediatamente en el motor existente. Su nuevo movimiento expresa la liberación y recuperación desde ese instante; no añade una preparación que retrase la ráfaga. La anticipación normal existente sigue funcionando antes de sus ataques normales.
+
+Si coinciden dos Láseres en un carril y solo el situado más a la derecha está potenciado, la intensificación empieza en su origen real. El tramo anterior conserva la presentación normal. Se sigue agrupando el haz por carril; no se dibuja un rayo por cada efecto emitido en cada paso.
+
+El brillo genérico de `tuna` se sustituye cuando está conectado el observador visual, evitando superponer dos celebraciones del mismo consumo. Los recursos conservan sus centros originales y objetivos táctiles: el rebote cambia su escala, no sus coordenadas ni sus puntos de recogida. Las quince fichas conservan las posiciones existentes del motor, con solapamiento en cinco ubicaciones; esta entrega no redistribuye los recursos lógicos.
+
+### Integración y conservación del motor
+
+`MzVisualFeedback.capturePower()` registra los IDs de recursos y proyectiles inmediatamente antes de `feed()`. Tras esa misma transacción, `observe()` asocia los elementos nuevos a los efectos `tuna` y defensores reales, incluida la activación compartida de nodos del Futuro. Un intento fallido no crea un pulso. Las apariciones y contactos se deduplican por identidad de efecto/entidad; el estado visual se limpia al expirar, recoger, desaparecer o reiniciar.
+
+`MzGameScreen` conserva `MzCombatAudio.capture()`/`events()` y los sonidos V3.6. La observación visual se ejecuta tras todo intento de atún, independientemente de si el mezclador dispone de una voz o devuelve un sonido específico. Sonido y presentación utilizan el mismo cambio real del motor; no se dispara audio desde el dibujado. Música, ganancias, límites del mezclador y MP3 de revelación permanecen intactos.
+
+Archivos de esta fase:
+
+- `lib/marus_zombies/mz_visual_feedback.dart`: pulsos, recursos nuevos, arcos de ráfaga y contactos/congelación observados.
+- `lib/marus_zombies/mz_combat_art.dart`: aura por familia, cristales, aparición de recursos, estelas, impactos y haz potenciado.
+- `lib/marus_zombies/mz_character_art.dart`: parámetro visual `power`, reacción corporal, pétalos y recuperación del mecanismo. Valor predeterminado cero: retratos, cartas y diseños anteriores conservan su aspecto habitual.
+- `lib/marus_zombies/mz_painter.dart`: integración y orden de dibujo; opción interna `enhancedPowers` para comparaciones, activada por defecto en juego.
+- `lib/marus_zombies/mz_game_screen.dart`: captura/observación junto a la transacción de atún.
+- `test/marus_zombies/tuna_visual_test.dart`: regresiones, comparación de secuencias y perfiles.
+
+No se editan simulación, niveles, modelos, catálogo, progreso, estadísticas, alcance, daño, duración del poder ni economía. No se añaden paquetes, motores, sprites ni PNG al bundle. Las imágenes de diagnóstico permanecen en `build/`.
+
+### Movimiento reducido, pausa y límites
+
+Todas las edades visuales proceden de `sim.time`: pausa congela la presentación y x2 acelera su recorrido junto al combate. Movimiento reducido elimina deformación corporal, movimiento de accesorios por el poder, desplazamiento de ornamentos, destellos móviles sobre el haz y rebote de recursos. Mantiene iluminación que se desvanece, aura de geometría fija y estados de congelación legibles.
+
+Se conservan **32 eventos visuales**, **48 estelas** y **cinco muestras por estela**. Cada pulso añade seis ornamentos; cada enemigo congelado muestra tres cristales. El estado de recursos especiales existe únicamente durante 0,7 segundos y se elimina al recogerlos; las marcas de proyectiles se eliminan con sus IDs. No se incorporan `saveLayer`, filtros ni un sistema adicional de partículas para estas mejoras. Las cachés estáticas de escenarios permanecen en uso.
+
+### Resultados de validación
+
+- **138 pruebas aprobadas, ocho optativas omitidas**: módulo, acceso desde Patio, sincronización y funciones generales. Incluye regresiones V3.5/V3.6 y V3.7.
+- **Nueve pruebas aprobadas** al habilitar `RENDER_TUNA=true`, con capturas y perfiles.
+- Análisis sin incidencias y compilación web aprobada.
+- Verificados: intento fallido, activación única, expiración, recogida de recurso real, restauración sin celebrar de nuevo, inmunidad, carriles, impacto frente a retirada, ausencia de haz sin enemigos y tramo de dos Láseres en un mismo carril.
+- Caso de tres poderes simultáneos en un nodo real del Futuro, con ochenta invasores: durante 180 avances de 2/60 segundos, checkpoints y RNG idénticos a la simulación de control; se respetan los presupuestos de eventos y estelas.
+- Renderizado de los cuatro poderes a 320×640, 844×390 y 1440×900, con/sin movimiento reducido. Mientras están pausados, dibujar y volver a observar no cambia ni el checkpoint ni el pulso.
+- Los tests de audio verifican que cada pulso comienza en la transacción que produce su sonido V3.6, sin duplicar el evento al consultar otra vez. No son pruebas de latencia de altavoces; no se declara escucha física por el agente.
+
+### Capturas y secuencias
+
+`build/previews/mz-tuna-v38.html` permite elegir los cuatro personajes, comparar ataque normal/atún y avanzar o reproducir cuatro fotogramas por acción: 0, 0,12, 0,32 y 0,65 segundos tras la transacción, ajustados al paso fijo. **64 capturas** a 960×540, con pares del mismo estado y la nueva presentación activada/desactivada. Revisadas las auras, la aparición de recursos, los cristales y el haz. La columna anterior es una comparación sin la capa V3.8, no una captura histórica de otra versión del motor.
+
+Son secuencias de fixtures Canvas, no vídeos de una partida completa ni una medición de FPS. El reproductor de la comparación avanza los fotogramas para facilitar la inspección; no pretende reproducir sus tiempos a escala real. Las imágenes, HTML y JSON se regeneran así:
+
+```powershell
+flutter test test/marus_zombies/tuna_visual_test.dart --no-pub --dart-define=RENDER_TUNA=true
+```
+
+### Rendimiento medido y limitaciones
+
+Escena saturada equivalente de **86 invasores**, Catapulta, ráfaga real y escenario cacheado a 960×540. Cinco rondas de treinta dibujos tras calentamiento, grabando instrucciones Canvas/Picture:
+
+| Presentación | Mediana CPU por dibujo |
+| --- | ---: |
+| Capa nueva desactivada | 9,448 ms |
+| V3.8 activada | 9,526 ms |
+
+Diferencia de muestra **+0,078 ms (~0,8 %)**. Rangos solapados: 9,321–9,811 ms frente a 9,426–9,627 ms. No demuestra un incremento estable significativo. Datos: `build/previews/mz-v38-profile.json`.
+
+Perfil adicional de 120 pasos con el mismo número de invasores: mediana 0,03247 ms/paso de motor frente a 0,05642 ms/paso con **todo** el observador visual, diferencia ~0,02395 ms. `mz-v38-observer-profile.json`. Compara motor sin observador frente al observador completo existente más V3.8; no atribuye toda la diferencia únicamente a esta fase.
+
+Las medidas excluyen rasterización GPU, reconstrucción de widgets, reproductor nativo y dispositivos Android/iOS. Queda pendiente revisar fluidez y sincronización audiovisual percibida en hardware real. No se promete 60 FPS ni se declara aprobada por el agente una mezcla que no puede escuchar.
+
+## V3.9 · Poderes especiales, segunda etapa (2026-10-10)
+
+### Auditoría de las habilidades reales
+
+| Unidad | Comportamiento que se conserva |
+| --- | --- |
+| Lanzador | Atún activa `burstLeft = 60`: sesenta proyectiles reales durante un segundo, incluso sin blancos. El disparo normal mantiene sus reglas existentes. |
+| Maru Wuatón | Atún establece **3000 HP y 6000 de armadura**. La armadura absorbe daño; no concede inmunidad ni es un multiplicador de vida. |
+| Caja sorpresa | Atún arma la caja original y crea **hasta dos** copias armadas en casillas libres, elegidas por el RNG existente. Con una casilla libre crea una; con ninguna, el intento se rechaza sin gastar atún. |
+| Gatitos bomba | **No acepta atún.** La simulación rechaza `feed()` y el catálogo dice «Explota automáticamente». Su explosión real sucede al alcanzar 0,8 segundos de edad, con las reglas de daño/área originales. |
+
+Por tanto, esta entrega mejora tres poderes de atún y la acción automática de Gatitos bomba. No convierte a este último en una cuarta habilidad de atún ni cambia su mecánica para ajustarse a la presentación.
+
+### Evolución visual implementada
+
+- **Lanzador:** postura inclinada y contraída, retroceso visual, gesto decidido de cejas y un aura durante la ráfaga real. Las nuevas estelas son trazos verdes claros sobre muestras de proyectiles efectivamente emitidos por la ráfaga. Se distinguen de los disparos normales por el cambio real del contador y sus propiedades originales; no se crean balas visuales adicionales. La postura sostenida termina cuando `burstLeft` llega a cero.
+- **Wuatón:** expansión/compresión pesada al consumir atún, reflejo y remaches sobre su casco real, aura plateada y seis símbolos de armadura cuando `armor > 0`. El equipo sigue estando condicionado a la armadura existente. No hay un escudo que anule ataques: la prueba de daño consume los 6000 puntos y después reduce HP normalmente.
+- **Caja sorpresa:** sacudida e impulso corporal, apertura ampliada de ambas solapas y reacción del gato original. Se identifican por ID las copias realmente añadidas durante la transacción; cada una tiene una breve aparición de 0,55 segundos, con apertura y fragmentos de cartón. No se dibujan cajas volando hacia casillas hipotéticas. Se evita el anillo genérico de colocación sobre esas mismas copias.
+- **Gatitos bomba:** Maru y Lady se separan e inclinan en direcciones opuestas durante la preparación existente de los últimos 0,18 segundos. La explosión real usa un destello central más marcado, onda de expansión y seis nubes de pelusa cálida con pequeños detalles. Sustituye la presentación anterior de ese `boom`, sin superponer otra explosión. La pala y un intento de atún rechazado no producen este efecto.
+
+La caja original y sus copias se arman inmediatamente, como antes. El movimiento nuevo representa su apertura y recuperación; no introduce un retraso de preparación antes del resultado lógico. La anticipación de trampa por proximidad de un enemigo continúa usando el mecanismo previo.
+
+### Integración
+
+Se reutilizan `MzVisualFeedback`, `mz_character_art.dart`, `mz_combat_art.dart` y `mz_painter.dart`. El observador registra IDs de defensores antes de `feed()`, nacimientos de copias, proyectiles nuevos durante una disminución real de la ráfaga y explosiones `boom` asociadas a un Gatito bomba que desapareció en ese paso. Ninguno de estos registros se guarda dentro del checkpoint ni escribe en la simulación.
+
+`secondStagePowers` es un interruptor interno de renderizado para comparar la segunda etapa, activo por defecto en la partida. Al desactivarlo, V3.8 sigue habilitada. Los retratos ordinarios conservan valores de poder/preparación cero y los diseños anteriores no se sustituyen.
+
+Se conservan **todos los sonidos existentes**: los consumos correctos usan la ruta actual de atún, la ráfaga usa sus eventos de disparo y la explosión utiliza el sonido ya conectado al `boom` real. No se cambian `GameAudio`, `GameSfx`, mezclador, música ni archivos de audio; no se dispara audio desde Canvas ni se añade una reproducción por nube o por copia.
+
+Archivos de esta fase: `mz_visual_feedback.dart`, `mz_character_art.dart`, `mz_combat_art.dart`, `mz_painter.dart` y `test/marus_zombies/special_visual_test.dart`. No se editan simulación, catálogo, niveles, modelos, progreso, economía, estadísticas, colisiones, RNG ni dependencias. Se conservan las cachés del escenario y el paso fijo.
+
+### Pausa, restauraciones y límites
+
+Las animaciones siguen `sim.time`; pausa congela su edad y x2 avanza junto al combate. Movimiento reducido conserva información de poder/armadura con geometría fija y omite sacudidas, inclinaciones, retrocesos, estelas y movimiento de nubes. Una restauración no repite la celebración inicial ni la llegada de copias; la armadura, cajas armadas y ráfaga todavía activa siguen representando su estado real.
+
+Si se restaura un `boom` ya en curso sin su defensor de origen, se conserva su representación genérica existente en vez de reconstruir una introducción pasada. El efecto lógico mantiene su TTL original.
+
+Se mantienen 32 eventos, 48 estelas y cinco muestras por estela. Los IDs de ráfaga se eliminan al desaparecer sus proyectiles, las apariciones de copia expiran o se eliminan junto con su defensor y los registros de explosiones duran solo mientras exista su efecto. La explosión sigue usando seis nubes; el aura usa seis ornamentos. No se añaden filtros, `saveLayer`, motores, sprites ni PNG al bundle.
+
+### Validación obtenida
+
+Suite del módulo más acceso desde Patio, sincronización y funciones generales: **146 pruebas aprobadas y nueve optativas omitidas**. Prueba optativa de capturas/perfil aprobada; análisis sin incidencias y compilación web aprobada.
+
+Una ejecución concurrente con la compilación web falló en una comprobación existente del mezclador de música (`combat_mixer_test.dart`, contador de fuentes tras pausa/reanudación). La suite completa repetida sin esa compilación concurrente pasó. No se modificó el audio para resolverlo; el fallo intermitente queda registrado y su causa no está confirmada.
+
+Se verifican: sesenta disparos con/sin blancos, rechazo de un segundo consumo durante la ráfaga, HP/armadura exactos, absorción seguida de daño, dos/una/cero copias, rechazo de atún para bomba, preparación antes de la explosión real, retirada con pala, intentos sin recurso y durante pausa, restauración de las cuatro unidades y ausencia de nuevas celebraciones en la carga.
+
+Cada acción se compara durante 90 avances de 2/60 segundos, incluyendo pausa, contra una simulación de control: checkpoints y RNG idénticos. Otro caso activa Lanzador, Wuatón y Caja en un nodo real del Futuro con ochenta invasores y compara 120 avances; también conserva exactamente el resultado. Cinco Gatitos bomba simultáneos producen cinco explosiones reales, con eventos dentro del presupuesto. Renderizado probado a 320×640, 844×390 y 1440×900 con/sin movimiento reducido.
+
+### Comparaciones y rendimiento
+
+`build/previews/mz-specials-v39.html` contiene **40 capturas Canvas** a 960×540: cinco fotogramas por unidad a 0, 0,2, 0,65, 0,85 y 1,05 segundos, con pares del mismo estado sin/con V3.9. La página señala explícitamente que la secuencia de Gatitos bomba corresponde a su explosión automática. Revisadas visualmente postura, armadura, originales/copias y explosión. El reproductor facilita inspeccionar fotogramas; no es un vídeo a tiempo real ni una prueba de FPS.
+
+Regeneración:
+
+```powershell
+flutter test test/marus_zombies/special_visual_test.dart --no-pub --dart-define=RENDER_SPECIALS=true
+```
+
+Perfil CPU de grabación Canvas/Picture con **83 invasores**, Lanzador en ráfaga real, sus proyectiles y escenario cacheado: cinco rondas de treinta dibujos después del calentamiento. Mediana sin segunda etapa **9,432 ms/dibujo**, con V3.9 **9,530 ms/dibujo**, diferencia de muestra **+0,098 ms (~1,0 %)**. Rangos solapados: 9,280–9,763 ms y 9,264–9,735 ms; no permite afirmar un incremento estable significativo. Datos en `build/previews/mz-v39-profile.json`.
+
+No se mide GPU, reconstrucción de widgets, audio nativo ni hardware Android/iOS. Queda pendiente validar fluidez y sincronización audiovisual percibida en una partida sobre dispositivos reales. Las capturas y perfiles permanecen en `build/`, excluidos de Git.
+
+## V3.9.1 · Los últimos tres defensores (2026-10-10)
+
+### Auditoría del combate existente
+
+| Unidad | Ataque normal | Atún y restricciones reales |
+| --- | --- | --- |
+| Bumerán | Un pez de 20 de daño × multiplicador existente. Avanza a la derecha y **sí regresa**, al alcanzar 9,8, tres blancos de ida o una lápida. Puede golpear hasta tres objetivos por sentido; desaparece al regresar al origen. | Tres peces de 40 × multiplicador. Conserva sus trayectorias reales coincidentes; no se separan artificialmente para mostrar tres rutas. |
+| Resorte | Empuja 1,5 casillas al primer objetivo de su fila cuando está a menos de dos casillas. Recarga de ataque existente: cinco segundos. | Empuja tres casillas a los objetivos reales de su fila a menos de cuatro. El jefe es inmune al empuje; agua y salida del tablero mantienen su resolución original. |
+| Relámpago | Hasta tres blancos elegibles entre su fila y las adyacentes, según el filtro espacial original, 15 de daño por blanco. | Primeros ocho invasores vivos según el orden existente, 120 por blanco. La simulación emite impactos eléctricos individuales, sin registrar aristas entre enemigos. |
+
+El consumo sin blancos está permitido para estos tres defensores. Bumerán emite sus tres peces; Resorte y Relámpago pueden consumir atún sin producir desplazamientos ni impactos. Pausa, falta de atún y las restricciones generales de `feed()` se conservan. No se añade una regla de rechazo por falta de objetivos.
+
+### Cambios implementados
+
+- **Bumerán:** inclinación y giro corporal durante preparación, lanzamiento y recuperación, movimiento de la pata con su juguete y cejas decididas durante el ataque. Estela dorada suavizada que interpola únicamente las muestras de posiciones existentes; el regreso procede de `returning`, sin rutas hipotéticas. Los peces creados por la transacción de atún se identifican por ID y tienen estela más ancha. No se crean proyectiles gráficos adicionales.
+- **Resorte:** base metálica con tornillos, plataforma superior, sombra y reflejos sobre las espiras. Compresión, extensión más marcada y recuperación elástica impulsadas por el ataque observado o por el consumo correcto de atún. La posición de los invasores sigue siendo exactamente la del motor: no hay interpolación que invente empujes contra el jefe ni impactos antes del contacto.
+- **Relámpago:** postura comprimida y reacción breve al consumir atún, brillo localizado de ojos y pequeños arcos sobre el equipo cuando existe ataque/poder. Los impactos eléctricos nuevos reciben un contorno luminoso y destello breve cuando se observan junto a un ataque o consumo real de Relámpago. Se conserva un efecto local por impacto; **no se dibujan conexiones entre blancos** porque el motor no guarda esa relación. No se añade un flash de pantalla.
+
+El observador reutiliza `_poweredShots` para los peces de atún y mantiene conjuntos temporales de efectos eléctricos reales, limpiados al desaparecer sus efectos. Una primera observación tras restauración no repite ataques ni celebraciones. El impacto eléctrico persistente conserva su dibujo genérico si no hay observación del ataque original.
+
+Archivos de esta fase: `mz_character_art.dart`, `mz_combat_art.dart`, `mz_painter.dart`, `mz_visual_feedback.dart` y `test/marus_zombies/final_defender_visual_test.dart`. El interruptor interno `finalDefenderPowers` permite comparar estados idénticos sin desactivar V3.8/V3.9. Los demás personajes conservan sus mejoras anteriores.
+
+No se editan simulación, catálogo, niveles, estadísticas, progreso, RNG, música, mezclador ni sonidos. Los eventos sonoros existentes siguen sus rutas originales; no hay audio desde el renderizado. Se conservan 32 eventos, 48 estelas y cinco muestras por estela, cachés, paso fijo y dependencias. Pausa conserva el tiempo visual y x2 lo avanza con el motor. Movimiento reducido omite poses animadas, destellos móviles y estelas; el equipo estático y los impactos existentes siguen siendo legibles.
+
+### Validación y capturas
+
+Suite completa de la aplicación ejecutada **sin compilación simultánea**: **314 pruebas aprobadas, diez optativas omitidas**. Prueba optativa de esta fase: siete aprobadas, incluyendo capturas/perfil. Se comprueban ida/vuelta e impactos de peces normales/reforzados, empuje e inmunidad del jefe, tres/ocho impactos eléctricos, intentos fallidos, activaciones sin blancos, pausa y restauración sin repetición visual.
+
+Análisis final sin incidencias (`mz-v391-analyze.log`) y compilación web aprobada en 41,2 segundos (`mz-v391-web.log`). La compilación se ejecutó después de finalizar las pruebas.
+
+Se comparan checkpoints completos, incluido RNG, durante 150 avances de 2/60 segundos contra una simulación de control, con ataques normales y tres activaciones consecutivas observadas, 83 invasores y los tres defensores presentes. Resultados idénticos y eventos dentro del presupuesto. Renderizado probado a 320×640, 844×390 y 1440×900, con/sin movimiento reducido; retratos revisados a 32, 64 y 128 px.
+
+`build/previews/mz-final-defenders-v391.html` ofrece **60 capturas a 960×540**: tres unidades × ataque normal/atún × cinco fotogramas × antes/después. Tiempos: 0, 0,033, 0,2, 0,5 y 1,2 segundos. Incluye acción y recuperación; son fotogramas discretos, no vídeo a tiempo real. `mz-v391-thumbnails.png` muestra las tres filas de personajes y pares idle/poder en los tres tamaños. Los PNG son artefactos de validación en `build/`, no assets del juego.
+
+```powershell
+flutter test test/marus_zombies/final_defender_visual_test.dart --no-pub --dart-define=RENDER_FINAL_DEFENDERS=true
+```
+
+El test intermitente del mezclador pasó en las dos ejecuciones completas y en una ejecución aislada adicional. Se revisaron el mock nativo, las esperas y la cola de transición musical, sin modificar audio ni prueba. Esto no demuestra la causa del fallo anterior ni garantiza su desaparición; queda conservado el registro V3.9.
+
+### Medición y límites
+
+Perfil CPU Canvas/Picture a 960×540 con escenario cacheado, 83 invasores y los tres poderes activos: cinco rondas de treinta dibujos, después del calentamiento y alternando el orden de versiones. Mediana antes **10,622 ms/dibujo**, después **10,876 ms/dibujo**; diferencia de muestra **+0,254 ms (~2,4 %)**. Rangos solapados: 10,395–12,851 ms y 10,485–11,512 ms. Datos completos en `build/previews/mz-v391-profile.json`; la dispersión impide atribuir un sobrecosto estable significativo a esta fase.
+
+La medición excluye GPU, widgets, audio nativo y hardware móvil. Sigue pendiente comprobar fluidez y sincronización audiovisual percibida en Android/iOS; no se promete 60 FPS.
+
+## V4.0 · Cierre, pulido y auditoría (2026-10-10)
+
+Los once defensores refinados en V3.8/V3.9/V3.9.1 se conservan. Dr. Maru Cat-trófico gana brazos hidráulicos con articulaciones, puños y Picture estático reutilizado, núcleo y expresión mecánica. La reacción especial procede del reinicio real de su temporizador; daño y derrota reutilizan las rutas existentes. Entrada ámbar distinta del Láser. Se corrige el desplazamiento que recortaba su cartel por arriba y se adapta la barra a tableros bajos.
+
+Se añaden cinco transiciones de mundo y cierre de campaña, con postales vectoriales y Maru/Lady. Solo tras victoria final de mundo nueva y guardada, al continuar/salir; omitibles, sin nuevos registros ni recompensas, compatibles con movimiento reducido. Prueba integrada de primera victoria del Patio → Cementerio y repetición sin celebración.
+
+La recogida tiene mínimo de 48 px táctiles y selecciona el recurso más cercano. Las estelas de pez reutilizan las muestras sin copiar una lista filtrada por frame. Se conservan cachés, SafeArea, presupuestos y limpieza existente.
+
+La prueba llamada «60 misiones» recorría cincuenta IDs; ahora recorre `mzCampaign` completo y su estrategia completa los sesenta niveles sin poderes pagados. Auditados orden, IDs históricos, requisitos, recompensas sin duplicar y restauración. No se editan motor, estadísticas, progreso ni economía.
+
+Se reproduce y corrige la recarga musical tras pausa prolongada: se conserva fuente/posición para la escena actual, incluyendo segundo plano. El test usa `musicSettled` para esperar la cola real. No se atribuye al defecto reproducido la causa única del fallo intermitente anterior. Audios y música aprobados intactos.
+
+Base V4: 314 pruebas aprobadas, diez omitidas. Suite final completa: **322 aprobadas, once omitidas y cero fallidas**. Capturas/perfil optativos V4: ocho aprobadas en su ejecución; análisis final sin incidencias. Entrega remota y detalles en **`MARUS_VS_ZOMBIES_V4_FINAL.md`**. Perfil CPU final saturado: 12,216 ms/dibujo frente a 12,528, +0,313 ms (~2,6 %) con rangos solapados. No mide GPU/FPS ni teléfonos.
+
+Capturas: ocho del jefe y seis transiciones en `build/previews/`. Verificada integridad SHA-256 de diez originales V3.6. No se certifica autorización pública para los MP3 aportados por el propietario. **No se realizaron compilaciones ni empaquetados durante V4.0.**

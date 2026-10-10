@@ -184,6 +184,10 @@ class GameAudio with WidgetsBindingObserver {
   double effectsVolume = .8, musicVolume = .3;
   Future<void> _musicQueue = Future.value();
 
+  /// Completes the currently queued transition, including native preparation.
+  /// Useful for callers that must verify lifecycle changes without guessing delays.
+  Future<void> get musicSettled => _musicQueue;
+
   Future<void> initialize(SharedPreferences prefs) async {
     _prefs = prefs;
     effectsEnabled = prefs.getBool('audio.effects') ?? true;
@@ -441,6 +445,15 @@ class GameAudio with WidgetsBindingObserver {
     if (revision != _revision) return;
     final previous = _music;
     if (asset == null && previous == null) return;
+    if (asset == null &&
+        musicEnabled &&
+        (_paused || _background) &&
+        (_tracks[_scene]?.contains(_musicAsset) ?? false)) {
+      // Pause keeps the source and its playback position. Disabling music or
+      // leaving a scene still uses the ordinary disposal/crossfade below.
+      await previous?.pause();
+      return;
+    }
     final startGain = _currentGain;
     if (asset == _musicAsset && previous != null) {
       await previous.resume();

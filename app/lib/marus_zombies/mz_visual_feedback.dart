@@ -22,7 +22,11 @@ class MzVisualEvent {
   final MzCat? cat;
   final MzEnemy? enemy;
   final bool armor, armed;
-  double get duration => type == 'defeat'
+  double get duration => type == 'tuna'
+      ? .9
+      : type == 'freezeHit'
+      ? .5
+      : type == 'defeat'
       ? .36
       : type == 'plant'
       ? .38
@@ -48,8 +52,9 @@ class _Snapshot {
     this.armed = false,
     this.slow = 0,
     this.special = 0,
+    this.frozen = 0,
   });
-  final double health, armor, timer, x, slow, special;
+  final double health, armor, timer, x, slow, special, frozen;
   final int burst, row;
   final MzCat? cat;
   final MzEnemy? enemy;
@@ -64,7 +69,39 @@ class MzVisualFeedback {
   final _trails = <int, List<MzTrailPoint>>{};
   final events = <MzVisualEvent>[];
   final _seenPoofs = <MzEffect>{};
+  final _seenTuna = <MzEffect>{}, _seenContacts = <MzEffect>{};
+  final _powers = <int, double>{}, _resourceBirths = <int, double>{};
+  final _poweredShots = <int>{};
+  final _arcs = <int, int?>{};
+  final _burstShots = <int>{}, _lastShotIds = <int>{};
+  final _copyBirths = <int, double>{};
+  final _seenBooms = <MzEffect>{}, _bombBooms = <MzEffect>{};
+  final _seenElectric = <MzEffect>{}, _lightningEffects = <MzEffect>{};
+  Set<int>? _beforeDefenders;
+  Set<int>? _beforeResources, _beforeShots;
   bool _initialized = false;
+
+  /// Capture immediately before feed(): IDs added by that transaction are real.
+  void capturePower(MzSimulation sim) {
+    _beforeResources = sim.pickups.map((p) => p.id).toSet();
+    _beforeShots = sim.projectiles.map((p) => p.id).toSet();
+    _beforeDefenders = sim.defenders.map((d) => d.id).toSet();
+  }
+
+  double power(int id, double time) => _pulse(_powers, id, time, .9);
+  double? resourceBirth(int id) => _resourceBirths[id];
+  bool poweredShot(int id) => _poweredShots.contains(id);
+  bool burstShot(int id) => _burstShots.contains(id);
+  bool bombExplosion(MzEffect effect) => _bombBooms.contains(effect);
+  bool lightningEffect(MzEffect effect) => _lightningEffects.contains(effect);
+  double copyPulse(int id, double time) => _pulse(_copyBirths, id, time, .55);
+  bool hasPowerAt(int row, double x, double time) => events.any(
+    (e) =>
+        e.type == 'tuna' &&
+        e.row == row &&
+        (e.x - x).abs() < .01 &&
+        e.progress(time) < 1,
+  );
 
   Iterable<MzTrailPoint> trail(int projectile) =>
       _trails[projectile] ?? const [];
@@ -87,29 +124,168 @@ class MzVisualFeedback {
     events.removeWhere((e) => sim.time - e.start >= e.duration);
     final poofs = sim.effects.where((f) => f.type == 'poof').toSet();
     final newPoofs = poofs.difference(_seenPoofs);
+    final tuna = sim.effects.where((f) => f.type == 'tuna').toSet();
+    final contacts = sim.effects.where((f) => f.type == 'hit').toSet();
+    final newContacts = contacts.difference(_seenContacts);
+    // A consumed targeted arc is an impact only if a real contact was emitted.
+    final shotIds = sim.projectiles.map((p) => p.id).toSet();
+    final booms = sim.effects.where((f) => f.type == 'boom').toSet();
+    final electric = sim.effects.where((f) => f.type == 'electric').toSet();
+    if (_initialized &&
+        sim.defenders.any(
+          (d) =>
+              d.kind == MzCat.lightning &&
+              ((_previous[d.id] != null &&
+                      d.attack > _previous[d.id]!.timer + .001) ||
+                  tuna
+                      .difference(_seenTuna)
+                      .any(
+                        (f) => f.row == d.row && (f.x - d.col - .5).abs() < .01,
+                      )),
+        )) {
+      // These are actual contact effects, not an inferred chain or new targets.
+      _lightningEffects.addAll(electric.difference(_seenElectric));
+    }
+    if (_initialized) {
+      for (final f in booms.difference(_seenBooms)) {
+        if (_previous.values.any(
+          (old) =>
+              old.cat == MzCat.bomb &&
+              old.row == f.row &&
+              (old.x - f.x).abs() < .01 &&
+              !sim.defenders.any(
+                (d) =>
+                    d.kind == MzCat.bomb &&
+                    d.row == old.row &&
+                    (d.col + .5 - old.x).abs() < .01,
+              ),
+        )) {
+          _bombBooms.add(f);
+        }
+      }
+      for (final d in sim.defenders.where((d) => d.kind == MzCat.launcher)) {
+        final old = _previous[d.id];
+        if (old == null || old.burst <= d.burstLeft) continue;
+        _burstShots.addAll(
+          sim.projectiles
+              .where(
+                (p) =>
+                    !_lastShotIds.contains(p.id) &&
+                    p.row == d.row &&
+                    (p.origin - d.col - .8).abs() < .01 &&
+                    p.damage < mzCats[d.kind]!.damage * sim.multiplier(d.kind),
+              )
+              .map((p) => p.id),
+        );
+      }
+      if (_beforeDefenders != null &&
+          tuna
+              .difference(_seenTuna)
+              .any(
+                (f) => sim.defenders.any(
+                  (d) =>
+                      d.kind == MzCat.mine &&
+                      d.row == f.row &&
+                      (d.col + .5 - f.x).abs() < .01,
+                ),
+              )) {
+        for (final d in sim.defenders.where(
+          (d) =>
+              d.kind == MzCat.mine &&
+              d.armed &&
+              !_beforeDefenders!.contains(d.id),
+        )) {
+          _copyBirths[d.id] = sim.time;
+        }
+      }
+    }
+    final croquetteTargets = <int>{};
+    for (final entry in _arcs.entries) {
+      if (shotIds.contains(entry.key)) continue;
+      final old = _previous[entry.value];
+      if (old == null ||
+          !newContacts.any(
+            (f) => f.row == old.row && (f.x - old.x).abs() < .4,
+          )) {
+        continue;
+      }
+      croquetteTargets.add(entry.value!);
+      _event(
+        MzVisualEvent('croquetteHit', old.row, old.x, sim.time, entry.value!),
+      );
+    }
+    if (_initialized) {
+      for (final f in tuna.difference(_seenTuna)) {
+        final d = sim.defenders
+            .where((d) => d.row == f.row && (d.col + .5 - f.x).abs() < .01)
+            .firstOrNull;
+        if (d == null) continue;
+        _powers[d.id] = sim.time;
+        _event(MzVisualEvent('tuna', d.row, f.x, sim.time, d.id, cat: d.kind));
+        if (d.kind == MzCat.sunflower && _beforeResources != null) {
+          for (final p in sim.pickups.where(
+            (p) =>
+                !p.tuna &&
+                !_beforeResources!.contains(p.id) &&
+                p.row == d.row &&
+                p.x >= d.col + .1 &&
+                p.x <= d.col + .9,
+          )) {
+            _resourceBirths[p.id] = sim.time;
+          }
+        }
+        if ((d.kind == MzCat.catapult || d.kind == MzCat.boomerang) &&
+            _beforeShots != null) {
+          _poweredShots.addAll(
+            sim.projectiles
+                .where(
+                  (p) =>
+                      (d.kind == MzCat.catapult ? p.arc : p.fish) &&
+                      !_beforeShots!.contains(p.id) &&
+                      (p.origin - d.col - .8).abs() < .01,
+                )
+                .map((p) => p.id),
+          );
+        }
+      }
+    }
+    _beforeResources = _beforeShots = null;
+    _beforeDefenders = null;
     final alive = <int>{};
     void record(int id, _Snapshot current) {
       alive.add(id);
       final previous = _previous[id];
       if (previous != null) {
-        if (current.enemy == MzEnemy.pianist &&
+        if ((current.enemy == MzEnemy.pianist ||
+                current.enemy == MzEnemy.boss) &&
             current.special > previous.special + .001) {
           _performances[id] = sim.time;
         }
         if (current.health < previous.health) {
           _hits[id] = sim.time;
+          if (!croquetteTargets.contains(id)) {
+            _event(
+              MzVisualEvent(
+                current.frozen > previous.frozen && current.frozen > sim.time
+                    ? 'freezeHit'
+                    : current.slow > previous.slow
+                    ? 'iceHit'
+                    : previous.armor > 0
+                    ? 'metalHit'
+                    : 'hit',
+                current.row,
+                current.x,
+                sim.time,
+                id,
+              ),
+            );
+          }
+        }
+        if (current.frozen > previous.frozen &&
+            current.frozen > sim.time &&
+            current.health >= previous.health) {
           _event(
-            MzVisualEvent(
-              current.slow > previous.slow
-                  ? 'iceHit'
-                  : previous.armor > 0
-                  ? 'metalHit'
-                  : 'hit',
-              current.row,
-              current.x,
-              sim.time,
-              id,
-            ),
+            MzVisualEvent('freezeHit', current.row, current.x, sim.time, id),
           );
         }
         if (current.timer > previous.timer + .001 ||
@@ -131,7 +307,9 @@ class MzVisualFeedback {
         if (current.enemy != null) {
           _moving[id] = (current.x - previous.x).abs() > .00001;
         }
-      } else if (_initialized && current.cat != null) {
+      } else if (_initialized &&
+          current.cat != null &&
+          !_copyBirths.containsKey(id)) {
         _event(MzVisualEvent('plant', current.row, current.x, sim.time, id));
       }
       _previous[id] = current;
@@ -165,6 +343,7 @@ class MzVisualFeedback {
           enemy: e.kind,
           slow: e.slowUntil,
           special: e.special,
+          frozen: e.frozenUntil,
         ),
       );
     }
@@ -201,6 +380,34 @@ class MzVisualFeedback {
       (id, t) => !alive.contains(id) || sim.time - t > .55,
     );
     _moving.removeWhere((id, _) => !alive.contains(id));
+    _powers.removeWhere((id, t) => !alive.contains(id) || sim.time - t >= .9);
+    final pickupIds = sim.pickups.map((p) => p.id).toSet();
+    _resourceBirths.removeWhere(
+      (id, t) => !pickupIds.contains(id) || sim.time - t >= .7,
+    );
+    _poweredShots.removeWhere((id) => !shotIds.contains(id));
+    _burstShots.removeWhere((id) => !shotIds.contains(id));
+    _lastShotIds
+      ..clear()
+      ..addAll(shotIds);
+    _copyBirths.removeWhere(
+      (id, t) => !alive.contains(id) || sim.time - t >= .55,
+    );
+    _bombBooms.removeWhere((f) => !booms.contains(f));
+    _lightningEffects.removeWhere((f) => !electric.contains(f));
+    _seenElectric
+      ..clear()
+      ..addAll(electric);
+    _seenBooms
+      ..clear()
+      ..addAll(booms);
+    _arcs
+      ..clear()
+      ..addEntries(
+        sim.projectiles
+            .where((p) => p.arc)
+            .map((p) => MapEntry(p.id, p.target)),
+      );
     final shots = <int>{};
     for (final p in sim.projectiles) {
       shots.add(p.id);
@@ -217,6 +424,12 @@ class MzVisualFeedback {
     _seenPoofs
       ..clear()
       ..addAll(poofs);
+    _seenTuna
+      ..clear()
+      ..addAll(tuna);
+    _seenContacts
+      ..clear()
+      ..addAll(contacts);
     _initialized = true;
   }
 
@@ -265,6 +478,21 @@ class MzVisualFeedback {
     _moving.clear();
     _trails.clear();
     _seenPoofs.clear();
+    _seenTuna.clear();
+    _seenContacts.clear();
+    _powers.clear();
+    _resourceBirths.clear();
+    _poweredShots.clear();
+    _arcs.clear();
+    _burstShots.clear();
+    _lastShotIds.clear();
+    _copyBirths.clear();
+    _seenBooms.clear();
+    _bombBooms.clear();
+    _seenElectric.clear();
+    _lightningEffects.clear();
+    _beforeDefenders = null;
+    _beforeResources = _beforeShots = null;
     events.clear();
     _initialized = false;
   }

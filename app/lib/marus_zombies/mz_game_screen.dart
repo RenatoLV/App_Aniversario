@@ -13,9 +13,11 @@ import 'mz_widgets.dart';
 import 'mz_scenery.dart';
 import 'mz_visual_feedback.dart';
 import 'mz_combat_audio.dart';
+import 'mz_threat_feedback.dart';
 import 'mz_result.dart';
 import 'mz_card_reveal.dart';
 import 'mz_almanac.dart';
+import 'mz_world_transition.dart';
 
 class MzGameScreen extends StatefulWidget {
   const MzGameScreen({super.key, required this.sim, required this.progress});
@@ -37,6 +39,7 @@ class _MzGameScreenState extends State<MzGameScreen>
   final scenery = MzSceneryCache();
   final visuals = MzVisualFeedback();
   final combatAudio = MzCombatAudio();
+  final threats = MzThreatFeedback(allWorlds: true);
   MzCat? dragging;
   double speed = 1;
   Duration? last;
@@ -51,6 +54,7 @@ class _MzGameScreenState extends State<MzGameScreen>
   String? saveError;
   MzResultReceipt? receipt;
   bool revealsHandled = false;
+  bool transitionShown = false, transitioning = false;
   double nextSave = 10;
   bool get wide =>
       MediaQuery.sizeOf(context).width > MediaQuery.sizeOf(context).height;
@@ -76,6 +80,7 @@ class _MzGameScreenState extends State<MzGameScreen>
     sim = widget.sim;
     _selectMusic();
     visuals.observe(sim);
+    threats.observe(sim);
     ticker = createTicker(_frame)..start();
     WidgetsBinding.instance.addObserver(this);
   }
@@ -103,9 +108,16 @@ class _MzGameScreenState extends State<MzGameScreen>
     combatAudio.capture(sim);
     sim.advance(math.min(dt, 5 * MzSimulation.step) * speed);
     final audioEvents = combatAudio.events(sim);
-    GameAudio.instance.updateCombatLaser(combatAudio.laserActive);
-    GameAudio.instance.playCombat(audioEvents);
     visuals.observe(sim);
+    final warnings = threats.observe(sim);
+    GameAudio.instance.updateCombatLaser(combatAudio.laserActive);
+    GameAudio.instance.playCombat([
+      ...audioEvents,
+      if (warnings.contains(MzThreatKind.boss)) GameSfx.marusLaserStart,
+    ]);
+    if (!widget.progress.reducedMotion && warnings.isNotEmpty) {
+      HapticFeedback.lightImpact();
+    }
     if (sim.effects.any(
       (f) => f.type == 'boom' && !beforeEffects.contains(f),
     )) {
@@ -197,7 +209,7 @@ class _MzGameScreenState extends State<MzGameScreen>
   }
 
   Future<void> _leave() async {
-    if (saving || leaving) return;
+    if (saving || leaving || transitioning) return;
     if (sim.ended) {
       if (!completed) {
         await _finish();
@@ -208,12 +220,16 @@ class _MzGameScreenState extends State<MzGameScreen>
       if (!await _save()) return;
     }
     if (!mounted) return;
+    await _worldTransition();
+    if (!mounted) return;
     setState(() => leaving = true);
     Navigator.pop(context);
   }
 
   Future<void> _restart({bool next = false}) async {
-    if (saving || !completed) return;
+    if (saving || transitioning || !completed) return;
+    if (next) await _worldTransition();
+    if (!mounted) return;
     final level = next ? mzNextLevel(sim.level)! : sim.level;
     final deck = sim.deck.where(level.allowed.contains).toList();
     if (next) {
@@ -232,6 +248,7 @@ class _MzGameScreenState extends State<MzGameScreen>
       combatAudio.reset();
       receipt = null;
       revealsHandled = false;
+      transitionShown = false;
       selected = null;
       power = null;
       tool = '';
@@ -240,9 +257,37 @@ class _MzGameScreenState extends State<MzGameScreen>
       nextSave = 10;
       visuals.reset();
       visuals.observe(sim);
+      threats.reset();
+      threats.observe(sim);
     });
     last = null;
     await _save();
+  }
+
+  Future<void> _worldTransition() async {
+    if (transitionShown ||
+        !completed ||
+        !sim.won ||
+        sim.level.mode != MzMode.campaign ||
+        !sim.level.finale ||
+        receipt?.starsBefore != 0) {
+      return;
+    }
+    transitionShown = true;
+    transitioning = true;
+    try {
+      await showDialog<void>(
+        context: context,
+        builder: (context) => MzWorldTransition(
+          from: sim.level.world,
+          to: mzNextLevel(sim.level)?.world,
+          reducedMotion: widget.progress.reducedMotion,
+          onContinue: () => Navigator.pop(context),
+        ),
+      );
+    } finally {
+      transitioning = false;
+    }
   }
 
   void _choose(MzCat cat) {
@@ -325,11 +370,12 @@ class _MzGameScreenState extends State<MzGameScreen>
       success = sim.remove(row, col);
     } else if (tool == 'tuna') {
       combatAudio.capture(sim);
+      visuals.capturePower(sim);
       success = sim.feed(row, col);
       final cues = combatAudio.events(sim);
       specificTunaSound = cues.isNotEmpty;
       GameAudio.instance.playCombat(cues);
-      if (success && cues.isNotEmpty) visuals.observe(sim);
+      visuals.observe(sim);
     } else if (selected != null) {
       success = sim.place(selected!, row, col);
     }
@@ -347,20 +393,19 @@ class _MzGameScreenState extends State<MzGameScreen>
   void _tap(Offset position, Size size) {
     if (saving || sim.paused || sim.ended) return;
     final g = MzBoardGeometry(size);
-    for (final p in sim.pickups.reversed.toList()) {
+    final p = mzPickupAt(sim, size, position);
+    if (p != null) {
       final center = g.point(p.row, p.x).translate(0, -g.ch * .14);
-      if ((center - position).distance < math.max(14, g.cw * .25)) {
-        if (sim.collect(p.id)) {
-          if (!p.tuna && sim.level.world == MzWorld.patio) {
-            GameAudio.instance.playCombat([GameSfx.marusHarvest]);
-          } else {
-            GameAudio.instance.play(GameSfx.coin);
-          }
-          if (!p.tuna && !widget.progress.reducedMotion) _fly(center);
+      if (sim.collect(p.id)) {
+        if (!p.tuna && sim.level.world == MzWorld.patio) {
+          GameAudio.instance.playCombat([GameSfx.marusHarvest]);
+        } else {
+          GameAudio.instance.play(GameSfx.coin);
         }
-        setState(() {});
-        return;
+        if (!p.tuna && !widget.progress.reducedMotion) _fly(center);
       }
+      setState(() {});
+      return;
     }
     final cell = g.cell(position);
     if (cell != null) _cell(cell.$1, cell.$2);
@@ -596,6 +641,7 @@ class _MzGameScreenState extends State<MzGameScreen>
                                               sim,
                                               scenery: scenery,
                                               visuals: visuals,
+                                              threats: threats,
                                               selected: dragging ?? selected,
                                               focusCell: preview ?? cursor,
                                               reducedMotion:
