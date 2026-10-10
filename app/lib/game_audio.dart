@@ -13,6 +13,12 @@ enum GameSfx {
   kitten('kitten.mp3', .62, 1500),
   paper('paper.wav', .55, 300),
   reveal('reveal.wav', .55, 500),
+  marusCardVictory('marus_card_victory.mp3', .7, 1000),
+  marusLauncher('marus_launcher.wav', .26, 120),
+  marusHarvest('marus_harvest.wav', .50, 100),
+  marusBite('marus_bite.wav', .22, 260),
+  marusArmor('marus_armor.wav', .38, 100),
+  marusDefeat('marus_defeat.wav', .30, 220),
   place('place.wav', .35, 90),
   clear('clear.wav', .48, 180),
   coin('coin.wav', .35, 100),
@@ -27,6 +33,88 @@ enum GameSfx {
   const GameSfx(this.file, this.gain, this.cooldownMs);
 }
 
+/// Four dedicated combat voices; no unbounded queue or delayed sonic backlog.
+class CombatVoiceRequest {
+  const CombatVoiceRequest(this.slot, this.effect, this.rate, this.gain);
+  final int slot;
+  final GameSfx effect;
+  final double rate, gain;
+  String get asset => rate == 1
+      ? effect.file
+      : effect.file.replaceFirst('.wav', rate < 1 ? '_low.wav' : '_high.wav');
+}
+
+class CombatSfxLimiter {
+  CombatSfxLimiter({math.Random? random}) : random = random ?? math.Random();
+  final math.Random random;
+  final _ends = List<int>.filled(4, 0);
+  final _priorities = List<int>.filled(4, -1);
+  final _last = <GameSfx, int>{};
+  final _starts = <int>[];
+  static const priorities = {
+    GameSfx.marusLauncher: 0,
+    GameSfx.marusBite: 1,
+    GameSfx.marusArmor: 2,
+    GameSfx.marusDefeat: 3,
+    GameSfx.marusHarvest: 4,
+  };
+  static const durations = {
+    GameSfx.marusLauncher: 293,
+    GameSfx.marusHarvest: 351,
+    GameSfx.marusBite: 273,
+    GameSfx.marusArmor: 243,
+    GameSfx.marusDefeat: 779,
+  };
+  List<CombatVoiceRequest> select(
+    Iterable<GameSfx> events,
+    int now, {
+    bool audible = true,
+  }) {
+    if (!audible) {
+      reset();
+      return const [];
+    }
+    _starts.removeWhere((t) => now - t >= 1000);
+    final ordered = events.where(priorities.containsKey).toSet().toList()
+      ..sort((a, b) => priorities[b]!.compareTo(priorities[a]!));
+    final accepted = <CombatVoiceRequest>[];
+    for (final cue in ordered) {
+      if (accepted.length >= 2 || _starts.length >= 10) break;
+      if (now - (_last[cue] ?? -10000) < cue.cooldownMs) continue;
+      var slot = _ends.indexWhere((end) => end <= now);
+      if (slot < 0) {
+        slot = 0;
+        for (var i = 1; i < 4; i++) {
+          if (_priorities[i] < _priorities[slot]) slot = i;
+        }
+        if (_priorities[slot] >= priorities[cue]!) continue;
+      }
+      final rate = const [.97, 1.0, 1.03][random.nextInt(3)];
+      final gain = cue.gain * (.92 + random.nextDouble() * .16);
+      _ends[slot] = now + (durations[cue]! / rate).ceil() + 40;
+      _priorities[slot] = priorities[cue]!;
+      _last[cue] = now;
+      _starts.add(now);
+      accepted.add(CombatVoiceRequest(slot, cue, rate, gain));
+    }
+    return accepted;
+  }
+
+  void reset() {
+    _ends.fillRange(0, 4, 0);
+    _priorities.fillRange(0, 4, -1);
+    _last.clear();
+    _starts.clear();
+  }
+}
+
+class _CombatVoice {
+  final player = AudioPlayer();
+  int revision = 0;
+  double gain = 0;
+  Future<void> queue = Future.value();
+}
+
 /// Local assets, independent SFX/music volumes, and cancellable music fades.
 /// No audio objects are created until the app initializes and receives a tap.
 class GameAudio with WidgetsBindingObserver {
@@ -35,6 +123,8 @@ class GameAudio with WidgetsBindingObserver {
   final meows = MeowRotation();
   SharedPreferences? _prefs;
   final Map<GameSfx, AudioPlayer> _effects = {};
+  final _combatLimiter = CombatSfxLimiter();
+  final _combatVoices = <int, _CombatVoice>{};
   final Map<GameSfx, int> _lastEffect = {};
   final Map<String, List<String>> _tracks = {};
   final Map<String, int> _trackIndex = {};
@@ -97,10 +187,59 @@ class GameAudio with WidgetsBindingObserver {
     _queueMusic();
   }
 
+  bool get combatAudible =>
+      _prefs != null &&
+      _unlocked &&
+      effectsEnabled &&
+      effectsVolume > 0 &&
+      !_background &&
+      !_paused;
+
+  void playCombat(Iterable<GameSfx> events) {
+    final requests = _combatLimiter.select(
+      events,
+      _clock.elapsedMilliseconds,
+      audible: combatAudible,
+    );
+    for (final r in requests) {
+      final v = _combatVoices.putIfAbsent(r.slot, _CombatVoice.new);
+      final revision = ++v.revision;
+      v.gain = r.gain;
+      v.queue = v.queue.then(
+        (_) => _safe(() async {
+          if (revision != v.revision || !combatAudible) return;
+          await v.player.stop();
+          await v.player.setReleaseMode(ReleaseMode.stop);
+          await v.player.setSource(AssetSource('audio/${r.asset}'));
+          // Pitch is baked into the short variant; browser preservePitch cannot undo it.
+          await _safe(() => v.player.setPlaybackRate(1));
+          if (revision != v.revision || !combatAudible) return;
+          await v.player.setVolume((effectsVolume * r.gain).clamp(0, 1));
+          if (revision != v.revision || !combatAudible) return;
+          await v.player.resume();
+        }),
+      );
+    }
+  }
+
+  void stopCombat() {
+    _combatLimiter.reset();
+    for (final v in _combatVoices.values) {
+      v.revision++;
+      v.queue = v.queue.then((_) => _safe(v.player.stop));
+    }
+  }
+
   void play(GameSfx effect) {
+    if (CombatSfxLimiter.priorities.containsKey(effect)) {
+      playCombat([effect]);
+      return;
+    }
+
     if (_prefs == null ||
         !_unlocked ||
         !effectsEnabled ||
+        effectsVolume <= 0 ||
         _background ||
         _paused) {
       return;
@@ -128,6 +267,7 @@ class GameAudio with WidgetsBindingObserver {
 
   void enter(String scene) {
     if (_scene == scene) return;
+    stopCombat();
     _scene = scene;
     _paused = false;
     for (final player in _effects.values) {
@@ -159,6 +299,7 @@ class GameAudio with WidgetsBindingObserver {
   }
 
   void _silenceNow() {
+    stopCombat();
     for (final player in [..._effects.values, ..._musicPlayers]) {
       unawaited(_safe(player.pause));
     }
@@ -175,7 +316,8 @@ class GameAudio with WidgetsBindingObserver {
     musicEnabled = music ?? musicEnabled;
     effectsVolume = (sfxGain ?? effectsVolume).clamp(0, 1);
     musicVolume = (musicGain ?? musicVolume).clamp(0, 1);
-    if (!effectsEnabled) {
+    if (!effectsEnabled || effectsVolume <= 0) {
+      stopCombat();
       for (final player in _effects.values) {
         unawaited(_safe(player.stop));
       }
@@ -185,6 +327,11 @@ class GameAudio with WidgetsBindingObserver {
           _safe(() => entry.value.setVolume(effectsVolume * entry.key.gain)),
         );
       }
+    }
+    for (final v in _combatVoices.values) {
+      unawaited(
+        _safe(() => v.player.setVolume((effectsVolume * v.gain).clamp(0, 1))),
+      );
     }
     // Changing a slider must never restart or crossfade the current song.
     // Update the active player directly and preserve its playback position.
@@ -238,7 +385,9 @@ class GameAudio with WidgetsBindingObserver {
       if (asset != null) {
         next = AudioPlayer();
         _musicPlayers.add(next);
-        await next.setReleaseMode(ReleaseMode.stop);
+        await next.setReleaseMode(
+          _tracks[_scene]?.length == 1 ? ReleaseMode.loop : ReleaseMode.stop,
+        );
         final player = next;
         player.onPlayerComplete.listen((_) {
           if (_music != player) return;

@@ -77,6 +77,29 @@ void main() {
     });
   }
 
+  testWidgets('Patio game card opens Marus vs Zombies campaign', (
+    tester,
+  ) async {
+    final f = await fixture();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PatioScreen(store: f.store, weather: f.weather),
+      ),
+    );
+    await tester.pump();
+    final entry = find.byKey(const ValueKey('patio-marus-zombies'));
+    await tester.scrollUntilVisible(entry, 240);
+    await tester.tap(entry);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.text('Marus vs Zombies'), findsOneWidget);
+    expect(find.text('¡Que nadie toque\nla casa de Maru!'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+    f.weather.dispose();
+    f.store.dispose();
+  });
+
   for (final width in [320.0, 390.0]) {
     testWidgets(
       'Patio and touch football fit a $width phone and goals pay only once',

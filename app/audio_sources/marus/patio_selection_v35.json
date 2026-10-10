@@ -1,0 +1,142 @@
+[
+  {
+    "event": "launcher",
+    "source": "digital/pepSound3.ogg",
+    "asset": "marus_launcher.wav",
+    "durationMs": 293,
+    "peak": 0.72,
+    "trimStartMs": 76,
+    "bytes": 12968,
+    "sha256": "1dc2239fa70c6e1b7ba0a280a29b0c7b465ec1bd8defa0fb9e01892625fe778f",
+    "license": "CC0-1.0",
+    "review": "Provisional technical selection. No listening performed; user authorized selecting among existing files.",
+    "variants": [
+      {
+        "asset": "marus_launcher_low.wav",
+        "pitchFactor": 0.97,
+        "durationMs": 302,
+        "bytes": 13404,
+        "sha256": "6888138ef998bcf5dcf56bbba3da8ccbfe8d832976abaabc3a5c7b16b80415ef"
+      },
+      {
+        "asset": "marus_launcher_high.wav",
+        "pitchFactor": 1.03,
+        "durationMs": 285,
+        "bytes": 12626,
+        "sha256": "62bcc9d0fa4a2683ce862bb6e58776379f6b2fa9a1c2a1d317561de79ca9e770"
+      }
+    ]
+  },
+  {
+    "event": "harvest",
+    "source": "digital/highUp.ogg",
+    "asset": "marus_harvest.wav",
+    "durationMs": 351,
+    "peak": 0.72,
+    "trimStartMs": 141,
+    "bytes": 15508,
+    "sha256": "fb8edf9c8c6031059dfe84bfa2ee8e9741d12f1dfc25f4ffb7264fdf1298ce05",
+    "license": "CC0-1.0",
+    "review": "Provisional technical selection. No listening performed; user authorized selecting among existing files.",
+    "variants": [
+      {
+        "asset": "marus_harvest_low.wav",
+        "pitchFactor": 0.97,
+        "durationMs": 362,
+        "bytes": 16022,
+        "sha256": "8955b72bce82e1a8eb8df7095c0af6810df35a829542d06325469c191d69693e"
+      },
+      {
+        "asset": "marus_harvest_high.wav",
+        "pitchFactor": 1.03,
+        "durationMs": 340,
+        "bytes": 15092,
+        "sha256": "6fc4bdc9bf81551ca9b101722ee2ad7214b3a7bedd5392b72290c3c523907676"
+      }
+    ]
+  },
+  {
+    "event": "bite",
+    "source": "zombies/zombie-24.wav",
+    "asset": "marus_bite.wav",
+    "durationMs": 273,
+    "peak": 0.62,
+    "trimStartMs": 15,
+    "bytes": 12102,
+    "sha256": "a55ecda0905d5114ede2a00dde35e28af73601edfea9c3ba44908cfb575b33c1",
+    "license": "CC0-1.0",
+    "review": "Provisional technical selection. No listening performed; user authorized selecting among existing files.",
+    "variants": [
+      {
+        "asset": "marus_bite_low.wav",
+        "pitchFactor": 0.97,
+        "durationMs": 282,
+        "bytes": 12510,
+        "sha256": "5ca82dd14b5461316fb899f77eaf00b33dd30f8a9ddadc937e5a33ee1b166cef"
+      },
+      {
+        "asset": "marus_bite_high.wav",
+        "pitchFactor": 1.03,
+        "durationMs": 265,
+        "bytes": 11786,
+        "sha256": "a567d68ca0ca16bb5eb686234cabfa8250b83214d070f2f4f2df95a31681ae54"
+      }
+    ]
+  },
+  {
+    "event": "armor",
+    "source": "digital/powerUp5.ogg",
+    "asset": "marus_armor.wav",
+    "durationMs": 243,
+    "peak": 0.68,
+    "trimStartMs": 96,
+    "bytes": 10742,
+    "sha256": "7de9725910fb8e490d991543e6a4eb0591a5763c56144db7c3bb538e6c182c2a",
+    "license": "CC0-1.0",
+    "review": "Provisional technical selection. No listening performed; user authorized selecting among existing files.",
+    "variants": [
+      {
+        "asset": "marus_armor_low.wav",
+        "pitchFactor": 0.97,
+        "durationMs": 250,
+        "bytes": 11108,
+        "sha256": "8a586e7e5f407670c52eebe9c0f3624cb4315b88d5676b9676dfbd2f626dc544"
+      },
+      {
+        "asset": "marus_armor_high.wav",
+        "pitchFactor": 1.03,
+        "durationMs": 236,
+        "bytes": 10466,
+        "sha256": "b389583d1a1c97ae0aafb660defabb749992a0e8d2a8a4876b4218c1079d4612"
+      }
+    ]
+  },
+  {
+    "event": "defeat",
+    "source": "zombies/zombie-8.wav",
+    "asset": "marus_defeat.wav",
+    "durationMs": 779,
+    "peak": 0.65,
+    "trimStartMs": 46,
+    "bytes": 34388,
+    "sha256": "0eb312be862e054858226fe90b0c51b5eb5d8443877a77db5e3aa38fd9dc9504",
+    "license": "CC0-1.0",
+    "review": "Provisional technical selection. No listening performed; user authorized selecting among existing files.",
+    "variants": [
+      {
+        "asset": "marus_defeat_low.wav",
+        "pitchFactor": 0.97,
+        "durationMs": 803,
+        "bytes": 35486,
+        "sha256": "bb15944e21eeb643a93f2ed3bd120934f742eed46e6c2d738085627363ab1d69"
+      },
+      {
+        "asset": "marus_defeat_high.wav",
+        "pitchFactor": 1.03,
+        "durationMs": 756,
+        "bytes": 33422,
+        "sha256": "15e4f11436c0d6c400e8484b9d65cd9185d68739de18bcd5756c25f3d371adf8"
+      }
+    ]
+  }
+]

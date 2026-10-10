@@ -8,6 +8,7 @@ import 'patio_art.dart';
 import 'patio_weather.dart';
 import 'patio_weather_bar.dart';
 import 'store.dart';
+import 'marus_zombies/mz_screen.dart';
 
 class PatioScreen extends StatefulWidget {
   const PatioScreen({super.key, required this.store, this.weather, this.clock});
@@ -58,6 +59,21 @@ class _PatioScreenState extends State<PatioScreen>
             weather: weather,
             clock: widget.clock,
           ),
+        ),
+      );
+    } finally {
+      _opening = false;
+    }
+  }
+
+  Future<void> _marusZombies() async {
+    if (_opening) return;
+    _opening = true;
+    try {
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          settings: const RouteSettings(name: '/marus-zombies'),
+          builder: (_) => MarusZombiesScreen(store: widget.store),
         ),
       );
     } finally {
@@ -217,6 +233,48 @@ class _PatioScreenState extends State<PatioScreen>
                             SizedBox(height: 5),
                             Text(
                               'Desliza el balón y supera a Maru o Lady.\nCada gol: +30 monedas.',
+                              style: TextStyle(fontSize: 12),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Icon(Icons.chevron_right_rounded),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Card(
+              color: const Color(0xffe7edcb),
+              child: InkWell(
+                key: const ValueKey('patio-marus-zombies'),
+                borderRadius: BorderRadius.circular(16),
+                onTap: _marusZombies,
+                child: const Padding(
+                  padding: EdgeInsets.all(18),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.shield_moon_outlined,
+                        size: 48,
+                        color: Color(0xff45684f),
+                      ),
+                      SizedBox(width: 15),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Marus vs Zombies',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            SizedBox(height: 5),
+                            Text(
+                              'Gatos defensores, ovillos y Roombas.\nProtege el jardín en seis mundos.',
                               style: TextStyle(fontSize: 12),
                             ),
                           ],

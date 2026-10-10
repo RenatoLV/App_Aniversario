@@ -1,0 +1,548 @@
+{
+  "downloaded": "2026-10-10",
+  "sources": [
+    {
+      "folder": "zombies",
+      "author": "artisticdude",
+      "license": "CC0-1.0",
+      "url": "https://opengameart.org/content/zombies-sound-pack"
+    },
+    {
+      "folder": "digital",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "url": "https://kenney.nl/assets/digital-audio"
+    },
+    {
+      "folder": ".",
+      "author": "Kerzoven",
+      "license": "CC0-1.0",
+      "url": "https://opengameart.org/content/cat-purr-meow"
+    }
+  ],
+  "files": [
+    {
+      "file": "cat_mewfood.wav",
+      "bytes": 99450,
+      "sha256": "3550f080882b52e236c8810a353756b2e0395fb7dadf0aeface0a06893cd181f",
+      "duration": 1.127,
+      "channels": 1,
+      "sampleRate": 44100
+    },
+    {
+      "file": "cat_softmew.wav",
+      "bytes": 218620,
+      "sha256": "7de9fed4401b677ccbf072781182857d875093a8e9b5727fc21b38028cfd5a90",
+      "duration": 2.478,
+      "channels": 1,
+      "sampleRate": 44100
+    },
+    {
+      "file": "digital/highDown.ogg",
+      "bytes": 5803,
+      "sha256": "cdbea353b2e435b4f869c7b045af81079c5d5eb81cfbbc805013ccc3a7a0f36a"
+    },
+    {
+      "file": "digital/highUp.ogg",
+      "bytes": 6135,
+      "sha256": "cbc1c3c7ccf5d7903818144a4c3f5b2ed2385095792f29d8d7c76360ba4fa559"
+    },
+    {
+      "file": "digital/laser1.ogg",
+      "bytes": 9315,
+      "sha256": "0bf468769b48a834dc1c6e38e457f2c71159b010225a9aedf84316795e8cc3e5"
+    },
+    {
+      "file": "digital/laser2.ogg",
+      "bytes": 8524,
+      "sha256": "50470d64f9397855e5d9a334484da9c5232b3e0524c52f088b8a73822bd89f45"
+    },
+    {
+      "file": "digital/laser3.ogg",
+      "bytes": 8302,
+      "sha256": "caede23d2b65299acdc4e9cab16d06c247d69c7ca1c74caa5e9da21cbdbc1400"
+    },
+    {
+      "file": "digital/laser4.ogg",
+      "bytes": 9208,
+      "sha256": "13f34561740aadbd3438b971dfe248cf56ea09d333eb7a0278561e09e27c3557"
+    },
+    {
+      "file": "digital/laser5.ogg",
+      "bytes": 8484,
+      "sha256": "8d7b30b35112bedf4dd6f03796a5f33af85414b02947187e4063819fd80cf3e2"
+    },
+    {
+      "file": "digital/laser6.ogg",
+      "bytes": 8928,
+      "sha256": "cec018b67fdd9a857e692be0596cec070617346853e5341c3e2df3aae950473d"
+    },
+    {
+      "file": "digital/laser7.ogg",
+      "bytes": 8848,
+      "sha256": "ec67a33a99dce15b93d74ee4d32c903150dcd04b822853f417eafd526ca041fd"
+    },
+    {
+      "file": "digital/laser8.ogg",
+      "bytes": 9383,
+      "sha256": "c87572c683af43f2c0050138a0d72ca049d7cae0ad0a6ae27ba3bd7ddf29bcd6"
+    },
+    {
+      "file": "digital/laser9.ogg",
+      "bytes": 9331,
+      "sha256": "ae77fe3e3f3488e64b83f0526640af512e5ef452d88e79b4b97404803a047e9f"
+    },
+    {
+      "file": "digital/lowDown.ogg",
+      "bytes": 5956,
+      "sha256": "e0215fcfd8b9d7877f74d5c46b239a13d7db0d25998da97b80404931ef9eef5d"
+    },
+    {
+      "file": "digital/lowRandom.ogg",
+      "bytes": 5416,
+      "sha256": "ceefeeeb6982838d78ac9059a845ca614b3bd94580a9a9127fd5834d6206f739"
+    },
+    {
+      "file": "digital/lowThreeTone.ogg",
+      "bytes": 7035,
+      "sha256": "b4b3bc7420e71bfbec49a6ea13b8c12d76a5751cbdf063d8a8ac017c0b1e1d87"
+    },
+    {
+      "file": "digital/pepSound1.ogg",
+      "bytes": 6019,
+      "sha256": "f2f44effce087e47683f0fea05a71002bd8dca78fb10bf93d9f0b38d49f9590e"
+    },
+    {
+      "file": "digital/pepSound2.ogg",
+      "bytes": 5910,
+      "sha256": "5a33494e622c15c4587e0a19447cf55c86283faac0e6c1238b550f43a30f16a3"
+    },
+    {
+      "file": "digital/pepSound3.ogg",
+      "bytes": 5590,
+      "sha256": "5e9f2b4a0b14e65a157d0bbcb28cf816926583afa96e753489c722ec3d810a78"
+    },
+    {
+      "file": "digital/pepSound4.ogg",
+      "bytes": 5948,
+      "sha256": "8afd1776651eb3155e1b588f26d6c9b5cc183e9c53297685763f51ac63e63673"
+    },
+    {
+      "file": "digital/pepSound5.ogg",
+      "bytes": 6422,
+      "sha256": "4dc9824b319efd915bac82d8e2767e51d5f6503224d358fda6e2d445f2934bc8"
+    },
+    {
+      "file": "digital/phaseJump1.ogg",
+      "bytes": 6733,
+      "sha256": "c60069ed7108678dd6a1306404d168a93cc2575cda37b06add9dd6c4d46352a3"
+    },
+    {
+      "file": "digital/phaseJump2.ogg",
+      "bytes": 6342,
+      "sha256": "5d85717cfca231f7da7887cef5f44b2131bbe3308eb0c1fee0b4f9e61d59b571"
+    },
+    {
+      "file": "digital/phaseJump3.ogg",
+      "bytes": 6854,
+      "sha256": "69e25a1b7b0781f57af84eb4424973ec406d34bc48eed8b6964787b2d74093a9"
+    },
+    {
+      "file": "digital/phaseJump4.ogg",
+      "bytes": 7117,
+      "sha256": "90e1c90b9da3d0be66b54f4daa926f0fde79eba867dec7e9d1eef10524756e19"
+    },
+    {
+      "file": "digital/phaseJump5.ogg",
+      "bytes": 6770,
+      "sha256": "322d62ab7da973880d86c5ad217a2da85916ed95aa6c8d29991de392fd0f7522"
+    },
+    {
+      "file": "digital/phaserDown1.ogg",
+      "bytes": 7113,
+      "sha256": "d2d046cd0247045f8819905fc9719a7237ccbd590b3128ce58a61a81f50d208b"
+    },
+    {
+      "file": "digital/phaserDown2.ogg",
+      "bytes": 6093,
+      "sha256": "0eaadbbc5c259cc89a1dfbb0c99b61ca07e08710d035cc9bfc805b68cb0bdc9e"
+    },
+    {
+      "file": "digital/phaserDown3.ogg",
+      "bytes": 7329,
+      "sha256": "19fd2f5bb8448e022381f1a72c36117d4adcb521ebeb697e888bfaf7945cfa56"
+    },
+    {
+      "file": "digital/phaserUp1.ogg",
+      "bytes": 7390,
+      "sha256": "4423d459fc15fdd8593a4584d71e272ec2e5f8bdc11b759db623fc613ffd957c"
+    },
+    {
+      "file": "digital/phaserUp2.ogg",
+      "bytes": 6895,
+      "sha256": "8f158744623b8d7a6d68aec5ba0716b8edd76a7461646071120c81f81dc54792"
+    },
+    {
+      "file": "digital/phaserUp3.ogg",
+      "bytes": 7222,
+      "sha256": "d6edcbde2c7190e275ef3eba08a8886129153a361cd0e16dc0fb58206deb5e53"
+    },
+    {
+      "file": "digital/phaserUp4.ogg",
+      "bytes": 6332,
+      "sha256": "a64a69368af9d85dfce8dd38432fd6c9935a7766621782193102c9cb276571fc"
+    },
+    {
+      "file": "digital/phaserUp5.ogg",
+      "bytes": 6289,
+      "sha256": "704433167121712c456fa7f06af96c975a28f9a022d91feb68196bb073704ea0"
+    },
+    {
+      "file": "digital/phaserUp6.ogg",
+      "bytes": 6349,
+      "sha256": "39616fbeb3cf28288873502e99acfc590705d54bf7f58ef3f1a23cec72dd22db"
+    },
+    {
+      "file": "digital/phaserUp7.ogg",
+      "bytes": 6410,
+      "sha256": "47ff0828ef14d4944689e771a50bc4e991a88067bea1ba46a06c6aeb1e03c2a3"
+    },
+    {
+      "file": "digital/powerUp1.ogg",
+      "bytes": 9011,
+      "sha256": "8c361b624b560c0bc30ea3063b71212bc30caebf425c9df2481c13b25561485c"
+    },
+    {
+      "file": "digital/powerUp10.ogg",
+      "bytes": 6568,
+      "sha256": "e4d2c7707655361678ccd358048b7956753e4f333e99545b4ae25e07a9b2ef9b"
+    },
+    {
+      "file": "digital/powerUp11.ogg",
+      "bytes": 6495,
+      "sha256": "d673bfcd3aee32202908708fdadb3ad3033f65162c6dbae4615e181e19eee0d3"
+    },
+    {
+      "file": "digital/powerUp12.ogg",
+      "bytes": 7278,
+      "sha256": "a9387a2cb0b13b8c794579e61ae1fb7e666e22d46a36aec6c77471635096f2fc"
+    },
+    {
+      "file": "digital/powerUp2.ogg",
+      "bytes": 5577,
+      "sha256": "83786b43d828a399e14ac20604b63a60ca05385977f5477d00304c2adc696204"
+    },
+    {
+      "file": "digital/powerUp3.ogg",
+      "bytes": 9043,
+      "sha256": "59e7591f7a068882767bc1fd61edabf479b78787466d3a70bc49dfa0533777d2"
+    },
+    {
+      "file": "digital/powerUp4.ogg",
+      "bytes": 6288,
+      "sha256": "df6992456056af760815460b66d2ca1c3a07c200cca26325db5820b90104d177"
+    },
+    {
+      "file": "digital/powerUp5.ogg",
+      "bytes": 5652,
+      "sha256": "528e7245a1b61c6fd94bcb8df1d747e6e9b76dce58a36e44be992cf9e09884f8"
+    },
+    {
+      "file": "digital/powerUp6.ogg",
+      "bytes": 5607,
+      "sha256": "d1007bc67852cc767fad077a6b7ee016c0eb3d52a2032f1496726d7ab590e22d"
+    },
+    {
+      "file": "digital/powerUp7.ogg",
+      "bytes": 5868,
+      "sha256": "9048d651b51f528099c384566b0d4c6c597bee8b56c48f3adab7a901feba0fa5"
+    },
+    {
+      "file": "digital/powerUp8.ogg",
+      "bytes": 6363,
+      "sha256": "2a2adebaacbf07cc89c194e5d088c8e01cad8557800559d6cb5b6106b6739508"
+    },
+    {
+      "file": "digital/powerUp9.ogg",
+      "bytes": 6101,
+      "sha256": "7dfa3198ab951f09bee096bcd08db6faafcdb57a6bf416c91e1fa9a8321076e5"
+    },
+    {
+      "file": "digital/Preview.ogg",
+      "bytes": 587635,
+      "sha256": "989a5f69887d90e0eff0dcc641a09419857d4649a219d03e7aa5ef53d7eb5d0b"
+    },
+    {
+      "file": "digital/spaceTrash1.ogg",
+      "bytes": 12132,
+      "sha256": "8f702781627c95cf9f91724dab3bcdb46bb87cc0ccf2a350748798dba6bc82aa"
+    },
+    {
+      "file": "digital/spaceTrash2.ogg",
+      "bytes": 12640,
+      "sha256": "1b3a14886d25a471273eec5d55ff3a7e7c7c6df4e82f3659046dafed982a76d4"
+    },
+    {
+      "file": "digital/spaceTrash3.ogg",
+      "bytes": 12413,
+      "sha256": "03fd29fd857c67b4401e7ffbc321568229844a10051ae455af497b2335f37d6c"
+    },
+    {
+      "file": "digital/spaceTrash4.ogg",
+      "bytes": 12685,
+      "sha256": "d0c659b2c8108a7bccfeac94dbac6b770f89e4b71c0b4c6c3024941287094f34"
+    },
+    {
+      "file": "digital/spaceTrash5.ogg",
+      "bytes": 11729,
+      "sha256": "7b74e7c5c9df8023bd6bdc595045ef96bd3e606da5457cfbbb6ff9d4dd32a005"
+    },
+    {
+      "file": "digital/threeTone1.ogg",
+      "bytes": 7361,
+      "sha256": "bdf21eb12e65507f091d074886fdac820e1ccae51d060caa168e5567acadb84b"
+    },
+    {
+      "file": "digital/threeTone2.ogg",
+      "bytes": 8082,
+      "sha256": "124198c80ff2e1826230be606aa3dcdd90262272bb545f621a9eb91dccfd5c9d"
+    },
+    {
+      "file": "digital/tone1.ogg",
+      "bytes": 6634,
+      "sha256": "12c6a1955aad54cb04206b5e9985df4379ebc598a01b65070609e0b0a3b9b026"
+    },
+    {
+      "file": "digital/twoTone1.ogg",
+      "bytes": 7362,
+      "sha256": "8732f14d6398407a8f1df77b986c2099cfd88f6583e1272cb60497cb2fe8da1d"
+    },
+    {
+      "file": "digital/twoTone2.ogg",
+      "bytes": 7349,
+      "sha256": "e8e4a2d9faa4344f4722de9ef81103290858bbcd80f1dc686879128cae52e9f0"
+    },
+    {
+      "file": "digital/zap1.ogg",
+      "bytes": 8126,
+      "sha256": "4e4bf11c671a4be0723022a7177f8e122329fa32a0c59555581f4193ed111585"
+    },
+    {
+      "file": "digital/zap2.ogg",
+      "bytes": 9819,
+      "sha256": "169cf3876647bae0a28a7eb3fc5b5bd573ab9efae7b56b64a8700ff9bafb3494"
+    },
+    {
+      "file": "digital/zapThreeToneDown.ogg",
+      "bytes": 9936,
+      "sha256": "272e60bc62a1685f990fa50d163c3cb7f85073c1c3f89e3c3409e7ec938703c5"
+    },
+    {
+      "file": "digital/zapThreeToneUp.ogg",
+      "bytes": 9590,
+      "sha256": "52da0ff5e219179df4521b38276abde0ed6ba27e0cf030b0d1209b8857406eff"
+    },
+    {
+      "file": "digital/zapTwoTone.ogg",
+      "bytes": 9847,
+      "sha256": "7d5871b7b01f631bee006772cc4fb6ab6a1eb5c78d5be42edc722b57157c00f5"
+    },
+    {
+      "file": "digital/zapTwoTone2.ogg",
+      "bytes": 9016,
+      "sha256": "9da93e8dade111d1913cb9dc582925712afed9f69206a80ebf89510756909a06"
+    },
+    {
+      "file": "zombies/zombie-1.wav",
+      "bytes": 227056,
+      "sha256": "dad8280256985cadc5745f407c53ebdcf428d55e6369a70847e5b83d60e98c17",
+      "duration": 0.854,
+      "channels": 2,
+      "sampleRate": 44100
+    },
+    {
+      "file": "zombies/zombie-10.wav",
+      "bytes": 182898,
+      "sha256": "be9223a5c65ad1c1444e6e2153918d8c2a2a1dee59efeb36fa5bbb060c2bfed8",
+      "duration": 0.688,
+      "channels": 2,
+      "sampleRate": 44100
+    },
+    {
+      "file": "zombies/zombie-11.wav",
+      "bytes": 133220,
+      "sha256": "edbe930f09f61f034c90b80a6f5b06757fbea2a8f2b9ccdc263ed9246b33a400",
+      "duration": 0.5,
+      "channels": 2,
+      "sampleRate": 44100
+    },
+    {
+      "file": "zombies/zombie-12.wav",
+      "bytes": 210492,
+      "sha256": "2b1984e3485715642a1195393fd35227eadc27b8f7eeb968956e18f4e8cb9400",
+      "duration": 0.792,
+      "channels": 2,
+      "sampleRate": 44100
+    },
+    {
+      "file": "zombies/zombie-13.wav",
+      "bytes": 149782,
+      "sha256": "b8a64c3a557d7ce0b69492717bc1a88706b69c499a2714f02527d822a8462545",
+      "duration": 0.563,
+      "channels": 2,
+      "sampleRate": 44100
+    },
+    {
+      "file": "zombies/zombie-14.wav",
+      "bytes": 177376,
+      "sha256": "b1fffbf93fd9cf353a9dd0d519b6cd6e739bd3fb28853a580e018ac73efdda4b",
+      "duration": 0.667,
+      "channels": 2,
+      "sampleRate": 44100
+    },
+    {
+      "file": "zombies/zombie-15.wav",
+      "bytes": 232570,
+      "sha256": "19d0955dfcca86939dbce76388dad5d3ad4dd8ed70bf7ce457d9a46b555e220b",
+      "duration": 0.875,
+      "channels": 2,
+      "sampleRate": 44100
+    },
+    {
+      "file": "zombies/zombie-16.wav",
+      "bytes": 381606,
+      "sha256": "637f8d26b186005246a279fb19def56c81eebcf144c2346460ac1e4fc0075fc7",
+      "duration": 1.438,
+      "channels": 2,
+      "sampleRate": 44100
+    },
+    {
+      "file": "zombies/zombie-17.wav",
+      "bytes": 420242,
+      "sha256": "c954b6173399ed574c1c1350b8da4a5b465e0454cc810d6e49779fe121fafa34",
+      "duration": 1.583,
+      "channels": 2,
+      "sampleRate": 44100
+    },
+    {
+      "file": "zombies/zombie-18.wav",
+      "bytes": 293286,
+      "sha256": "91c33adaf9efa32d87c364eb2a679833a24ac5586c52f675f3e9cf8cedfde199",
+      "duration": 1.104,
+      "channels": 2,
+      "sampleRate": 44100
+    },
+    {
+      "file": "zombies/zombie-19.wav",
+      "bytes": 260170,
+      "sha256": "79fa7bb077c0b5c46837a63299a1df3269a2310f25b6a3055dd27a4700c74789",
+      "duration": 0.979,
+      "channels": 2,
+      "sampleRate": 44100
+    },
+    {
+      "file": "zombies/zombie-2.wav",
+      "bytes": 188414,
+      "sha256": "b8833b90e2f929cb28ce067e10dacc6e807f47f92393b8f2e6fd17d34f207efe",
+      "duration": 0.708,
+      "channels": 2,
+      "sampleRate": 44100
+    },
+    {
+      "file": "zombies/zombie-20.wav",
+      "bytes": 254650,
+      "sha256": "3a962ea1d8517ad4c2fea8221e6a0e622dcad3ba34bae5a436d4f0971774b56d",
+      "duration": 0.958,
+      "channels": 2,
+      "sampleRate": 44100
+    },
+    {
+      "file": "zombies/zombie-21.wav",
+      "bytes": 287770,
+      "sha256": "d58c26ae8df808238becc3434cf46778fca4582e9fcda138bdc01f720ecbbefc",
+      "duration": 1.083,
+      "channels": 2,
+      "sampleRate": 44100
+    },
+    {
+      "file": "zombies/zombie-22.wav",
+      "bytes": 177376,
+      "sha256": "3224f8e3e9e446e5e424a9f6ce11ee78784ebd7bdc2db535306b337c973e6e02",
+      "duration": 0.667,
+      "channels": 2,
+      "sampleRate": 44100
+    },
+    {
+      "file": "zombies/zombie-23.wav",
+      "bytes": 216012,
+      "sha256": "d467553c380b0c2fb04cd5e5583ec53d0d3620902cf3b90e6aa64438f3e5e84c",
+      "duration": 0.812,
+      "channels": 2,
+      "sampleRate": 44100
+    },
+    {
+      "file": "zombies/zombie-24.wav",
+      "bytes": 89062,
+      "sha256": "3776a39a471c215f26115290837012084fc07f37e20b4808ce76f5dafe98f2fb",
+      "duration": 0.333,
+      "channels": 2,
+      "sampleRate": 44100
+    },
+    {
+      "file": "zombies/zombie-3.wav",
+      "bytes": 155298,
+      "sha256": "8097e5c1da76b30ae5a1dca0b85d70fab0e1386170a03acc77f9492047ac4e84",
+      "duration": 0.583,
+      "channels": 2,
+      "sampleRate": 44100
+    },
+    {
+      "file": "zombies/zombie-4.wav",
+      "bytes": 193940,
+      "sha256": "36b6376649969e11112361afb00e6d161a2433f9db045273d9ed40d6e9b06ab0",
+      "duration": 0.729,
+      "channels": 2,
+      "sampleRate": 44100
+    },
+    {
+      "file": "zombies/zombie-5.wav",
+      "bytes": 133220,
+      "sha256": "6920b559f953d19737f65a9da5b31f7bb3e1421c48552f52d7a57399d507574b",
+      "duration": 0.5,
+      "channels": 2,
+      "sampleRate": 44100
+    },
+    {
+      "file": "zombies/zombie-6.wav",
+      "bytes": 144256,
+      "sha256": "2ad9acaccc9bc29f77f89581767699c3ed8d9630c19a11a8bbf6332ce89686a2",
+      "duration": 0.542,
+      "channels": 2,
+      "sampleRate": 44100
+    },
+    {
+      "file": "zombies/zombie-7.wav",
+      "bytes": 155298,
+      "sha256": "8e63e327c960bfe76d0402f7a54f7629272e6346e5c6b84ac35ad52b9597dec8",
+      "duration": 0.583,
+      "channels": 2,
+      "sampleRate": 44100
+    },
+    {
+      "file": "zombies/zombie-8.wav",
+      "bytes": 221534,
+      "sha256": "98dadef79f3cdbf120277e24e95919dfc2e853a45a7d72273a1d3c2cbc1ea823",
+      "duration": 0.833,
+      "channels": 2,
+      "sampleRate": 44100
+    },
+    {
+      "file": "zombies/zombie-9.wav",
+      "bytes": 232570,
+      "sha256": "938c9a75828cda0ec78482e7a969cebc8f989968dcde15326e8c5a2f437fd468",
+      "duration": 0.875,
+      "channels": 2,
+      "sampleRate": 44100
+    }
+  ]
+}

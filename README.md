@@ -8,6 +8,11 @@ El repositorio incluye **334 memes**, **27 cartas celestiales animadas** y seis 
 
 ## Qué incluye
 
+- Marus vs Zombies, desde los juegos del Patio: campaña de seis mundos y 60
+  misiones, once gatos defensores, Roombas, atún, poderes humanos, terreno especial,
+  Dr. Cat-trófico, desafíos y supervivencia. Guardado local y sincronización del
+  progreso. Controles y estado: [app/MARUS_VS_ZOMBIES.md](app/MARUS_VS_ZOMBIES.md).
+
 - Bomber Miau: cuatro arenas con relieve y colores diferentes, Maru, Lady, Milo y
   Nube, seis poderes, IA sin conexión y duelos en línea. Permite buscar usuarios
   e invitarlos, o encontrar un rival en la arena. Firebase controla bombas,

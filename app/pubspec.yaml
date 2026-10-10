@@ -94,6 +94,7 @@ flutter:
     - assets/audio/music/sweet/
     - assets/audio/music/blocks/
     - assets/audio/music/leap/
+    - assets/audio/music/marus/
 
   # To add assets to your application, add an assets section, like this:
   # assets:

@@ -40,6 +40,7 @@ void main() {
         'leap.last': '{"points":9000,"finished":true}',
         'leap.trail': 'galaxy',
         'leap.trails': ['rainbow', 'galaxy', 'comet'],
+        'marusZombies.v1': '{"stars":{"0":3},"cookies":150}',
       });
       final prefs = await SharedPreferences.getInstance();
       final sync = ProgressSync(prefs, () {});
@@ -54,6 +55,7 @@ void main() {
       expect(backup['sweet.best'], 500);
       expect(backup['leap.best'], 10000);
       expect(backup['leap.trail'], 'galaxy');
+      expect(backup['marusZombies.v1'], '{"stars":{"0":3},"cookies":150}');
       expect(backup['leap.trails'], ['rainbow', 'galaxy', 'comet']);
       expect(core['catCare']['ownedClothes'], ['shirt_navy', 'hat_party']);
       expect(core['cardVariants']['6:legendary:gold'], 2);

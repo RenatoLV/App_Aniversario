@@ -25,6 +25,7 @@ class ProgressSync extends ChangeNotifier {
     'leap.last',
     'leap.trail',
     'leap.trails',
+    'marusZombies.v1',
   ];
   Timer? _timer;
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _subscription;
