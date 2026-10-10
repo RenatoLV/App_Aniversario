@@ -134,3 +134,9 @@ Sólo se publican código, tests y documentación de esta entrega. No build/, ca
 - Diagnóstico + smoke de campaña: **cuatro aprobadas**; CSV final de 540 partidas, sin tiempos agotados.
 - Restauración y perfil inicial: cinco aprobadas; perfil posterior: dos aprobadas. Cinco ejecuciones aisladas del mezclador: cinco aprobadas, sin fallos observados en esas repeticiones.
 - No se ejecutó compilación, empaquetado, instalación ni medición en un Android físico. La lista del propietario permanece parcialmente abierta por esos límites y los permisos de música.
+
+## Entrega confirmada en GitHub
+
+Implementación V4.1: **`42c95aa2eb6b64b317340122299381623807fdd1`**, `fix(marus): audit V4.1 gameplay and protect saves and touch tools`.
+
+`git push origin HEAD:refs/heads/codex/marus-zombies-audio` terminó correctamente. `git ls-remote origin refs/heads/codex/marus-zombies-audio` devolvió ese mismo hash el 2026-10-10; árbol limpio tras el commit. Esta confirmación se registra en un cierre documental posterior, sin inventar el hash de su propio archivo. Los 20 archivos de implementación incluyen código, pruebas, informes y generador; ningún temporal de build/ ni asset nuevo. Sin force-push, main, PR ni merge.

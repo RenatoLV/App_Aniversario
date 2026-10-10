@@ -1058,3 +1058,5 @@ Diagnóstico reproducible: 540 partidas legales, nueve políticas y 60 misiones.
 Sondeos separados de pintura CPU legal/extrema, observadores, cachés y creación de pantallas; no FPS de Android. Getters read-only permiten comprobar límites y limpieza. Cinco ejecuciones secuenciales del mezclador pasan. Capturas antes/después y de confirmación/ayuda en `build/previews/`, no assets nuevos. No se compila una aplicación ni se genera APK.
 
 Resultados finales, matriz de teléfono físico, auditoría de progresión y bloqueos de licencias se consignan en `MARUS_VS_ZOMBIES_V41_QUALITY_REVIEW.md`. No consta permiso público/comercial para los dos MP3 aportados: distribución pendiente, aunque sus selecciones se conservan. La experiencia física, el entretenimiento y el rendimiento GPU/memoria de Android permanecen por validar.
+
+Suite completa final V4.1: **339 aprobadas, 14 optativas omitidas, cero fallidas**; análisis sin incidencias. Implementación publicada en `origin/codex/marus-zombies-audio`, hash **`42c95aa2eb6b64b317340122299381623807fdd1`**, comprobado con `git ls-remote`. El cierre documental se añade después.
