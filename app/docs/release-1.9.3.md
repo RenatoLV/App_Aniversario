@@ -29,3 +29,9 @@ Las pruebas cubren precio y saldo insuficiente, apertura secuencial alternando c
 Validación local: suite completa con **357 aprobadas y 14 optativas omitidas**. Tras separar el reintento de abono de monedas del checkpoint de combate ya confirmado, cierre específico con **29 aprobadas y una optativa omitida**, y análisis sin incidencias. Una transferencia pendiente de cartera no deshace un poder ni su débito que ya se guardaron correctamente.
 
 La prueba automatizada independiente de Chrome no terminó su carga en este entorno; no se cuenta como aprobada. No hay mediciones nuevas en un Android físico ni certificación de licencias musicales. Se conservan los límites documentados en la revisión V4.1.
+
+## Publicación confirmada
+
+[Release v1.9.3-build1029](https://github.com/RenatoLV/App_Aniversario/releases/tag/v1.9.3-build1029), marcada como latest. [Actions 38855167525](https://github.com/RenatoLV/App_Aniversario/actions/runs/38855167525) finalizó correctamente sobre `2a2880588699fc2eb3d30fc8727058fee975a240`: **357 pruebas aprobadas y 14 omitidas**, análisis limpio, Firebase/multijugador, intercambio, APK release ARM64 y pruebas Android Gradle. La firma existente se conserva.
+
+APK `Anivermaru-1.9.3-1029-arm64.apk`: 220.116.666 bytes, descarga HTTP 200. Se comprobaron latest, versión 1.9.3/código 1029 y coincidencia de SHA-256 entre metadata, checksum descargado y digest GitHub: `de054d2761bc560fbe0d2afdb04e8ee757f8d64e2e7f82729857ac4076be8dfb`. No se descargó el APK completo para revalidación local.
