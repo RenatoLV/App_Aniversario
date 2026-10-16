@@ -19,6 +19,37 @@ class MzProgress {
   String? recovery;
   int get cookies => (_data['cookies'] as int?) ?? 0;
   int get mints => (_data['mints'] as int?) ?? 0;
+  static const coinsPerKill = 2,
+      firstVictoryCoins = 100,
+      replayVictoryCoins = 25;
+  int get coinsEarned => (_data['coinsEarned'] as int?) ?? 0;
+
+  Map<String, dynamic> _coinState(
+    MzSimulation sim, {
+    bool fresh = false,
+    bool finished = false,
+  }) {
+    fresh =
+        fresh ||
+        _data['coinLevel'] !=
+            '${sim.level.mode.name}:${sim.level.seed}:${sim.level.id}';
+    final previousKills = fresh ? 0 : (_data['coinKills'] as int? ?? 0);
+    final alreadyFinished = !fresh && _data['coinFinished'] == true;
+    final killGain = math.max(0, sim.kills - previousKills) * coinsPerKill;
+    final victoryGain = finished && sim.won && !alreadyFinished
+        ? (sim.level.mode == MzMode.campaign &&
+                  (stars['${sim.level.id}'] as int? ?? 0) == 0
+              ? firstVictoryCoins
+              : replayVictoryCoins)
+        : 0;
+    return {
+      'coinsEarned': coinsEarned + killGain + victoryGain,
+      'coinLevel': '${sim.level.mode.name}:${sim.level.seed}:${sim.level.id}',
+      'coinKills': math.max(previousKills, sim.kills),
+      'coinFinished': alreadyFinished || finished,
+    };
+  }
+
   bool get lion => _data['lion'] == true;
   bool get autoCollect => _data['auto'] == true;
   bool get reducedMotion => _data['reduced'] == true;
@@ -120,6 +151,7 @@ class MzProgress {
       return {
         ..._data,
         'cookies': cookies - spent,
+        ..._coinState(sim, fresh: run == null && !sim.ended),
         'run': snapshot,
         'expenses': (_data['expenses'] as int? ?? 0) + spent,
       };
@@ -200,6 +232,7 @@ class MzProgress {
     return {
       ..._data,
       'stars': nextStars,
+      ..._coinState(sim, finished: true),
       'claims': claims,
       'cookies': cookies + gain,
       'mints': mints + mintGain,

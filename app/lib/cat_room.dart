@@ -216,10 +216,12 @@ class _CatRoomState extends State<CatRoom> with TickerProviderStateMixin {
       child: LayoutBuilder(
         builder: (context, c) {
           final width = c.maxWidth;
-          final doorWidth = math.min(72.0, width * .20);
+          final doorWidth = math.min(84.0, width * .24);
           // Leave room for the active cat in the middle and its companion at the side.
           final catSize = math.min(148.0, width * .30);
           final height = (width * .4 + 165).clamp(285.0, 380.0);
+          // Reserve enough wall below the picture for a full-height door.
+          final pictureSize = math.min(width * .24, (height - 70) * .48);
           final litter = _moment == _RoomMoment.litter;
           final meal = _moment == _RoomMoment.food;
           final churu = _moment == _RoomMoment.churu;
@@ -312,8 +314,8 @@ class _CatRoomState extends State<CatRoom> with TickerProviderStateMixin {
                         top: 17,
                         right: 16,
                         child: Container(
-                          width: width * .24,
-                          height: width * .24,
+                          width: pictureSize,
+                          height: pictureSize,
                           padding: const EdgeInsets.all(5),
                           decoration: BoxDecoration(
                             color: const Color(0xffc58e50),
@@ -340,10 +342,10 @@ class _CatRoomState extends State<CatRoom> with TickerProviderStateMixin {
                       ),
                       if (widget.onOpenPatio != null)
                         Positioned(
-                          top: 27 + width * .24,
-                          right: 16 + (width * .24 - doorWidth) / 2,
+                          top: 27 + pictureSize,
+                          bottom: 38, // Same wall/floor seam as _RoomBackdrop.
+                          right: 16 + (pictureSize - doorWidth) / 2,
                           width: doorWidth,
-                          height: doorWidth * 1.5 + 18,
                           child: Semantics(
                             button: true,
                             label: 'Abrir la puerta al patio',
@@ -353,21 +355,34 @@ class _CatRoomState extends State<CatRoom> with TickerProviderStateMixin {
                                 key: const ValueKey('home-patio-door'),
                                 borderRadius: BorderRadius.circular(12),
                                 onTap: widget.onOpenPatio,
-                                child: Column(
+                                child: Stack(
                                   children: [
-                                    Expanded(
+                                    Positioned.fill(
                                       child: CustomPaint(
+                                        key: const ValueKey(
+                                          'home-patio-door-art',
+                                        ),
                                         painter: PatioDoorPainter(light: light),
-                                        child: SizedBox.expand(),
                                       ),
                                     ),
-                                    SizedBox(height: 4),
-                                    Text(
-                                      'Patio',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        color: light.text,
-                                        fontWeight: FontWeight.w800,
+                                    Positioned(
+                                      bottom: 12,
+                                      left: 0,
+                                      right: 0,
+                                      child: Text(
+                                        'Patio',
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: Color(0xffffedbc),
+                                          fontWeight: FontWeight.w800,
+                                          shadows: [
+                                            Shadow(
+                                              color: Color(0xff25382f),
+                                              blurRadius: 3,
+                                            ),
+                                          ],
+                                        ),
                                       ),
                                     ),
                                   ],

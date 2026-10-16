@@ -1,3 +1,5 @@
+import 'dart:math';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:nuestro_rincon/football_game.dart';
@@ -22,6 +24,45 @@ void main() {
     game.dispose();
     return outcome!;
   }
+
+  test(
+    'Session IDs work on JavaScript and remain distinct at the same time',
+    () {
+      if (kIsWeb) {
+        expect(1 << 32, 0);
+        expect(() => Random().nextInt(1 << 32), throwsRangeError);
+      }
+      final rng = Random(4);
+      final now = DateTime(2026, 10, 16);
+      final sessions = List.generate(
+        100,
+        (_) => FootballGame.newSessionId(random: rng, now: now),
+      );
+      expect(sessions.toSet().length, 100);
+    },
+  );
+
+  test(
+    'Long deliberate swipes work; downward and invalid gestures do not shoot',
+    () {
+      expect(run(const Offset(125, 200), .8), FootballResult.goal);
+      final game = FootballGame();
+      expect(
+        game.shoot(FootballGame.origin, const Offset(200, 560), .2),
+        isFalse,
+      );
+      expect(
+        game.shoot(FootballGame.origin, const Offset(200, 250), -1),
+        isFalse,
+      );
+      expect(game.attempts, 0);
+      game.point(FootballGame.origin + const Offset(0, -300));
+      expect(game.aimPower, 1);
+      game.cancelAim();
+      expect(game.aimPower, 0);
+      game.dispose();
+    },
+  );
 
   test(
     'Fast corners can score, center shots are saved and weak swipes stop',
@@ -94,7 +135,7 @@ void main() {
     },
   );
   test(
-    'Each goal grants exactly 30 coins, with durable deduplication and records',
+    'Each goal grants exactly 40 coins, with durable deduplication and records',
     () async {
       SharedPreferences.setMockInitialValues({});
       final prefs = await SharedPreferences.getInstance();
@@ -102,11 +143,11 @@ void main() {
       final before = store.coins;
       await store.recordFootballGoal('goal:test:1', 1);
       await store.recordFootballGoal('goal:test:1', 1);
-      expect(store.coins, before + 30);
+      expect(store.coins, before + 40);
       final restored = GameStore(prefs);
       await restored.recordFootballGoal('goal:test:1', 1);
       await restored.recordFootballGoal('goal:test:2', 2);
-      expect(restored.coins, before + 60);
+      expect(restored.coins, before + 80);
       expect(restored.footballGoals, 2);
       expect(restored.footballBestStreak, 2);
       expect(

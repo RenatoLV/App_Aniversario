@@ -9,10 +9,13 @@ import 'game_audio.dart';
 
 class CelestialRevealDialog extends StatefulWidget {
   final int cardId, copies;
+  final int? queuePosition, queueCount;
   final String collectionId;
   const CelestialRevealDialog({
     super.key,
     required this.cardId,
+    this.queuePosition,
+    this.queueCount,
     required this.copies,
     required this.collectionId,
   });
@@ -97,8 +100,10 @@ class _CelestialRevealDialogState extends State<CelestialRevealDialog>
                     ),
                   ),
                   const SizedBox(height: 5),
-                  const Text(
-                    'Una sorpresa de 1 entre 100',
+                  Text(
+                    widget.queuePosition == null
+                        ? 'Una carta entre las estrellas'
+                        : 'Carta ${widget.queuePosition} de ${widget.queueCount}',
                     style: TextStyle(color: Color(0xffe8d7a0), fontSize: 12),
                   ),
                   const SizedBox(height: 10),

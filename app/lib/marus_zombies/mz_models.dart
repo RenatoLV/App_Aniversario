@@ -149,16 +149,25 @@ class MzProjectile {
 }
 
 class MzPickup {
-  MzPickup(this.id, this.row, this.x, {this.tuna = false, this.ttl = 10});
+  MzPickup(
+    this.id,
+    this.row,
+    this.x, {
+    this.tuna = false,
+    this.ttl = 10,
+    this.power,
+  });
   final int id, row;
   final double x;
   final bool tuna;
+  final MzPower? power;
   double ttl;
   Map<String, dynamic> toJson() => {
     'id': id,
     'row': row,
     'x': x,
     'tuna': tuna,
+    if (power != null) 'power': power!.index,
     'ttl': ttl,
   };
   factory MzPickup.fromJson(Map<String, dynamic> j) => MzPickup(
@@ -166,6 +175,7 @@ class MzPickup {
     j['row'] as int,
     mzNum(j, 'x'),
     tuna: j['tuna'] == true,
+    power: j['power'] == null ? null : MzPower.values[j['power'] as int],
     ttl: mzNum(j, 'ttl'),
   );
 }

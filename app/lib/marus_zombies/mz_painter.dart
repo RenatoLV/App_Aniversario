@@ -696,7 +696,26 @@ class MzBoardPainter extends CustomPainter {
         );
       }
       c.drawCircle(pos, g.cw * .23, Paint()..color = const Color(0x66fff7a6));
-      if (p.tuna) {
+      if (p.power != null) {
+        final icon = switch (p.power!) {
+          MzPower.pinch => Icons.back_hand_outlined,
+          MzPower.pointer => Icons.ads_click,
+          MzPower.spray => Icons.water_drop_outlined,
+        };
+        c.drawCircle(pos, g.cw * .23, Paint()..color = const Color(0xffa5e7ed));
+        final glyph = TextPainter(
+          text: TextSpan(
+            text: String.fromCharCode(icon.codePoint),
+            style: TextStyle(
+              fontFamily: icon.fontFamily,
+              fontSize: g.cw * .3,
+              color: mzInk,
+            ),
+          ),
+          textDirection: TextDirection.ltr,
+        )..layout();
+        glyph.paint(c, pos - Offset(glyph.width / 2, glyph.height / 2));
+      } else if (p.tuna) {
         mzBox(
           c,
           Rect.fromCenter(center: pos, width: g.cw * .3, height: g.cw * .22),

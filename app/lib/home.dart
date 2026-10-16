@@ -1037,37 +1037,141 @@ class _RinconHomeState extends State<RinconHome>
     }
   }
 
-  Future<void> _openPack() async {
-    if (_openingPack || s.coins < s.packPrice) return;
+  Future<void> _revealPack(
+    PackResult result,
+    String collectionId, {
+    int? position,
+    int? count,
+  }) => showDialog<void>(
+    context: context,
+    barrierColor: const Color(0xee120a31),
+    barrierDismissible: position == null,
+    builder: (context) => CardRevealDialog(
+      key: position == null ? null : ValueKey('pack-reveal-$position'),
+      queuePosition: position,
+      queueCount: count,
+      cardId: result.cardId,
+      copies: s.cards[result.cardId]!,
+      total: s.totalCards,
+      opener: result.opener,
+      rarity: result.rarity,
+      collectionId: collectionId,
+      finish: result.finish,
+    ),
+  );
+
+  Future<void> _openPack({bool ten = false, bool celestial = false}) async {
+    final price = celestial
+        ? GameStore.celestialPackPrice
+        : ten
+        ? s.tenPackPrice
+        : s.packPrice;
+    if (_openingPack || s.coins < price) return;
     final opener = _packCat;
-    final selectedVolume = _selectedPackVolume;
+    final collectionId = _selectedPackVolume == 0
+        ? anniversaryCollectionId
+        : anniversaryCollectionV2Id;
     _packSoundFlags = 0;
     GameAudio.instance.play(GameSfx.kitten);
     setState(() => _openingPack = true);
     HapticFeedback.mediumImpact();
-    await _packAnimation.forward(from: 0);
-    final collectionId = selectedVolume == 0
-        ? anniversaryCollectionId
-        : anniversaryCollectionV2Id;
-    final id = s.openPack(opener: opener, collectionId: collectionId);
-    _packAnimation.reset();
+    try {
+      await _packAnimation.forward(from: 0).orCancel;
+    } on TickerCanceled {
+      return;
+    }
     if (!mounted) return;
-    setState(() => _openingPack = false);
-    if (id == null) return;
-    HapticFeedback.heavyImpact();
-    await showDialog<void>(
-      context: context,
-      barrierColor: const Color(0xee120a31),
-      builder: (context) => CardRevealDialog(
-        cardId: id,
-        copies: s.cards[id]!,
-        total: s.totalCards,
-        opener: opener,
-        rarity: s.lastOpenedRarity,
-        collectionId: collectionId,
-        finish: s.lastOpenedFinish,
-      ),
-    );
+    final List<PackResult> results;
+    if (ten) {
+      results = s.openTenPacks(opener: opener, collectionId: collectionId);
+    } else {
+      final id = celestial
+          ? s.openCelestialPack(opener: opener, collectionId: collectionId)
+          : s.openPack(opener: opener, collectionId: collectionId);
+      results = id == null
+          ? []
+          : [PackResult(id, s.lastOpenedRarity, s.lastOpenedFinish, opener)];
+    }
+    _packAnimation.reset();
+    try {
+      if (results.isEmpty) return;
+      HapticFeedback.heavyImpact();
+      if (!ten) {
+        await _revealPack(results.single, collectionId);
+      } else {
+        for (var index = 0; index < results.length && mounted; index++) {
+          await _revealPack(
+            results[index],
+            collectionId,
+            position: index + 1,
+            count: results.length,
+          );
+        }
+        if (!mounted) return;
+        await showModalBottomSheet<void>(
+          context: context,
+          isScrollControlled: true,
+          showDragHandle: true,
+          builder: (sheetContext) => SafeArea(
+            child: SizedBox(
+              height: MediaQuery.sizeOf(sheetContext).height * .8,
+              child: Column(
+                children: [
+                  const Padding(
+                    padding: EdgeInsets.all(12),
+                    child: Text(
+                      '¡Tus 10 cartas!',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                  const Text(
+                    'Ya están guardadas en tu colección. Toca una para verla.',
+                  ),
+                  Expanded(
+                    child: ListView.builder(
+                      itemCount: results.length,
+                      itemBuilder: (_, index) {
+                        final result = results[index];
+                        return ListTile(
+                          leading: SizedBox(
+                            width: 56,
+                            height: 64,
+                            child: CardMedia(
+                              cardId: result.cardId,
+                              thumbnail: true,
+                            ),
+                          ),
+                          title: Text(
+                            '${index + 1}. ${cardName(result.cardId)}',
+                          ),
+                          subtitle: Text(
+                            '${result.rarity.label} · ${result.finish.label}',
+                          ),
+                          trailing: const Icon(Icons.chevron_right),
+                          onTap: () => _revealPack(result, collectionId),
+                        );
+                      },
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: FilledButton(
+                      onPressed: () => Navigator.pop(sheetContext),
+                      child: const Text('A LA COLECCIÓN'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _openingPack = false);
+    }
   }
 
   Widget packs() => ListView(
@@ -1273,6 +1377,40 @@ class _RinconHomeState extends State<RinconHome>
               ? '¡Brillando tu sorpresa…!'
               : 'Abrir sobre · ${s.packPrice} monedas',
         ),
+      ),
+      const SizedBox(height: 10),
+      FilledButton.tonalIcon(
+        key: const ValueKey('open-ten-packs'),
+        onPressed: _openingPack || s.coins < s.tenPackPrice
+            ? null
+            : () => _openPack(ten: true),
+        icon: const Icon(Icons.style_rounded),
+        label: Text('Abrir 10 sobres · ${s.tenPackPrice} monedas'),
+      ),
+      const SizedBox(height: 6),
+      const Text(
+        '10 cartas del volumen elegido · precios progresivos habituales',
+        textAlign: TextAlign.center,
+        style: TextStyle(fontSize: 12),
+      ),
+      const SizedBox(height: 16),
+      FilledButton.icon(
+        key: const ValueKey('open-celestial-pack'),
+        style: FilledButton.styleFrom(
+          backgroundColor: const Color(0xff422b80),
+          foregroundColor: const Color(0xffd7fff5),
+        ),
+        onPressed: _openingPack || s.coins < GameStore.celestialPackPrice
+            ? null
+            : () => _openPack(celestial: true),
+        icon: const Icon(Icons.auto_awesome),
+        label: const Text('Sobre celestial · 5.000 monedas'),
+      ),
+      const SizedBox(height: 6),
+      const Text(
+        '1 celestial garantizada del volumen elegido. Puede repetirse.\nNo cambia el precio diario ni la garantía legendaria de los sobres normales.',
+        textAlign: TextAlign.center,
+        style: TextStyle(fontSize: 12, height: 1.5),
       ),
       const SizedBox(height: 16),
       Text(
@@ -4642,6 +4780,7 @@ class _FinishChip extends StatelessWidget {
 
 class CardRevealDialog extends StatefulWidget {
   final int cardId, copies, total;
+  final int? queuePosition, queueCount;
   final CatKind opener;
   final CardRarity rarity;
   final CardFinish finish;
@@ -4651,6 +4790,8 @@ class CardRevealDialog extends StatefulWidget {
     required this.cardId,
     required this.copies,
     required this.total,
+    this.queuePosition,
+    this.queueCount,
     required this.opener,
     required this.rarity,
     this.finish = CardFinish.normal,
@@ -4720,6 +4861,8 @@ class _CardRevealDialogState extends State<CardRevealDialog>
         cardId: cardId,
         copies: copies,
         collectionId: widget.collectionId,
+        queuePosition: widget.queuePosition,
+        queueCount: widget.queueCount,
       );
     }
     final bonus = total == 6 || total == 9;
@@ -5002,8 +5145,10 @@ class _CardRevealDialogState extends State<CardRevealDialog>
                 ),
                 onPressed: () => Navigator.pop(context),
                 icon: const Icon(Icons.auto_awesome),
-                label: const Text(
-                  'A LA COLECCIÓN',
+                label: Text(
+                  widget.queuePosition == null
+                      ? 'A LA COLECCIÓN'
+                      : 'SIGUIENTE · ${widget.queuePosition}/${widget.queueCount}',
                   style: TextStyle(
                     fontWeight: FontWeight.w900,
                     letterSpacing: 1,

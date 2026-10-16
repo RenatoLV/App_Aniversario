@@ -28,6 +28,8 @@ class MzFieldGuide extends StatelessWidget {
         'Toca una carta y una casilla libre, o arrástrala al jardín. En pantallas pequeñas, confirma la casilla.',
         'Toca la hierba para recoger 25. El coste se paga al colocar; el contador de la carta indica su recarga. Desactiva las herramientas para recoger recursos.',
         'Pala: retira un gato sin devolver su coste. Atún: recoge una lata y toca un gato para su poder; Gatitos bomba explota solo. En pantallas pequeñas, confirma antes de usarlo.',
+        'Los invasores pueden dejar atún y, muy raramente, Pellizco, Puntero o Spray. Recógelos y abre Poderes para gastar sus cargas gratis (máximo tres de cada uno). Se conservan al suspender esta partida.',
+        'Cada invasor derrotado da 2 monedas para tus sobres. Primera victoria de una misión: 100 monedas; al repetirla: 25. Los avances se abonan con el guardado y al terminar, sin duplicar recompensas al reabrir.',
         'Conos y baldes absorben daño. Cada Roomba despeja su carril una vez. Pierdes si llega un invasor por un carril que ya gastó su Roomba; vence a toda la horda para ganar.',
         level.world.rule,
         switch (level.world) {

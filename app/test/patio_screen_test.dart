@@ -14,6 +14,7 @@ import 'package:nuestro_rincon/cat_bedroom.dart';
 import 'package:nuestro_rincon/football_game.dart';
 import 'package:nuestro_rincon/football_screen.dart';
 import 'package:nuestro_rincon/patio_screen.dart';
+import 'package:nuestro_rincon/patio_art.dart';
 import 'package:nuestro_rincon/patio_weather.dart';
 import 'package:nuestro_rincon/store.dart';
 
@@ -100,6 +101,55 @@ void main() {
     f.store.dispose();
   });
 
+  testWidgets(
+    'Clouds keep moving forward across the eight-second breeze loop',
+    (tester) async {
+      final f = await fixture();
+      await tester.pumpWidget(
+        MaterialApp(
+          home: PatioScreen(store: f.store, weather: f.weather),
+        ),
+      );
+      await tester.pump();
+      PatioBackdrop backdrop() =>
+          tester
+                  .widget<CustomPaint>(
+                    find.byWidgetPredicate(
+                      (w) => w is CustomPaint && w.painter is PatioBackdrop,
+                    ),
+                  )
+                  .painter
+              as PatioBackdrop;
+      await tester.pump(const Duration(milliseconds: 7900));
+      final before = backdrop();
+      await tester.pump(const Duration(milliseconds: 200));
+      final after = backdrop();
+      expect(after.phase, lessThan(before.phase));
+      expect(after.cloudPhase, greaterThan(before.cloudPhase));
+      expect(
+        PatioBackdrop.cloudX(1, after.cloudPhase) -
+            PatioBackdrop.cloudX(1, before.cloudPhase),
+        closeTo(.6, .001),
+      );
+      for (var i = 0; i < 6; i++) {
+        var last = PatioBackdrop.cloudX(i, 0);
+        for (var step = 1; step <= 1000; step++) {
+          final x = PatioBackdrop.cloudX(i, step / 1000);
+          if (x < last) {
+            expect(last - 37, greaterThan(400));
+            expect(x + 37, lessThan(0));
+          } else {
+            expect(x - last, closeTo(.48, .001));
+          }
+          last = x;
+        }
+      }
+      await tester.pumpWidget(const SizedBox());
+      f.weather.dispose();
+      f.store.dispose();
+    },
+  );
+
   for (final width in [320.0, 390.0]) {
     testWidgets(
       'Patio and touch football fit a $width phone and goals pay only once',
@@ -148,13 +198,13 @@ void main() {
         for (var n = 0; n < 60; n++) {
           await tester.pump(const Duration(milliseconds: 16));
         }
-        expect(f.store.coins, before + 30);
+        expect(f.store.coins, before + 40);
         expect(find.text('1 gol'), findsOneWidget);
         await capture(tester, 'goal-${width.toInt()}');
         for (var n = 0; n < 100; n++) {
           await tester.pump(const Duration(milliseconds: 16));
         }
-        expect(f.store.coins, before + 30);
+        expect(f.store.coins, before + 40);
         final cancelled = await tester.startGesture(at(FootballGame.origin));
         await tester.pump(const Duration(milliseconds: 60));
         tester.binding.handleAppLifecycleStateChanged(
@@ -168,7 +218,7 @@ void main() {
         for (var n = 0; n < 60; n++) {
           await tester.pump(const Duration(milliseconds: 16));
         }
-        expect(f.store.coins, before + 30);
+        expect(f.store.coins, before + 40);
         expect(tester.takeException(), isNull);
         await tester.pumpWidget(const SizedBox());
         await f.store.save();

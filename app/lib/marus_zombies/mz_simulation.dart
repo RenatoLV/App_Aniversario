@@ -25,6 +25,7 @@ class MzSimulation {
   final invaders = <MzInvader>[];
   final projectiles = <MzProjectile>[];
   final pickups = <MzPickup>[];
+  final freePowers = List<int>.filled(MzPower.values.length, 0);
   final effects = <MzEffect>[];
   final warnings = <MzWarning>[];
   final tombs = <int, double>{};
@@ -132,13 +133,22 @@ class MzSimulation {
     if (paused || ended) return false;
     final found = pickups.where((p) => p.id == id).firstOrNull;
     if (found == null || (found.tuna && tuna >= 3)) return false;
-    if (found.tuna) {
+    if (found.power != null) {
+      final i = found.power!.index;
+      if (freePowers[i] >= 3) return false;
+      freePowers[i]++;
+      say('¡${found.power!.label} recogido! Úsalo gratis desde Poderes.');
+    } else if (found.tuna) {
       tuna++;
     } else {
       catnip += 25;
     }
     pickups.remove(found);
-    effect(found.row, found.x, 'collect');
+    effect(
+      found.row,
+      found.x,
+      found.power == null ? 'collect' : 'powerCollect',
+    );
     return true;
   }
 
@@ -325,6 +335,15 @@ class MzSimulation {
     }
     humanUntil = time + 15;
     _deaths();
+    return true;
+  }
+
+  bool useDroppedPower(MzPower power, int row, double x) {
+    if (freePowers[power.index] <= 0 || level.mode == MzMode.challenge) {
+      return false;
+    }
+    if (!human(power, row, x)) return false;
+    freePowers[power.index]--;
     return true;
   }
 
@@ -802,10 +821,27 @@ class MzSimulation {
     for (final e in invaders.where((e) => !e.alive).toList()) {
       kills++;
       effect(e.row, e.x, 'poof');
-      if (e.shiny) {
-        pickups.add(
-          MzPickup(nextId++, e.row, e.x.clamp(.2, 8.8), tuna: true, ttl: 18),
-        );
+      // Separate deterministic loot sampling: never consumes combat RNG.
+      final hash = (level.seed ^ (kills * 104729)) & 0x7fffffff;
+      final roll = ((hash * 1664525 + 1013904223) & 0x7fffffff) % 200;
+      if (e.shiny ||
+          (roll < 9 &&
+              pickups.where((p) => p.tuna || p.power != null).length < 16)) {
+        if (e.shiny || roll < 6) {
+          pickups.add(
+            MzPickup(nextId++, e.row, e.x.clamp(.2, 8.8), tuna: true, ttl: 18),
+          );
+        } else if (level.mode != MzMode.challenge) {
+          pickups.add(
+            MzPickup(
+              nextId++,
+              e.row,
+              e.x.clamp(.2, 8.8),
+              power: MzPower.values[roll - 6],
+              ttl: 18,
+            ),
+          );
+        }
       }
       if (e.captive != null) {
         final d = captives.where((d) => d.id == e.captive).firstOrNull;
@@ -851,7 +887,9 @@ class MzSimulation {
     e.special = e.kind == MzEnemy.boss ? 8 : 12;
     switch (e.kind) {
       case MzEnemy.thief:
-        final p = pickups.where((p) => !p.tuna && p.row == e.row).firstOrNull;
+        final p = pickups
+            .where((p) => !p.tuna && p.power == null && p.row == e.row)
+            .firstOrNull;
         if (p != null) {
           pickups.remove(p);
           effect(e.row, e.x, 'collect');
@@ -956,6 +994,7 @@ class MzSimulation {
     'id': nextId,
     'catnip': catnip,
     'tuna': tuna,
+    'freePowers': [...freePowers],
     'spawn': spawnIndex,
     'sky': sky,
     'worldTimer': worldTimer,
@@ -1005,6 +1044,14 @@ class MzSimulation {
     sim.nextId = j['id'] as int;
     sim.catnip = j['catnip'] as int;
     sim.tuna = j['tuna'] as int;
+    final savedPowers = (j['freePowers'] as List?) ?? const [];
+    for (
+      var i = 0;
+      i < math.min(savedPowers.length, sim.freePowers.length);
+      i++
+    ) {
+      sim.freePowers[i] = (savedPowers[i] as int).clamp(0, 3);
+    }
     sim.spawnIndex = j['spawn'] as int;
     sim.sky = mzNum(j, 'sky');
     sim.worldTimer = mzNum(j, 'worldTimer');

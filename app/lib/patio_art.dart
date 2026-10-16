@@ -72,6 +72,25 @@ class PatioDoorPainter extends CustomPainter {
       4,
       Paint()..color = const Color(0xfff6d489),
     );
+    // The threshold meets the wall/floor seam instead of floating above it.
+    c.drawRect(
+      const Rect.fromLTWH(0, 115, 80, 5),
+      Paint()..color = const Color(0xffad8357),
+    );
+    c.drawLine(
+      const Offset(3, 116),
+      const Offset(77, 116),
+      Paint()
+        ..color = const Color(0xfff1d2a1)
+        ..strokeWidth = 1.5,
+    );
+    c.drawLine(
+      const Offset(0, 120),
+      const Offset(80, 120),
+      Paint()
+        ..color = const Color(0x66312424)
+        ..strokeWidth = 2,
+    );
     c.restore();
   }
 
@@ -84,12 +103,18 @@ class PatioBackdrop extends CustomPainter {
     required this.light,
     this.conditions,
     this.phase = 0,
+    this.cloudPhase = 0,
     this.field = false,
     super.repaint,
   });
   final HouseLight light;
   final PatioConditions? conditions;
   final double phase;
+  final double cloudPhase;
+
+  /// Wrap only after the entire cloud has left the 400-unit-wide viewport.
+  static double cloudX(int index, double progress) =>
+      ((index * 103 + progress * 480) % 480) - 40;
   final bool field;
   @override
   void paint(Canvas c, Size size) {
@@ -160,7 +185,7 @@ class PatioBackdrop extends CustomPainter {
       Paint()..color = top.withValues(alpha: light.night),
     );
     for (var i = 0; i < (cloudy ? 6 : 3); i++) {
-      final x = ((i * 103 + phase * 22) % 470) - 30;
+      final x = cloudX(i, cloudPhase);
       final y = 35 + (i * 27 % 67).toDouble();
       final paint = Paint()
         ..color = light
@@ -399,5 +424,6 @@ class PatioBackdrop extends CustomPainter {
       light != old.light ||
       conditions != old.conditions ||
       phase != old.phase ||
+      cloudPhase != old.cloudPhase ||
       field != old.field;
 }

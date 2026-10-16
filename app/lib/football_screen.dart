@@ -31,22 +31,28 @@ class _FootballScreenState extends State<FootballScreen>
   late final FootballGame game;
   late final Ticker ticker;
   late final AnimationController breeze;
+  late final AnimationController clouds;
   late final String session;
   Duration _last = Duration.zero, _downAt = Duration.zero;
   int? _pointer;
   Offset _start = Offset.zero, _end = Offset.zero;
   CatKind keeper = CatKind.maru;
-  bool _paused = false;
+  bool _manualPaused = false, _backgrounded = false;
+  bool get _paused => _manualPaused || _backgrounded;
+  bool _wasReady = true;
   String _message = 'Desliza el balón hacia la portería';
   @override
   void initState() {
     super.initState();
-    session =
-        '${DateTime.now().microsecondsSinceEpoch}:${math.Random().nextInt(1 << 32)}';
-    game = FootballGame(onResult: _result);
+    session = FootballGame.newSessionId();
+    game = FootballGame(onResult: _result)..addListener(_readyChanged);
     breeze = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 8),
+    )..repeat();
+    clouds = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 160),
     )..repeat();
     ticker = createTicker((elapsed) {
       final dt = _last == Duration.zero
@@ -56,6 +62,35 @@ class _FootballScreenState extends State<FootballScreen>
       if (!_paused) game.tick(dt.clamp(0.0, .05));
     })..start();
     WidgetsBinding.instance.addObserver(this);
+  }
+
+  void _readyChanged() {
+    if (game.ready == _wasReady) return;
+    _wasReady = game.ready;
+    if (game.ready && mounted) {
+      setState(
+        () => _message = 'Desliza hacia una esquina · +40 monedas por gol',
+      );
+    }
+  }
+
+  void _syncPause() {
+    _last = Duration.zero;
+    _pointer = null;
+    game.cancelAim();
+    if (_paused || MediaQuery.disableAnimationsOf(context)) {
+      breeze.stop();
+      clouds.stop();
+    } else if (!breeze.isAnimating) {
+      breeze.repeat();
+      clouds.repeat();
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _syncPause();
   }
 
   void _result(FootballResult result, int streak, int attempt) {
@@ -71,7 +106,8 @@ class _FootballScreenState extends State<FootballScreen>
     if (mounted) {
       setState(
         () => _message = switch (result) {
-          FootballResult.goal => '¡Gol! +30 monedas',
+          FootballResult.goal =>
+            '¡Gol! +${GameStore.footballGoalCoins} monedas',
           FootballResult.save =>
             '¡${keeper == CatKind.maru ? 'Maru' : 'Lady'} atajó! Intenta a una esquina',
           FootballResult.weak => 'Un poco más de fuerza en el próximo tiro',
@@ -86,10 +122,9 @@ class _FootballScreenState extends State<FootballScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    _paused = state != AppLifecycleState.resumed;
-    _last = Duration.zero;
-    _pointer = null;
-    game.cancelAim();
+    _backgrounded = state != AppLifecycleState.resumed;
+    _syncPause();
+    if (mounted) setState(() {});
   }
 
   @override
@@ -97,6 +132,7 @@ class _FootballScreenState extends State<FootballScreen>
     WidgetsBinding.instance.removeObserver(this);
     ticker.dispose();
     breeze.dispose();
+    clouds.dispose();
     game.dispose();
     super.dispose();
   }
@@ -108,6 +144,17 @@ class _FootballScreenState extends State<FootballScreen>
       appBar: AppBar(
         title: const Text('Fútbol de patitas'),
         actions: [
+          IconButton(
+            key: const ValueKey('goal-pause'),
+            tooltip: _manualPaused ? 'Reanudar' : 'Pausar',
+            icon: Icon(
+              _manualPaused ? Icons.play_arrow_rounded : Icons.pause_rounded,
+            ),
+            onPressed: () {
+              setState(() => _manualPaused = !_manualPaused);
+              _syncPause();
+            },
+          ),
           AnimatedBuilder(
             animation: widget.store,
             builder: (context, _) => Center(
@@ -134,179 +181,205 @@ class _FootballScreenState extends State<FootballScreen>
         ],
       ),
       body: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: PatioWeatherBar(weather: widget.weather, light: light),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 18),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Text(
-                      '${game.goals} ${game.goals == 1 ? 'gol' : 'goles'}',
-                      key: const ValueKey('goal-score'),
-                      style: const TextStyle(
-                        fontSize: 21,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    flex: 2,
-                    child: Text(
-                      'Racha: ${game.streak} · Récord: ${widget.store.footballBestStreak}',
-                      textAlign: TextAlign.right,
-                      maxLines: 2,
-                      style: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ],
+        child: LayoutBuilder(
+          builder: (context, bounds) {
+            final panels = <Widget>[
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: PatioWeatherBar(weather: widget.weather, light: light),
               ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 6),
-              child: Wrap(
-                alignment: WrapAlignment.center,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  const Text('Portero: ', style: TextStyle(fontSize: 12)),
-                  for (final cat in CatKind.values)
-                    Padding(
-                      padding: const EdgeInsets.only(right: 6),
-                      child: ChoiceChip(
-                        key: ValueKey('goal-keeper-${cat.name}'),
-                        label: Text(cat == CatKind.maru ? 'Maru' : 'Lady'),
-                        selected: keeper == cat,
-                        onSelected: (_) {
-                          if (game.ready && _pointer == null) {
-                            setState(() => keeper = cat);
-                          }
-                        },
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 18),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        '${game.goals} ${game.goals == 1 ? 'gol' : 'goles'}',
+                        key: const ValueKey('goal-score'),
+                        style: const TextStyle(
+                          fontSize: 21,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
                     ),
-                ],
+                    const SizedBox(width: 8),
+                    Expanded(
+                      flex: 2,
+                      child: Text(
+                        'Racha: ${game.streak} · Récord: ${widget.store.footballBestStreak}',
+                        textAlign: TextAlign.right,
+                        maxLines: 2,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            Expanded(
-              child: LayoutBuilder(
-                builder: (context, bounds) {
-                  final width = math.min(
-                    bounds.maxWidth - 24,
-                    bounds.maxHeight * FootballGame.width / FootballGame.height,
-                  );
-                  final height =
-                      width * FootballGame.height / FootballGame.width;
-                  Offset position(Offset local) => Offset(
-                    local.dx * FootballGame.width / width,
-                    local.dy * FootballGame.height / height,
-                  );
-                  return Center(
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(24),
-                      child: SizedBox(
-                        width: width,
-                        height: height,
-                        child: Semantics(
-                          label:
-                              'Balón de fútbol: toca el balón, desliza hacia la portería y suelta para tirar',
-                          child: Listener(
-                            key: const ValueKey('goal-field'),
-                            behavior: HitTestBehavior.opaque,
-                            onPointerDown: (event) {
-                              if (_paused ||
-                                  _pointer != null ||
-                                  !game.ready ||
-                                  (position(event.localPosition) - game.ball)
-                                          .distance >
-                                      math.max(
-                                        FootballGame.radius + 12,
-                                        26 * FootballGame.width / width,
-                                      )) {
-                                return;
-                              }
-                              _pointer = event.pointer;
-                              _start = _end = position(event.localPosition);
-                              _downAt = event.timeStamp;
-                              game.point(_end);
-                            },
-                            onPointerMove: (event) {
-                              if (_pointer != event.pointer) return;
-                              _end = position(event.localPosition);
-                              game.point(_end);
-                            },
-                            onPointerCancel: (event) {
-                              if (_pointer == event.pointer) {
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: Wrap(
+                  alignment: WrapAlignment.center,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    const Text('Portero: ', style: TextStyle(fontSize: 12)),
+                    for (final cat in CatKind.values)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 6),
+                        child: ChoiceChip(
+                          key: ValueKey('goal-keeper-${cat.name}'),
+                          label: Text(cat == CatKind.maru ? 'Maru' : 'Lady'),
+                          selected: keeper == cat,
+                          onSelected: (_) {
+                            if (game.ready && _pointer == null) {
+                              setState(() => keeper = cat);
+                            }
+                          },
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: LayoutBuilder(
+                  builder: (context, bounds) {
+                    final width = math.min(
+                      bounds.maxWidth - 24,
+                      bounds.maxHeight *
+                          FootballGame.width /
+                          FootballGame.height,
+                    );
+                    final height =
+                        width * FootballGame.height / FootballGame.width;
+                    Offset position(Offset local) => Offset(
+                      local.dx * FootballGame.width / width,
+                      local.dy * FootballGame.height / height,
+                    );
+                    return Center(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(24),
+                        child: SizedBox(
+                          width: width,
+                          height: height,
+                          child: Semantics(
+                            label:
+                                'Balón de fútbol: toca el balón, desliza hacia la portería y suelta para tirar',
+                            child: Listener(
+                              key: const ValueKey('goal-field'),
+                              behavior: HitTestBehavior.opaque,
+                              onPointerDown: (event) {
+                                if (_paused ||
+                                    _pointer != null ||
+                                    !game.ready ||
+                                    (position(event.localPosition) - game.ball)
+                                            .distance >
+                                        math.max(
+                                          FootballGame.radius + 12,
+                                          26 * FootballGame.width / width,
+                                        )) {
+                                  return;
+                                }
+                                _pointer = event.pointer;
+                                _start = _end = position(event.localPosition);
+                                _downAt = event.timeStamp;
+                                game.point(game.ball);
+                              },
+                              onPointerMove: (event) {
+                                if (_pointer != event.pointer) return;
+                                _end = position(event.localPosition);
+                                game.point(game.ball + _end - _start);
+                              },
+                              onPointerCancel: (event) {
+                                if (_pointer == event.pointer) {
+                                  _pointer = null;
+                                  game.cancelAim();
+                                }
+                              },
+                              onPointerUp: (event) {
+                                if (_pointer != event.pointer) return;
                                 _pointer = null;
-                                game.cancelAim();
-                              }
-                            },
-                            onPointerUp: (event) {
-                              if (_pointer != event.pointer) return;
-                              _pointer = null;
-                              if (_paused) {
-                                game.cancelAim();
-                                return;
-                              }
-                              _end = position(event.localPosition);
-                              if (game.shoot(
-                                _start,
-                                _end,
-                                (event.timeStamp - _downAt).inMicroseconds /
-                                    1000000,
-                              )) {
-                                GameAudio.instance.play(GameSfx.jump);
-                                setState(() => _message = '');
-                              }
-                            },
-                            child: RepaintBoundary(
-                              child: CustomPaint(
-                                painter: FootballPainter(
-                                  game: game,
-                                  light: light,
-                                  weather: widget.weather,
-                                  breeze: breeze,
-                                  keeper: keeper,
-                                  outfit: widget.store.catCare.outfit(keeper),
+                                if (_paused) {
+                                  game.cancelAim();
+                                  return;
+                                }
+                                _end = position(event.localPosition);
+                                if (game.shoot(
+                                  _start,
+                                  _end,
+                                  (event.timeStamp - _downAt).inMicroseconds /
+                                      1000000,
+                                )) {
+                                  GameAudio.instance.play(GameSfx.jump);
+                                  setState(() => _message = '');
+                                } else {
+                                  setState(
+                                    () => _message =
+                                        'Desliza hacia arriba y suelta para tirar',
+                                  );
+                                }
+                              },
+                              child: RepaintBoundary(
+                                child: CustomPaint(
+                                  painter: FootballPainter(
+                                    game: game,
+                                    light: light,
+                                    weather: widget.weather,
+                                    breeze: breeze,
+                                    clouds: clouds,
+                                    keeper: keeper,
+                                    outfit: widget.store.catCare.outfit(keeper),
+                                  ),
                                 ),
                               ),
                             ),
                           ),
                         ),
                       ),
-                    ),
-                  );
-                },
+                    );
+                  },
+                ),
               ),
-            ),
-            SizedBox(
-              height: 40,
-              child: Center(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Text(
-                    _message,
-                    maxLines: 2,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: game.result == FootballResult.goal
-                          ? const Color(0xff44865d)
-                          : const Color(0xff63776c),
+              SizedBox(
+                height: 40,
+                child: Center(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Text(
+                      _paused ? 'En pausa · toca ▶ para continuar' : _message,
+                      maxLines: 2,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: game.result == FootballResult.goal
+                            ? const Color(0xff44865d)
+                            : const Color(0xff63776c),
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
-          ],
+            ];
+            if (bounds.maxWidth > bounds.maxHeight && bounds.maxWidth >= 600) {
+              return Row(
+                children: [
+                  SizedBox(
+                    width: 220,
+                    child: SingleChildScrollView(
+                      child: Column(
+                        children: [panels[0], panels[1], panels[2], panels[4]],
+                      ),
+                    ),
+                  ),
+                  panels[3],
+                ],
+              );
+            }
+            return Column(children: panels);
+          },
         ),
       ),
     ),
@@ -319,13 +392,15 @@ class FootballPainter extends CustomPainter {
     required this.light,
     required this.weather,
     required this.breeze,
+    required this.clouds,
     required this.keeper,
     required this.outfit,
-  }) : super(repaint: Listenable.merge([game, weather, breeze]));
+  }) : super(repaint: Listenable.merge([game, weather, breeze, clouds]));
   final FootballGame game;
   final HouseLight light;
   final PatioWeather weather;
   final Animation<double> breeze;
+  final Animation<double> clouds;
   final CatKind keeper;
   final CatOutfit outfit;
   @override
@@ -334,6 +409,7 @@ class FootballPainter extends CustomPainter {
       light: light,
       conditions: weather.conditions,
       phase: breeze.value,
+      cloudPhase: clouds.value,
       field: true,
     ).paint(c, size);
     c.save();
@@ -394,10 +470,30 @@ class FootballPainter extends CustomPainter {
     c.restore();
     if (game.aim != null && (game.aim! - game.ball).distance > 5) {
       final delta = game.aim! - game.ball;
+      final power = game.aimPower;
+      final strength = Color.lerp(
+        const Color(0xffffd96f),
+        const Color(0xff94efb1),
+        power,
+      )!;
+      c.drawRRect(
+        RRect.fromRectAndRadius(
+          const Rect.fromLTWH(140, 551, 120, 9),
+          const Radius.circular(5),
+        ),
+        Paint()..color = const Color(0x66324135),
+      );
+      c.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromLTWH(140, 551, 120 * power, 9),
+          const Radius.circular(5),
+        ),
+        Paint()..color = strength,
+      );
       final length = math.min(delta.distance, 170.0);
       final dir = delta / delta.distance;
       final p = Paint()
-        ..color = const Color(0xfffcf3c5).withValues(alpha: .7)
+        ..color = strength.withValues(alpha: .9)
         ..strokeWidth = 3
         ..strokeCap = StrokeCap.round;
       for (var n = 28.0; n < length; n += 17) {

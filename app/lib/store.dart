@@ -131,6 +131,14 @@ class PocketNote {
   };
 }
 
+class PackResult {
+  final int cardId;
+  final CardRarity rarity;
+  final CardFinish finish;
+  final CatKind opener;
+  const PackResult(this.cardId, this.rarity, this.finish, this.opener);
+}
+
 class GameStore extends ChangeNotifier {
   final SharedPreferences prefs;
   late final CatCare catCare = CatCare(onChanged: save);
@@ -174,12 +182,23 @@ class GameStore extends ChangeNotifier {
   String? lastDiscountPackDay;
   int dailyPacksOpened = 0;
   int footballGoals = 0, footballBestStreak = 0;
+  int _mzCoinsClaimed = 0;
   Map<String, int> _footballClaims = {};
   String _packDay(DateTime now) => '${now.year}-${now.month}-${now.day}';
   int packPriceAt(DateTime now) => lastDiscountPackDay == _packDay(now)
       ? (20 + 5 * dailyPacksOpened).clamp(20, 70)
       : 20;
   int get packPrice => packPriceAt(DateTime.now());
+  static const celestialPackPrice = 5000;
+  int tenPackPriceAt(DateTime now) {
+    final opened = lastDiscountPackDay == _packDay(now) ? dailyPacksOpened : 0;
+    return List.generate(
+      10,
+      (i) => (20 + 5 * (opened + i)).clamp(20, 70),
+    ).fold(0, (sum, price) => sum + price);
+  }
+
+  int get tenPackPrice => tenPackPriceAt(DateTime.now());
   Map<String, int> cardVariants = {};
   Map<String, dynamic> _tradeReceipts = {};
   List<String> variantsFor(int id) =>
@@ -215,6 +234,7 @@ class GameStore extends ChangeNotifier {
       catCare.restore(j['catCare']);
       _dirtyNotes.addAll(List<String>.from(j['dirtyNotes'] ?? []));
       coins = j['coins'] as int;
+      _mzCoinsClaimed = (j['mzCoinsClaimed'] as int?) ?? 0;
       _wordleRewards.addAll(List<String>.from(j['wordleRewards'] ?? []));
       _gameRewards.addAll(List<String>.from(j['gameRewards'] ?? []));
       best = j['best'] as int;
@@ -513,6 +533,7 @@ class GameStore extends ChangeNotifier {
     packsSinceLegendary = restored.packsSinceLegendary;
     lastDiscountPackDay = restored.lastDiscountPackDay;
     dailyPacksOpened = restored.dailyPacksOpened;
+    _mzCoinsClaimed = restored._mzCoinsClaimed;
     footballGoals = restored.footballGoals;
     footballBestStreak = restored.footballBestStreak;
     _footballClaims = restored._footballClaims;
@@ -565,6 +586,7 @@ class GameStore extends ChangeNotifier {
   Future<void> save() {
     final snapshot = jsonEncode({
       'coins': coins,
+      'mzCoinsClaimed': _mzCoinsClaimed,
       'catCare': catCare.toJson(),
       'wordleRewards': _wordleRewards.toList(),
       'gameRewards': _gameRewards.toList(),
@@ -627,6 +649,17 @@ class GameStore extends ChangeNotifier {
     await save();
   }
 
+  /// Cumulative durable entitlement from Marus; repeated transfers pay no extra.
+  Future<void> rewardMarusCoins(int earned) async {
+    final delta = max(0, earned - _mzCoinsClaimed);
+    if (delta == 0 && saveError == null) return;
+    coins += delta;
+    _mzCoinsClaimed = max(_mzCoinsClaimed, earned);
+    await save();
+    if (saveError != null) throw StateError(saveError!);
+  }
+
+  static const footballGoalCoins = 40;
   Future<void> recordFootballGoal(String claimId, int streak) async {
     final separator = claimId.lastIndexOf(':');
     if (separator <= 0) return;
@@ -635,7 +668,7 @@ class GameStore extends ChangeNotifier {
     if (attempt == null || attempt <= (_footballClaims[session] ?? 0)) return;
     // One high-water mark per run, rather than an ever-growing ID per goal.
     _footballClaims[session] = attempt;
-    coins += 30;
+    coins += footballGoalCoins;
     footballGoals++;
     footballBestStreak = max(footballBestStreak, streak);
     await save();
@@ -656,6 +689,76 @@ class GameStore extends ChangeNotifier {
     required CatKind opener,
     String collectionId = anniversaryCollectionId,
     DateTime? now,
+  }) => _openPack(
+    random: random,
+    opener: opener,
+    collectionId: collectionId,
+    now: now,
+  );
+
+  List<PackResult> openTenPacks({
+    Random? random,
+    required CatKind opener,
+    String collectionId = anniversaryCollectionId,
+    DateTime? now,
+  }) {
+    final day = now ?? DateTime.now();
+    if (coins < tenPackPriceAt(day) ||
+        cardsForCollection(collectionId).isEmpty) {
+      return const [];
+    }
+    final generator = random ?? Random();
+    final results = <PackResult>[];
+    for (var i = 0; i < 10; i++) {
+      final cat = i.isEven
+          ? opener
+          : opener == CatKind.maru
+          ? CatKind.lady
+          : CatKind.maru;
+      final id = _openPack(
+        random: generator,
+        opener: cat,
+        collectionId: collectionId,
+        now: day,
+        persist: false,
+      )!;
+      results.add(PackResult(id, lastOpenedRarity, lastOpenedFinish, cat));
+    }
+    save();
+    return List.unmodifiable(results);
+  }
+
+  int? openCelestialPack({
+    Random? random,
+    required CatKind opener,
+    String collectionId = anniversaryCollectionId,
+  }) {
+    final pool = cardsForCollection(
+      collectionId,
+    ).where(isCelestialCard).toList();
+    if (coins < celestialPackPrice || pool.isEmpty) return null;
+    final generator = random ?? Random();
+    final id = pool[generator.nextInt(pool.length)];
+    final finishRoll = generator.nextInt(100);
+    lastOpenedRarity = CardRarity.celestial;
+    lastOpenedFinish = finishRoll < 5
+        ? CardFinish.gold
+        : finishRoll < 20
+        ? CardFinish.silver
+        : CardFinish.normal;
+    coins -= celestialPackPrice;
+    // This separate purchase preserves normal prices and their pity counter.
+    _addOpenedCard(id, opener, collectionId);
+    save();
+    return id;
+  }
+
+  int? _openPack({
+    Random? random,
+    required CatKind opener,
+    required String collectionId,
+    DateTime? now,
+    bool persist = true,
   }) {
     final day = now ?? DateTime.now();
     final price = packPriceAt(day);
@@ -693,8 +796,6 @@ class GameStore extends ChangeNotifier {
         : finishRoll < 20
         ? CardFinish.silver
         : CardFinish.normal;
-    final variant = '$id:${lastOpenedRarity.name}:${lastOpenedFinish.name}';
-    cardVariants[variant] = (cardVariants[variant] ?? 0) + 1;
     coins -= price;
     dailyPacksOpened =
         (lastDiscountPackDay == _packDay(day) ? dailyPacksOpened + 1 : 1).clamp(
@@ -702,6 +803,14 @@ class GameStore extends ChangeNotifier {
           10,
         );
     lastDiscountPackDay = _packDay(day);
+    _addOpenedCard(id, opener, collectionId);
+    if (persist) save();
+    return id;
+  }
+
+  void _addOpenedCard(int id, CatKind opener, String collectionId) {
+    final variant = '$id:${lastOpenedRarity.name}:${lastOpenedFinish.name}';
+    cardVariants[variant] = (cardVariants[variant] ?? 0) + 1;
     cards[id] = (cards[id] ?? 0) + 1;
     cardOpeners.putIfAbsent(id, () => opener.index);
     cardCollections.putIfAbsent(id, () => collectionId);
@@ -709,8 +818,6 @@ class GameStore extends ChangeNotifier {
         lastOpenedRarity.rank > rarities[id]!.rank) {
       rarities[id] = lastOpenedRarity;
     }
-    save();
-    return id;
   }
 
   void newGame() {

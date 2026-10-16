@@ -93,8 +93,8 @@ class GameplayProbe {
 
   void _collect() {
     for (final p in sim.pickups.toList()) {
-      if (!p.tuna && _resources.add(p.id)) generated += 25;
-      if (sim.collect(p.id) && !p.tuna) collected += 25;
+      if (!p.tuna && p.power == null && _resources.add(p.id)) generated += 25;
+      if (sim.collect(p.id) && !p.tuna && p.power == null) collected += 25;
     }
   }
 

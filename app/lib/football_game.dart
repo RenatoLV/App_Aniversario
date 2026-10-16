@@ -19,6 +19,16 @@ class FootballGame extends ChangeNotifier {
   FootballResult? result;
   final void Function(FootballResult, int, int)? onResult;
   FootballGame({this.onResult});
+
+  /// Web bitwise shifts are 32-bit; `1 << 32` becomes zero in JavaScript.
+  static String newSessionId({math.Random? random, DateTime? now}) {
+    final rng = random ?? math.Random();
+    return '${(now ?? DateTime.now()).microsecondsSinceEpoch}:'
+        '${rng.nextInt(1 << 30)}:${rng.nextInt(1 << 30)}';
+  }
+
+  double get aimPower =>
+      aim == null ? 0 : ((aim! - ball).distance / 300).clamp(0.0, 1.0);
   double get keeperSpeed => (100 + goals * 5).clamp(100, 170).toDouble();
   double get reactionDelay => (.24 - goals * .012).clamp(.12, .24);
   Rect get keeper =>
@@ -38,12 +48,21 @@ class FootballGame extends ChangeNotifier {
         !swipe.dx.isFinite ||
         !swipe.dy.isFinite ||
         !seconds.isFinite ||
+        seconds < 0 ||
+        swipe.dy >= -8 ||
         swipe.distance < 12) {
       notifyListeners();
       return false;
     }
-    var impulse = swipe / seconds.clamp(.06, 5) * 1.25;
-    if (impulse.distance > 1250) impulse = impulse / impulse.distance * 1250;
+    // Long deliberate drags remain useful without requiring a fast flick.
+    // Short, slow gestures still produce weak shots; direction is unchanged.
+    final speed = math
+        .max(
+          swipe.distance / seconds.clamp(.06, 5) * 1.25,
+          swipe.distance * 3.2,
+        )
+        .clamp(0.0, 1250.0);
+    final impulse = swipe / swipe.distance * speed;
     velocity = impulse;
     flying = true;
     attempts++;

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import '../game_audio.dart';
+import '../store.dart';
 import 'mz_catalog.dart';
 import 'mz_levels.dart';
 import 'mz_painter.dart';
@@ -21,9 +22,15 @@ import 'mz_world_transition.dart';
 import 'mz_field_guide.dart';
 
 class MzGameScreen extends StatefulWidget {
-  const MzGameScreen({super.key, required this.sim, required this.progress});
+  const MzGameScreen({
+    super.key,
+    required this.sim,
+    required this.progress,
+    this.store,
+  });
   final MzSimulation sim;
   final MzProgress progress;
+  final GameStore? store;
   @override
   State<MzGameScreen> createState() => _MzGameScreenState();
 }
@@ -76,7 +83,7 @@ class _MzGameScreenState extends State<MzGameScreen>
     if (selected != null) {
       return '${mzCats[selected]!.name}: toca una casilla libre.';
     }
-    return 'Arrastra un gato al césped o toca carta y casilla.';
+    return 'Arrastra un gato o toca carta y casilla. +${sim.kills * MzProgress.coinsPerKill} monedas por derrotas.';
   }
 
   @override
@@ -169,6 +176,15 @@ class _MzGameScreenState extends State<MzGameScreen>
     setState(() => saving = true);
     try {
       await widget.progress.checkpoint(sim, spent: spent);
+      try {
+        await widget.store?.rewardMarusCoins(widget.progress.coinsEarned);
+      } catch (e) {
+        // Combat and its debit are already committed. Do not roll them back
+        // merely because the separate wallet transfer needs to be retried.
+        sim.paused = true;
+        saveError = 'Monedas pendientes de abonar: $e';
+        return true;
+      }
       saveError = null;
       return true;
     } catch (e) {
@@ -186,7 +202,15 @@ class _MzGameScreenState extends State<MzGameScreen>
     try {
       receipt ??= MzResultReceipt(widget.progress, sim);
       await widget.progress.complete(sim);
+      await widget.store?.rewardMarusCoins(widget.progress.coinsEarned);
       receipt!.resolve(widget.progress, sim);
+      receipt!.coins =
+          sim.kills * MzProgress.coinsPerKill +
+          (sim.won
+              ? (receipt!.starsBefore == 0 && sim.level.mode == MzMode.campaign
+                    ? MzProgress.firstVictoryCoins
+                    : MzProgress.replayVictoryCoins)
+              : 0);
       completed = true;
       saveError = null;
       if (!sim.won || receipt!.newCards.isEmpty) {
@@ -349,7 +373,16 @@ class _MzGameScreenState extends State<MzGameScreen>
     if (saving || sim.paused || sim.ended) return;
     cursor = (row, col);
     if (tool == 'human' && power != null) {
-      unawaited(_paid(() => sim.human(power!, row, col + .5), power!.cost));
+      final p = power!;
+      final free = sim.freePowers[p.index] > 0;
+      unawaited(
+        _paid(
+          () => free
+              ? sim.useDroppedPower(p, row, col + .5)
+              : sim.human(p, row, col + .5),
+          free ? 0 : p.cost,
+        ),
+      );
       return;
     }
     if (tool == 'cart') {
@@ -415,12 +448,14 @@ class _MzGameScreenState extends State<MzGameScreen>
     if (p != null) {
       final center = g.point(p.row, p.x).translate(0, -g.ch * .14);
       if (sim.collect(p.id)) {
-        if (!p.tuna && sim.level.world == MzWorld.patio) {
+        if (!p.tuna && p.power == null && sim.level.world == MzWorld.patio) {
           GameAudio.instance.playCombat([GameSfx.marusHarvest]);
         } else {
           GameAudio.instance.play(GameSfx.coin);
         }
-        if (!p.tuna && !widget.progress.reducedMotion) _fly(center);
+        if (!p.tuna && p.power == null && !widget.progress.reducedMotion) {
+          _fly(center);
+        }
       }
       setState(() {});
       return;
@@ -779,14 +814,18 @@ class _MzGameScreenState extends State<MzGameScreen>
                                         sim.level.mode != MzMode.challenge) ...[
                                       for (final p in MzPower.values)
                                         _tool(
-                                          '${p.label} ${p.cost}',
+                                          sim.freePowers[p.index] > 0
+                                              ? '${p.label} ×${sim.freePowers[p.index]} · Gratis'
+                                              : '${p.label} ${p.cost}',
                                           p == MzPower.spray
                                               ? Icons.water_drop_outlined
                                               : p == MzPower.pointer
                                               ? Icons.ads_click
                                               : Icons.back_hand_outlined,
                                           power == p && tool == 'human',
-                                          widget.progress.cookies >= p.cost &&
+                                          (sim.freePowers[p.index] > 0 ||
+                                                      widget.progress.cookies >=
+                                                          p.cost) &&
                                                   sim.time >= sim.humanUntil
                                               ? () => _chooseTool('human', p)
                                               : null,

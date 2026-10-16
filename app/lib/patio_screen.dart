@@ -20,9 +20,10 @@ class PatioScreen extends StatefulWidget {
 }
 
 class _PatioScreenState extends State<PatioScreen>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late final PatioWeather weather;
   late final AnimationController breeze;
+  late final AnimationController clouds;
   bool _opening = false;
   @override
   void initState() {
@@ -32,6 +33,10 @@ class _PatioScreenState extends State<PatioScreen>
     breeze = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 8),
+    )..repeat();
+    clouds = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 160),
     )..repeat();
     unawaited(_wakeCats());
   }
@@ -44,6 +49,16 @@ class _PatioScreenState extends State<PatioScreen>
           widget.store.catCare.bedroom(cat).copyWith(lamp: true),
         );
       }
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (MediaQuery.disableAnimationsOf(context)) {
+      clouds.stop();
+    } else if (!clouds.isAnimating) {
+      clouds.repeat();
     }
   }
 
@@ -84,6 +99,7 @@ class _PatioScreenState extends State<PatioScreen>
   @override
   void dispose() {
     breeze.dispose();
+    clouds.dispose();
     if (widget.weather == null) weather.dispose();
     super.dispose();
   }
@@ -128,12 +144,17 @@ class _PatioScreenState extends State<PatioScreen>
                         Positioned.fill(
                           child: RepaintBoundary(
                             child: AnimatedBuilder(
-                              animation: Listenable.merge([breeze, weather]),
+                              animation: Listenable.merge([
+                                breeze,
+                                clouds,
+                                weather,
+                              ]),
                               builder: (context, _) => CustomPaint(
                                 painter: PatioBackdrop(
                                   light: light,
                                   conditions: weather.conditions,
                                   phase: breeze.value,
+                                  cloudPhase: clouds.value,
                                 ),
                               ),
                             ),
@@ -232,7 +253,7 @@ class _PatioScreenState extends State<PatioScreen>
                             ),
                             SizedBox(height: 5),
                             Text(
-                              'Desliza el balón y supera a Maru o Lady.\nCada gol: +30 monedas.',
+                              'Desliza el balón y supera a Maru o Lady.\nCada gol: +40 monedas.',
                               style: TextStyle(fontSize: 12),
                             ),
                           ],

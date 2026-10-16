@@ -51,6 +51,7 @@ class _MarusZombiesScreenState extends State<MarusZombiesScreen> {
   }
 
   Future<void> _rewardWorlds() async {
+    await widget.store.rewardMarusCoins(progress.coinsEarned);
     for (final w in progress.pendingWorlds.toList()) {
       await widget.store.rewardGameCoins(
         'mz:world:$w:first-clear',
@@ -80,7 +81,8 @@ class _MarusZombiesScreenState extends State<MarusZombiesScreen> {
       await Navigator.of(context).push(
         MaterialPageRoute<void>(
           settings: const RouteSettings(name: '/marus-zombies/play'),
-          builder: (_) => MzGameScreen(sim: sim, progress: progress),
+          builder: (_) =>
+              MzGameScreen(sim: sim, progress: progress, store: widget.store),
         ),
       );
       await _rewardWorlds();

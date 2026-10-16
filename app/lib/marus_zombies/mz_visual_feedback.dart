@@ -230,6 +230,7 @@ class MzVisualFeedback {
           for (final p in sim.pickups.where(
             (p) =>
                 !p.tuna &&
+                p.power == null &&
                 !_beforeResources!.contains(p.id) &&
                 p.row == d.row &&
                 p.x >= d.col + .1 &&

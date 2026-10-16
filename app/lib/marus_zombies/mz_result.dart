@@ -17,6 +17,7 @@ class MzResultReceipt {
   final int cookiesBefore, mintsBefore, highestBefore, starsBefore;
   final Set<MzCat> catsBefore;
   int cookies = 0, mints = 0, starsAdded = 0, highestAfter = 0;
+  int coins = 0;
   List<MzCat> newCards = [];
   void resolve(MzProgress p, MzSimulation s) {
     cookies = math.max(0, p.cookies - cookiesBefore);
@@ -248,6 +249,12 @@ class _MzResultPanelState extends State<MzResultPanel>
                                         spacing: 8,
                                         runSpacing: 8,
                                         children: [
+                                          if (r.coins > 0)
+                                            _reward(
+                                              Icons.monetization_on_rounded,
+                                              '+${r.coins}',
+                                              'Monedas',
+                                            ),
                                           if (r.cookies > 0)
                                             _reward(
                                               Icons.cookie_rounded,
@@ -270,6 +277,7 @@ class _MzResultPanelState extends State<MzResultPanel>
                                         ],
                                       ),
                                       if (r.cookies == 0 &&
+                                          r.coins == 0 &&
                                           r.mints == 0 &&
                                           r.starsAdded == 0)
                                         const Text(
