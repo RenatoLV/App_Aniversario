@@ -1,0 +1,396 @@
+{
+  "reference25": {
+    "catalogVersion": "lucky777.catalog.v1",
+    "rulesVersion": "lucky777.rules.candidate.v1",
+    "lineStake": 5,
+    "maxBonusSpins": 50,
+    "reels": [
+      [
+        "yarn",
+        "fish",
+        "bell",
+        "yarn",
+        "churu",
+        "maru",
+        "fish",
+        "yarn",
+        "wild",
+        "bell",
+        "churu",
+        "fish",
+        "lady",
+        "yarn",
+        "scatter",
+        "seven"
+      ],
+      [
+        "fish",
+        "yarn",
+        "churu",
+        "lady",
+        "yarn",
+        "bell",
+        "scatter",
+        "fish",
+        "yarn",
+        "seven",
+        "churu",
+        "fish",
+        "wild",
+        "yarn",
+        "maru",
+        "bell"
+      ],
+      [
+        "bell",
+        "yarn",
+        "fish",
+        "scatter",
+        "churu",
+        "yarn",
+        "maru",
+        "fish",
+        "wild",
+        "yarn",
+        "bell",
+        "lady",
+        "churu",
+        "fish",
+        "yarn",
+        "seven"
+      ],
+      [
+        "yarn",
+        "lady",
+        "fish",
+        "bell",
+        "churu",
+        "yarn",
+        "wild",
+        "fish",
+        "yarn",
+        "scatter",
+        "bell",
+        "churu",
+        "maru",
+        "yarn",
+        "fish",
+        "seven"
+      ],
+      [
+        "fish",
+        "yarn",
+        "maru",
+        "churu",
+        "bell",
+        "yarn",
+        "fish",
+        "seven",
+        "yarn",
+        "lady",
+        "scatter",
+        "churu",
+        "yarn",
+        "fish",
+        "bell",
+        "wild"
+      ]
+    ],
+    "lines": [
+      {
+        "id": "superior",
+        "rows": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "id": "central",
+        "rows": [
+          1,
+          1,
+          1,
+          1,
+          1
+        ]
+      },
+      {
+        "id": "inferior",
+        "rows": [
+          2,
+          2,
+          2,
+          2,
+          2
+        ]
+      },
+      {
+        "id": "v",
+        "rows": [
+          0,
+          1,
+          2,
+          1,
+          0
+        ]
+      },
+      {
+        "id": "v-invertida",
+        "rows": [
+          2,
+          1,
+          0,
+          1,
+          2
+        ]
+      }
+    ],
+    "payouts": {
+      "yarn": {
+        "3": 4,
+        "4": 12,
+        "5": 40
+      },
+      "fish": {
+        "3": 4,
+        "4": 12,
+        "5": 40
+      },
+      "churu": {
+        "3": 6,
+        "4": 20,
+        "5": 64
+      },
+      "bell": {
+        "3": 8,
+        "4": 28,
+        "5": 80
+      },
+      "maru": {
+        "3": 12,
+        "4": 40,
+        "5": 120
+      },
+      "lady": {
+        "3": 12,
+        "4": 40,
+        "5": 120
+      },
+      "seven": {
+        "3": 20,
+        "4": 80,
+        "5": 320
+      },
+      "wild": {
+        "3": 24,
+        "4": 120,
+        "5": 600
+      }
+    },
+    "scatterAwards": {
+      "3": 5,
+      "4": 8,
+      "5": 12
+    }
+  },
+  "scaled10": {
+    "catalogVersion": "lucky777.catalog.v1",
+    "rulesVersion": "lucky777.rules.audit.stake10.v1",
+    "lineStake": 2,
+    "maxBonusSpins": 50,
+    "reels": [
+      [
+        "yarn",
+        "fish",
+        "bell",
+        "yarn",
+        "churu",
+        "maru",
+        "fish",
+        "yarn",
+        "wild",
+        "bell",
+        "churu",
+        "fish",
+        "lady",
+        "yarn",
+        "scatter",
+        "seven"
+      ],
+      [
+        "fish",
+        "yarn",
+        "churu",
+        "lady",
+        "yarn",
+        "bell",
+        "scatter",
+        "fish",
+        "yarn",
+        "seven",
+        "churu",
+        "fish",
+        "wild",
+        "yarn",
+        "maru",
+        "bell"
+      ],
+      [
+        "bell",
+        "yarn",
+        "fish",
+        "scatter",
+        "churu",
+        "yarn",
+        "maru",
+        "fish",
+        "wild",
+        "yarn",
+        "bell",
+        "lady",
+        "churu",
+        "fish",
+        "yarn",
+        "seven"
+      ],
+      [
+        "yarn",
+        "lady",
+        "fish",
+        "bell",
+        "churu",
+        "yarn",
+        "wild",
+        "fish",
+        "yarn",
+        "scatter",
+        "bell",
+        "churu",
+        "maru",
+        "yarn",
+        "fish",
+        "seven"
+      ],
+      [
+        "fish",
+        "yarn",
+        "maru",
+        "churu",
+        "bell",
+        "yarn",
+        "fish",
+        "seven",
+        "yarn",
+        "lady",
+        "scatter",
+        "churu",
+        "yarn",
+        "fish",
+        "bell",
+        "wild"
+      ]
+    ],
+    "lines": [
+      {
+        "id": "superior",
+        "rows": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "id": "central",
+        "rows": [
+          1,
+          1,
+          1,
+          1,
+          1
+        ]
+      },
+      {
+        "id": "inferior",
+        "rows": [
+          2,
+          2,
+          2,
+          2,
+          2
+        ]
+      },
+      {
+        "id": "v",
+        "rows": [
+          0,
+          1,
+          2,
+          1,
+          0
+        ]
+      },
+      {
+        "id": "v-invertida",
+        "rows": [
+          2,
+          1,
+          0,
+          1,
+          2
+        ]
+      }
+    ],
+    "payouts": {
+      "yarn": {
+        "3": 4,
+        "4": 12,
+        "5": 40
+      },
+      "fish": {
+        "3": 4,
+        "4": 12,
+        "5": 40
+      },
+      "churu": {
+        "3": 6,
+        "4": 20,
+        "5": 64
+      },
+      "bell": {
+        "3": 8,
+        "4": 28,
+        "5": 80
+      },
+      "maru": {
+        "3": 12,
+        "4": 40,
+        "5": 120
+      },
+      "lady": {
+        "3": 12,
+        "4": 40,
+        "5": 120
+      },
+      "seven": {
+        "3": 20,
+        "4": 80,
+        "5": 320
+      },
+      "wild": {
+        "3": 24,
+        "4": 120,
+        "5": 600
+      }
+    },
+    "scatterAwards": {
+      "3": 5,
+      "4": 8,
+      "5": 12
+    }
+  }
+}

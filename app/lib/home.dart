@@ -38,6 +38,7 @@ import 'cat_care_screen.dart';
 import 'card_media.dart';
 import 'celestial_reveal.dart';
 import 'bomber/bomber_screen.dart';
+import 'lucky_palace/lucky_palace_screen.dart';
 
 const ink = Color(0xff293f39),
     cream = Color(0xfffaf6ee),
@@ -412,6 +413,8 @@ class _RinconHomeState extends State<RinconHome>
                 ? '/patio'
                 : screen is BomberScreen
                 ? '/bomber'
+                : screen is LuckyPalaceScreen
+                ? '/lucky-palace'
                 : '/blocks',
           ),
           builder: (_) => screen,
@@ -949,6 +952,19 @@ class _RinconHomeState extends State<RinconHome>
         colors: const [Color(0xff345e68), Color(0xff6c78a8)],
         accent: const Color(0xffffd989),
         onTap: () => _play(BomberScreen(store: s)),
+      ),
+      const SizedBox(height: 24),
+      _gameSpotlight(
+        gameId: 'lucky-palace',
+        showLeaderboard: false,
+        eyebrow: 'EL CASINO DE MARU Y LADY',
+        title: 'Lucky Palace',
+        description:
+            'Gira los rodillos, consigue giros gratis y juega con fichas del casino.',
+        icon: Icons.auto_awesome_rounded,
+        colors: const [Color(0xff452047), Color(0xff86254f)],
+        accent: const Color(0xffffe6a0),
+        onTap: () => _play(const LuckyPalaceScreen()),
       ),
       const SizedBox(height: 24),
       Wrap(

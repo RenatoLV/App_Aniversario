@@ -12,6 +12,10 @@ firebase-debug.log
 !.env.example
 config.local.json
 app/config.local.json
+# Local design/audit drafts. The casino concept scope is recorded in its commit.
+/GUIA_COMPLETA_DEL_PROYECTO.md
+/app/LUCKY_PALACE*.md
+/app/assets/lucky_palace/**/*.md
 supabase/activation.local.txt
 supabase/seed.local.sql
 supabase/deploy.local.sql

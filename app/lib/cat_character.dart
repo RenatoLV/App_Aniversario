@@ -260,12 +260,14 @@ class _CatActorState extends State<CatActor> with TickerProviderStateMixin {
 /// Shared anatomy for games: preserves Maru's stripes and Lady's patches.
 abstract class CatPainter extends CustomPainter {
   final double phase, blink, joy;
+  final bool showWorkingPaw;
   final CatOutfit outfit;
   final double cleanliness;
   const CatPainter({
     this.phase = 0,
     this.blink = 0,
     this.joy = 0,
+    this.showWorkingPaw = true,
     this.outfit = const CatOutfit(),
     this.cleanliness = 100,
   });
@@ -289,6 +291,7 @@ abstract class CatPainter extends CustomPainter {
     packProgress: 0,
     showShadow: false,
     forcedBlink: blink > .35,
+    hideWorkingPaw: !showWorkingPaw,
   ).paint(canvas, size);
   @override
   bool shouldRepaint(covariant CatPainter old) =>
@@ -297,7 +300,8 @@ abstract class CatPainter extends CustomPainter {
       old.cleanliness != cleanliness ||
       old.phase != phase ||
       old.blink != blink ||
-      old.joy != joy;
+      old.joy != joy ||
+      old.showWorkingPaw != showWorkingPaw;
 }
 
 class MaruPainter extends CatPainter {
@@ -305,6 +309,7 @@ class MaruPainter extends CatPainter {
     super.phase,
     super.blink,
     super.joy,
+    super.showWorkingPaw,
     super.outfit,
     super.cleanliness,
   });
@@ -317,6 +322,7 @@ class LadyPainter extends CatPainter {
     super.phase,
     super.blink,
     super.joy,
+    super.showWorkingPaw,
     super.outfit,
     super.cleanliness,
   });

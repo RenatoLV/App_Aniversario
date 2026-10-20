@@ -1,0 +1,153 @@
+{
+  "package": "anivermaru_lucky_palace_scratch_assets",
+  "version": "1.0.0",
+  "illustrationPolicy": "No rasterizar ni reemplazar MaruPainter/LadyPainter; estos fondos incluyen espacios para su arte original.",
+  "format": "SVG vector source plus transparent PNG renders",
+  "ticketCanvas": {
+    "width": 640,
+    "height": 960
+  },
+  "layers": "Background opaque; reveal_board at (77,420) 486x342; symbols dynamically into nine cells; foil at (77,420) 486x342; frame topmost; Maru/Lady painters between background and frame.",
+  "anchors": {
+    "maru": {
+      "rect": [
+        81,
+        198,
+        196,
+        190
+      ]
+    },
+    "lady": {
+      "rect": [
+        369,
+        198,
+        196,
+        190
+      ]
+    },
+    "scratchArea": {
+      "rect": [
+        77,
+        420,
+        486,
+        342
+      ]
+    },
+    "title": {
+      "rect": [
+        106,
+        83,
+        428,
+        74
+      ]
+    },
+    "caption": {
+      "rect": [
+        104,
+        826,
+        432,
+        78
+      ]
+    }
+  },
+  "rules": [
+    "Graphics do not contain results/monetary amounts.",
+    "No predetermined scratched-stage images: dynamically erase foil using Clip+Canvas / alpha mask.",
+    "Do not promote offline receipts to verified currency.",
+    "All scratch results determined and committed before reveal."
+  ],
+  "themes": {
+    "patita_suerte": {
+      "title": "Patita de la Suerte",
+      "subtitle": "Un toque de fortuna",
+      "accent": "#FFD67A",
+      "files": {
+        "background": "tickets/patita_suerte/background.png",
+        "frame": "tickets/patita_suerte/frame.png",
+        "reveal_board": "tickets/patita_suerte/reveal_board.png",
+        "foil": "tickets/patita_suerte/foil.png"
+      }
+    },
+    "tesoros_maru": {
+      "title": "Tesoros de Maru",
+      "subtitle": "Bajo el mar",
+      "accent": "#FFE39D",
+      "files": {
+        "background": "tickets/tesoros_maru/background.png",
+        "frame": "tickets/tesoros_maru/frame.png",
+        "reveal_board": "tickets/tesoros_maru/reveal_board.png",
+        "foil": "tickets/tesoros_maru/foil.png"
+      }
+    },
+    "dulces_lady": {
+      "title": "Dulces de Lady",
+      "subtitle": "Una sorpresa deliciosa",
+      "accent": "#FFE2A0",
+      "files": {
+        "background": "tickets/dulces_lady/background.png",
+        "frame": "tickets/dulces_lady/frame.png",
+        "reveal_board": "tickets/dulces_lady/reveal_board.png",
+        "foil": "tickets/dulces_lady/foil.png"
+      }
+    },
+    "estrellas_suerte": {
+      "title": "Estrellas de la Suerte",
+      "subtitle": "Pide un deseo",
+      "accent": "#FFE7A2",
+      "files": {
+        "background": "tickets/estrellas_suerte/background.png",
+        "frame": "tickets/estrellas_suerte/frame.png",
+        "reveal_board": "tickets/estrellas_suerte/reveal_board.png",
+        "foil": "tickets/estrellas_suerte/foil.png"
+      }
+    },
+    "festival_felino": {
+      "title": "Festival Felino",
+      "subtitle": "Luces, flores y suerte",
+      "accent": "#FFE09A",
+      "files": {
+        "background": "tickets/festival_felino/background.png",
+        "frame": "tickets/festival_felino/frame.png",
+        "reveal_board": "tickets/festival_felino/reveal_board.png",
+        "foil": "tickets/festival_felino/foil.png"
+      }
+    }
+  },
+  "symbolIds": [
+    "paw",
+    "fish",
+    "ball_yarn",
+    "churu",
+    "bell",
+    "star",
+    "heart",
+    "crown",
+    "chest",
+    "gem",
+    "moon",
+    "clover",
+    "lantern",
+    "flower",
+    "candy",
+    "seven",
+    "wild",
+    "coin",
+    "scratch_ticket"
+  ],
+  "geometry": {
+    "ticketAspectRatio": 0.6666666666666666,
+    "scratchCells": {
+      "rows": 3,
+      "cols": 3,
+      "boardWidth": 486,
+      "boardHeight": 342,
+      "cellStepX": 159,
+      "cellStepY": 106,
+      "cellLeft": 12,
+      "cellTop": 12,
+      "cellWidth": 143,
+      "cellHeight": 92
+    }
+  },
+  "disclaimer": "Artwork is 100% new illustrated ornamentation, original Maru/Lady appearances MUST come from game painters. Visual concepts generated in chat are NOT the canonical character assets."
+}

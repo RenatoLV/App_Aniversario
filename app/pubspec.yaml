@@ -44,6 +44,9 @@ dependencies:
   google_sign_in: ^7.2.0
   audioplayers: 6.5.1
   http: ^1.5.0
+  sembast: ^3.8.5+2
+  sembast_web: ^2.4.2
+  path_provider: ^2.1.5
 
 dev_dependencies:
   flutter_test:
@@ -77,6 +80,14 @@ flutter:
       fonts:
         - asset: assets/fonts/Nunito.ttf
   assets:
+    - assets/lucky_palace/scratch/
+    - assets/lucky_palace/scratch/tickets/patita_suerte/
+    - assets/lucky_palace/scratch/tickets/tesoros_maru/
+    - assets/lucky_palace/scratch/tickets/dulces_lady/
+    - assets/lucky_palace/scratch/tickets/estrellas_suerte/
+    - assets/lucky_palace/scratch/tickets/festival_felino/
+    - assets/lucky_palace/scratch/symbols/png/
+    - assets/lucky_palace/scratch/shared/
     - assets/cuadro.jpg
     - assets/gato_cohete.png
     - assets/anivermaru_logo.png
