@@ -11,6 +11,9 @@ import 'package:nuestro_rincon/wordle.dart';
 import 'package:nuestro_rincon/lucky_palace/lucky_palace_screen.dart';
 import 'package:nuestro_rincon/lucky_palace/data/lucky_database.dart';
 import 'package:nuestro_rincon/lucky_palace/data/local_lucky_repository.dart';
+import 'package:nuestro_rincon/lucky_palace/scratch/scratch_screen.dart';
+import 'package:nuestro_rincon/lucky_palace/scratch/scratch_engine.dart';
+import 'package:nuestro_rincon/lucky_palace/scratch/scratch_local_repository.dart';
 
 Future<void> storageEvents(WidgetTester tester) async {
   for (var i = 0; i < 10; i++) {
@@ -116,6 +119,34 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 450));
       await tester.scrollUntilVisible(
+        find.text('Patita de la Suerte'),
+        500,
+        maxScrolls: 30,
+      );
+      await tester.ensureVisible(find.text('Patita de la Suerte'));
+      await tester.tap(find.text('Patita de la Suerte'));
+      await tester.pump(const Duration(milliseconds: 450));
+      await storageEvents(tester);
+      expect(find.byType(ScratchScreen), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('scratch-primary')));
+      for (var i = 0; i < 12; i++) {
+        await storageEvents(tester);
+        if (find
+            .byKey(const ValueKey('scratch-surface'))
+            .evaluate()
+            .isNotEmpty) {
+          break;
+        }
+      }
+      expect(find.byKey(const ValueKey('scratch-surface')), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('scratch-back')));
+      await storageEvents(tester);
+      await tester.pump(const Duration(milliseconds: 450));
+      await tester.tap(find.byKey(const ValueKey('scratch-back')));
+      await storageEvents(tester);
+      await tester.pump(const Duration(milliseconds: 450));
+      expect(find.byType(ScratchScreen), findsNothing);
+      await tester.scrollUntilVisible(
         find.text('Wordlady'),
         -500,
         maxScrolls: 30,
@@ -140,6 +171,11 @@ void main() {
       await tester.runAsync(() async {
         final db = await openLuckyDatabase();
         final repo = LocalLuckyRoundRepository(LuckyDatabase(db));
+        expect((await repo.refresh()).configId, 'rewards25v2');
+        final scratch = ScratchLocalRepository(LuckyDatabase(db));
+        final receipt = (await scratch.recover())!;
+        expect(receipt.rulesVersion, ScratchRules.enhancedVersion);
+        expect(await scratch.balance(), receipt.balance);
         expect((await repo.history()).length, 1);
         expect(await repo.recover(), null);
         await db.close();

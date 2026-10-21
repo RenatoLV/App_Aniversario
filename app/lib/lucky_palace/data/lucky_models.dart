@@ -13,6 +13,7 @@ String luckyId() => List.generate(
 LuckyRules luckyRules(String config) {
   final a = LuckyRules.candidate;
   if (config == 'reference25') return a;
+  if (config == 'rewards25v2') return LuckyRules.rewardsV2;
   if (config != 'scaled10') {
     throw const FormatException('Configuración desconocida');
   }

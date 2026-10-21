@@ -2,6 +2,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../game_audio.dart';
+import '../../store.dart';
+import '../lucky_prize_screen.dart';
 import '../art/lucky_cabinet_art.dart';
 import '../data/lucky_database.dart';
 import '../data/lucky_models.dart';
@@ -27,8 +29,9 @@ enum ScratchPhase {
 }
 
 class ScratchScreen extends StatefulWidget {
-  const ScratchScreen({super.key, this.repository});
+  const ScratchScreen({super.key, this.repository, this.store});
   final ScratchLocalRepository? repository;
+  final GameStore? store;
   @override
   State<ScratchScreen> createState() => _ScratchScreenState();
 }
@@ -79,7 +82,10 @@ class _ScratchScreenState extends State<ScratchScreen>
     try {
       repo =
           widget.repository ??
-          ScratchLocalRepository(LuckyDatabase(await openLuckyDatabase()));
+          ScratchLocalRepository(
+            LuckyDatabase(await openLuckyDatabase()),
+            rulesVersion: ScratchRules.enhancedVersion,
+          );
       final recovered = await repo!.recover();
       final b = await repo!.balance();
       if (!mounted) return;
@@ -101,6 +107,26 @@ class _ScratchScreenState extends State<ScratchScreen>
         }
       });
       if (dirty) await _flush();
+    } catch (e) {
+      _fail(e);
+    }
+  }
+
+  Future<void> _openPrizes() async {
+    if (busy || repo == null || widget.store == null) return;
+    if (!await _flush() || !mounted) return;
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute(
+        settings: const RouteSettings(name: '/lucky-palace/prizes'),
+        builder: (_) =>
+            LuckyPrizeScreen(storage: repo!.storage, store: widget.store!),
+      ),
+    );
+    if (!mounted) return;
+    try {
+      final next = await repo!.balance();
+      if (mounted) setState(() => balance = next);
     } catch (e) {
       _fail(e);
     }
@@ -164,6 +190,9 @@ class _ScratchScreenState extends State<ScratchScreen>
 
   void _react() {
     if (!MediaQuery.disableAnimationsOf(context) && active) {
+      reaction.duration = Duration(
+        milliseconds: ticket?.revealed == true ? 1200 : 650,
+      );
       reaction.forward(from: 0);
     }
   }
@@ -313,6 +342,10 @@ class _ScratchScreenState extends State<ScratchScreen>
     }
   }
 
+  String get _shownRules => !catalog && ticket != null
+      ? ticket!.rulesVersion
+      : repo?.rulesVersion ?? ScratchRules.enhancedVersion;
+
   Future<void> _details() => showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -337,9 +370,14 @@ class _ScratchScreenState extends State<ScratchScreen>
                     'Busca tres o más símbolos iguales en cualquier posición. Cada tipo que aparezca tres veces paga una vez. Los premios de tipos distintos se suman.',
                     style: LuckyPalette.text(16),
                   ),
+                  if (_shownRules == ScratchRules.enhancedVersion)
+                    Text(
+                      'Premios nuevos: con 6, 7 u 8 iguales, el pago de ese símbolo se multiplica por 3. Con los 9 iguales, se multiplica por 20. No se cobra otro boleto.',
+                      style: LuckyPalette.text(16),
+                    ),
                   const SizedBox(height: 12),
                   Text(
-                    'Boleto: ${ScratchRules.cost} fichas del casino. Tabla candidata de laboratorio. No entrega monedas generales, cartas ni ropa.',
+                    'Boleto: ${ScratchRules.cost} fichas del casino. Cada raspe revelado suma una partida para desbloquear Premios. Canjea tus fichas por monedas y prendas exclusivas para Maru y Lady.',
                     style: LuckyPalette.text(16),
                   ),
                   for (var i = 0; i < 6; i++)
@@ -356,7 +394,7 @@ class _ScratchScreenState extends State<ScratchScreen>
                           const SizedBox(width: 12),
                           Expanded(
                             child: Text(
-                              '${scratchSymbolNames[theme.symbols[i]]} · 3 o más: ${ScratchRules.payouts[i]} fichas',
+                              '${scratchSymbolNames[theme.symbols[i]]} · ${_shownRules == ScratchRules.enhancedVersion ? '3–5' : '3 o más'}: ${ScratchRules.payoutsFor(_shownRules)[i]} fichas',
                               style: LuckyPalette.text(16),
                             ),
                           ),
@@ -388,7 +426,7 @@ class _ScratchScreenState extends State<ScratchScreen>
                         style: LuckyPalette.text(16),
                       ),
                     SelectableText(
-                      'Recibo: ${ticket!.id}\n${ScratchRules.version}',
+                      'Recibo: ${ticket!.id}\n${ticket!.rulesVersion}',
                       style: LuckyPalette.text(14),
                     ),
                   ],
@@ -418,6 +456,13 @@ class _ScratchScreenState extends State<ScratchScreen>
                 ],
               ),
             ),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              unawaited(_history());
+            },
+            child: const Text('Historial de raspes'),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx),
@@ -482,6 +527,10 @@ class _ScratchScreenState extends State<ScratchScreen>
     if (!active) {
       reaction.stop();
       unawaited(_flush());
+    } else if (reaction.value > 0 && reaction.value < 1) {
+      // A celebration interrupted by backgrounding must not leave a plaque
+      // covering the symbols indefinitely, nor replay a recovered reward.
+      reaction.value = 1;
     }
   }
 
@@ -547,6 +596,8 @@ class _ScratchScreenState extends State<ScratchScreen>
                     child: ScratchTicketWidget(
                       key: ValueKey('${theme.id}-${ticket?.id ?? 'cover'}'),
                       theme: theme,
+                      rulesVersion:
+                          repo?.rulesVersion ?? ScratchRules.enhancedVersion,
                       receipt: catalog ? null : ticket,
                       mask: mask,
                       enabled: !catalog && !busy && error == null && active,
@@ -623,12 +674,20 @@ class _ScratchScreenState extends State<ScratchScreen>
         icon: const Icon(Icons.arrow_back_rounded),
       ),
       if (!side) Expanded(child: _wallet()),
-      IconButton(
-        key: const ValueKey('scratch-history'),
-        tooltip: 'Historial de raspes',
-        onPressed: busy ? null : () => unawaited(_history()),
-        icon: const Icon(Icons.history),
-      ),
+      if (widget.store != null)
+        IconButton(
+          key: const ValueKey('scratch-prizes'),
+          tooltip: 'Premios de Lucky Palace',
+          onPressed: busy ? null : _openPrizes,
+          icon: const Icon(Icons.card_giftcard_rounded),
+        )
+      else
+        IconButton(
+          key: const ValueKey('scratch-history'),
+          tooltip: 'Historial de raspes',
+          onPressed: busy ? null : () => unawaited(_history()),
+          icon: const Icon(Icons.history),
+        ),
       IconButton(
         key: const ValueKey('scratch-help'),
         tooltip: 'Reglas y detalles',

@@ -1,6 +1,8 @@
 import 'scratch_engine.dart';
 
-Map<int, int> scratchExactDistribution() {
+Map<int, int> scratchExactDistribution({
+  String rulesVersion = ScratchRules.version,
+}) {
   final distribution = <int, int>{};
   final counts = List<int>.filled(6, 0);
   int factorial(int n) {
@@ -17,7 +19,7 @@ Map<int, int> scratchExactDistribution() {
       var denominator = 1, gross = 0;
       for (var i = 0; i < 6; i++) {
         denominator *= factorial(counts[i]);
-        if (counts[i] >= 3) gross += ScratchRules.payouts[i];
+        gross += ScratchRules.award(rulesVersion, i, counts[i]);
       }
       distribution.update(
         gross,

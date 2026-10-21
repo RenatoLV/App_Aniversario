@@ -109,6 +109,38 @@ void paintCatBodyClothing(Canvas canvas, CatOutfit outfit) {
     canvas.clipPath(shirt);
     const cream = Color(0xfffff0d6), gold = Color(0xffffd677);
     switch (item.id) {
+      case 'casino_confetti':
+        for (var i = 0; i < 18; i++) {
+          final x = 28.0 + (i * 13 % 44), y = 69.0 + (i * 7 % 24);
+          if (i % 3 == 0) {
+            canvas.drawPath(_star(x, y, 2.4), _ink(gold));
+          } else {
+            canvas.drawLine(
+              Offset(x, y),
+              Offset(x + 1.8, y + 2.7),
+              _ink(i.isEven ? cream : const Color(0xffef9fbe), 1.3),
+            );
+          }
+        }
+        _bow(canvas, 50, 69, 7, const Color(0xffef9fbe));
+        canvas.drawPath(_heart(50, 83, 5), _ink(gold));
+      case 'casino_suit':
+        canvas.drawPath(
+          Path()
+            ..moveTo(34, 63)
+            ..lineTo(50, 83)
+            ..lineTo(66, 63)
+            ..lineTo(58, 66)
+            ..lineTo(50, 75)
+            ..lineTo(42, 66)
+            ..close(),
+          _ink(gold),
+        );
+        _bow(canvas, 50, 69, 6, const Color(0xff24836d));
+        for (final y in [82.0, 88.0]) {
+          canvas.drawCircle(Offset(50, y), 1.4, _ink(gold));
+        }
+        canvas.drawPath(_star(63, 78, 3), _ink(gold));
       case 'shirt_stripes':
         for (var y = 71.0; y < 92; y += 6) {
           canvas.drawLine(Offset(22, y), Offset(78, y), _ink(cream, 2.8));
@@ -441,6 +473,32 @@ void paintCatBodyClothing(Canvas canvas, CatOutfit outfit) {
   );
   const gold = Color(0xffffd46a);
   switch (neck.id) {
+    case 'casino_love':
+      for (var i = 0; i < 9; i++) {
+        final a = i * math.pi / 8;
+        canvas.drawCircle(
+          Offset(50 + 18 * math.cos(a), 63 + 6 * math.sin(a)),
+          2,
+          _ink(const Color(0xfffff3e3)),
+        );
+      }
+      canvas.drawPath(_heart(50, 74, 5.5), _ink(gold));
+      canvas.drawPath(_heart(50, 74, 3.7), _ink(neck.color));
+      canvas.drawCircle(const Offset(48, 72), 1, _ink(Colors.white));
+    case 'casino_charm':
+      canvas.drawCircle(const Offset(50, 74), 5.5, _ink(gold));
+      canvas.drawOval(
+        const Rect.fromLTWH(47.5, 73, 5, 4),
+        _ink(const Color(0xff24836d)),
+      );
+      for (final p in [
+        const Offset(46.5, 71.5),
+        const Offset(49, 70),
+        const Offset(52, 70),
+        const Offset(54, 72),
+      ]) {
+        canvas.drawCircle(p, 1.1, _ink(const Color(0xff24836d)));
+      }
     case 'collar_fish':
       canvas.drawOval(const Rect.fromLTWH(44, 70, 10, 6), _ink(gold));
       canvas.drawPath(
@@ -519,6 +577,39 @@ void paintCatHeadClothing(
     }
     final fill = _ink(hat.color);
     switch (hat.id) {
+      case 'casino_crown':
+        canvas.drawPath(
+          Path()
+            ..moveTo(31, 29)
+            ..lineTo(28, 12)
+            ..lineTo(40, 21)
+            ..lineTo(50, 6)
+            ..lineTo(60, 21)
+            ..lineTo(72, 12)
+            ..lineTo(69, 29)
+            ..close(),
+          fill,
+        );
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(
+            const Rect.fromLTWH(31, 25, 38, 7),
+            const Radius.circular(2),
+          ),
+          _ink(const Color(0xffab7532)),
+        );
+        for (final x in [38.0, 50.0, 62.0]) {
+          canvas.drawPath(
+            _star(x, 28, x == 50 ? 4 : 2.5),
+            _ink(const Color(0xff48d3a8)),
+          );
+        }
+        for (final p in [
+          const Offset(28, 12),
+          const Offset(50, 6),
+          const Offset(72, 12),
+        ]) {
+          canvas.drawCircle(p, 2, _ink(const Color(0xfffff1b9)));
+        }
       case 'bucket':
         canvas.drawPath(
           Path()
@@ -822,7 +913,7 @@ void paintCatHeadClothing(
           ..lineTo(x - 7, y + 7)
           ..close(),
       'glasses_heart' => _heart(x, y - 1, 8),
-      'glasses_star' => _star(x, y, 11),
+      'glasses_star' || 'casino_starlight' => _star(x, y, 11),
       'glasses_cat' =>
         Path()
           ..moveTo(x - 11, y - 8)
@@ -866,6 +957,10 @@ void paintCatHeadClothing(
       ),
     );
     canvas.drawPath(lens, frame);
+    if (glasses.id == 'casino_starlight') {
+      canvas.drawCircle(Offset(x, y - 11), 1.7, _ink(const Color(0xffb93668)));
+      canvas.drawPath(_star(x + 9, y + 8, 2.4), _ink(const Color(0xfffff3d9)));
+    }
     canvas.drawLine(
       Offset(x - 4, y - 5),
       Offset(x + 2, y - 7),

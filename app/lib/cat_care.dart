@@ -12,6 +12,7 @@ class CatClothing {
   final IconData icon;
   final Color color;
   const CatClothing(this.id, this.name, this.slot, this.icon, this.color);
+  bool get casinoExclusive => id.startsWith('casino_');
   int get price => switch (id) {
     'crown' ||
     'wizard' ||
@@ -52,6 +53,48 @@ class CatClothing {
 }
 
 const catWardrobe = [
+  CatClothing(
+    'casino_starlight',
+    'Gafas Estrella de la noche',
+    ClothingSlot.eyes,
+    Icons.auto_awesome_rounded,
+    Color(0xffeec45e),
+  ),
+  CatClothing(
+    'casino_love',
+    'Medallón Maruzonita',
+    ClothingSlot.neck,
+    Icons.favorite_rounded,
+    Color(0xffb93668),
+  ),
+  CatClothing(
+    'casino_confetti',
+    'Traje Noche de confeti',
+    ClothingSlot.body,
+    Icons.celebration_rounded,
+    Color(0xff624098),
+  ),
+  CatClothing(
+    'casino_charm',
+    'Amuleto de la suerte',
+    ClothingSlot.neck,
+    Icons.pets_rounded,
+    Color(0xff24836d),
+  ),
+  CatClothing(
+    'casino_suit',
+    'Traje Royal Maru',
+    ClothingSlot.body,
+    Icons.checkroom_rounded,
+    Color(0xff722d50),
+  ),
+  CatClothing(
+    'casino_crown',
+    'Corona Lucky Palace',
+    ClothingSlot.head,
+    Icons.workspace_premium_rounded,
+    Color(0xffefbf58),
+  ),
   CatClothing(
     'collar_heart',
     'Collar corazón',

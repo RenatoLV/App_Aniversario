@@ -4,9 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../cat_character.dart';
 import '../lucky_palace_theme.dart';
+import '../art/lucky_reward_burst.dart';
 import 'scratch_catalog.dart';
 import 'scratch_mask.dart';
 import 'scratch_models.dart';
+import 'scratch_engine.dart';
 import 'scratch_surface.dart';
 
 /// Manifest geometry in virtual coordinates; every visual layer shares this transform.
@@ -74,6 +76,7 @@ class ScratchTicketWidget extends StatefulWidget {
   const ScratchTicketWidget({
     super.key,
     required this.theme,
+    this.rulesVersion = ScratchRules.version,
     this.receipt,
     required this.mask,
     required this.onChanged,
@@ -83,6 +86,7 @@ class ScratchTicketWidget extends StatefulWidget {
     this.onStart,
   });
   final ScratchTheme theme;
+  final String rulesVersion;
   final ScratchReceipt? receipt;
   final ScratchMask mask;
   final VoidCallback onChanged, onGestureEnd;
@@ -256,7 +260,11 @@ class _ScratchTicketWidgetState extends State<ScratchTicketWidget> {
                     Positioned.fill(
                       child: IgnorePointer(
                         child: CustomPaint(
-                          painter: _TicketText(widget.theme, receipt),
+                          painter: _TicketText(
+                            widget.theme,
+                            receipt,
+                            widget.rulesVersion,
+                          ),
                         ),
                       ),
                     ),
@@ -307,9 +315,10 @@ class _FrameOpening extends CustomClipper<Path> {
 }
 
 class _TicketText extends CustomPainter {
-  _TicketText(this.theme, this.receipt);
+  _TicketText(this.theme, this.receipt, this.rulesVersion);
   final ScratchTheme theme;
   final ScratchReceipt? receipt;
+  final String rulesVersion;
   void _text(Canvas c, Rect rect, String value, double font) {
     final p = TextPainter(
       text: TextSpan(text: value, style: LuckyPalette.text(font, title: true)),
@@ -333,6 +342,9 @@ class _TicketText extends CustomPainter {
       ScratchTicketGeometry.caption,
       receipt?.revealed == true
           ? 'Premio ${receipt!.gross} · Coste ${receipt!.cost}\nNeto ${receipt!.net >= 0 ? '+' : ''}${receipt!.net}'
+          : (receipt?.rulesVersion ?? rulesVersion) ==
+                ScratchRules.enhancedVersion
+          ? '3 iguales pagan · 6 ×3 · 9 ×20\n${theme.subtitle}'
           : 'Encuentra tres símbolos iguales\n${theme.subtitle}',
       24,
     );
@@ -341,7 +353,9 @@ class _TicketText extends CustomPainter {
 
   @override
   bool shouldRepaint(_TicketText old) =>
-      old.theme != theme || old.receipt != receipt;
+      old.theme != theme ||
+      old.receipt != receipt ||
+      old.rulesVersion != rulesVersion;
 }
 
 class _Winners extends CustomPainter {
@@ -366,6 +380,17 @@ class _Winners extends CustomPainter {
           ).withValues(alpha: .7 + pulse * .25)
           ..style = PaintingStyle.stroke
           ..strokeWidth = 3 + pulse * 2,
+      );
+    }
+    if (receipt.net > 0) {
+      LuckyRewardBurst.paint(
+        c,
+        const Rect.fromLTWH(0, 0, 486, 342),
+        progress: pulse,
+        accent: Color(receipt.theme.accent),
+        amount: receipt.gross,
+        heading: receipt.net > 0 ? '¡PREMIO!' : 'PREMIO BRUTO',
+        grand: receipt.net >= receipt.cost,
       );
     }
     c.restore();

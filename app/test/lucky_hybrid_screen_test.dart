@@ -64,7 +64,10 @@ void main() {
           ),
           child: child!,
         ),
-        home: LuckyPalaceScreen(localRepository: local),
+        home: LuckyPalaceScreen(
+          enableDeveloperTools: true,
+          localRepository: local,
+        ),
       );
       await tester.pumpWidget(app(false));
       await tester.pumpAndSettle();
@@ -128,7 +131,10 @@ void main() {
           key: boundary,
           child: MaterialApp(
             debugShowCheckedModeBanner: false,
-            home: LuckyPalaceScreen(localRepository: local),
+            home: LuckyPalaceScreen(
+              enableDeveloperTools: true,
+              localRepository: local,
+            ),
           ),
         ),
       );
@@ -150,7 +156,12 @@ void main() {
       await tester.pumpWidget(const SizedBox());
       // Mounting another controller does not erase wallet/bonus or replay seen receipts.
       await tester.pumpWidget(
-        MaterialApp(home: LuckyPalaceScreen(localRepository: local)),
+        MaterialApp(
+          home: LuckyPalaceScreen(
+            enableDeveloperTools: true,
+            localRepository: local,
+          ),
+        ),
       );
       await tester.pumpAndSettle();
       expect(find.byTooltip('Girar gratis'), findsOneWidget);
@@ -184,6 +195,7 @@ void main() {
           key: boundary,
           child: MaterialApp(
             home: LuckyPalaceScreen(
+              enableDeveloperTools: true,
               localRepository: local,
               connectSandbox: () async => remote,
             ),

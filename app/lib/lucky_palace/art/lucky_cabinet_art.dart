@@ -4,6 +4,7 @@ import '../../cat_character.dart';
 import '../lucky_palace_theme.dart';
 import 'lucky_symbol_art.dart';
 import 'lucky_cabinet_geometry.dart';
+import 'lucky_reward_burst.dart';
 import '../lucky_demo.dart';
 
 /// Static cabinet and animated foreground have separate repaint boundaries.
@@ -253,29 +254,31 @@ class LuckyCabinetPainter extends CustomPainter {
     _arm(c, geometry.lady, geometry.ladyRest, false);
     _cost(c, geometry.console);
     _prize(c, geometry.console);
-    if (frame.settled && frame.amount > 0) _celebration(c, geometry);
+    if (frame.settled && frame.hasReward) _celebration(c, geometry);
     c.restore();
   }
 
   void _celebration(Canvas c, LuckyCabinetGeometry g) {
-    final energy = frame.celebration;
-    if (energy <= 0) return;
-    final count = frame.bigWin ? 18 : 5;
-    for (var i = 0; i < count; i++) {
-      final t = ((frame.seconds - 3.35) * .72 + i / count) % 1;
-      final x = g.board.left + (i * 137 % 397) / 397 * g.board.width;
-      final y = g.board.top - 16 + t * g.board.height;
-      c.save();
-      c.translate(x, y);
-      c.scale(.45 + .55 * math.cos(t * math.pi * 4).abs(), 1);
-      c.drawCircle(Offset.zero, 6, LuckyDrawing.fill(LuckyPalette.gold));
-      c.drawCircle(
-        Offset.zero,
-        4,
-        LuckyDrawing.stroke(LuckyPalette.goldLight, 1.5),
-      );
-      c.restore();
-    }
+    if (frame.reduced) return;
+    final free = frame.round?.grantedSpins ?? 0;
+    final cost = frame.round?.simulatedCost ?? 0;
+    final profit = frame.amount - cost;
+    if (profit <= 0 && free == 0) return;
+    LuckyRewardBurst.paint(
+      c,
+      g.board.deflate(6),
+      progress: (frame.seconds - 3.35) / 1.95,
+      accent: free > 0 ? LuckyPalette.mint : LuckyPalette.goldLight,
+      amount: frame.amount > 0 ? frame.shownAmount : free,
+      heading: frame.amount == 0 && free > 0
+          ? '¡GIROS GRATIS!'
+          : profit <= 0
+          ? 'PREMIO BRUTO'
+          : frame.bigWin
+          ? '¡GRAN PREMIO!'
+          : '¡PREMIO!',
+      grand: profit > 0 && frame.bigWin || free > 0,
+    );
   }
 
   void _pedestal(Canvas c, Rect console) {
@@ -394,66 +397,126 @@ class LuckyCabinetPainter extends CustomPainter {
   }
 
   void _arm(Canvas c, Rect cat, Offset grip, bool maru) {
-    final shoulder = cat.topLeft + Offset(cat.width * .65, cat.height * .65);
-    final wrist = grip - const Offset(0, 4);
-    final elbow = Offset(shoulder.dx + (maru ? 11 : -3), shoulder.dy + 12);
-    final width = cat.width * .075;
+    // Attach below the neck rather than at the cheek. The curved foreleg follows
+    // the host's bounce while its paw stays anchored to the lever or shelf.
+    final unit = cat.width / 145;
+    final shoulder =
+        cat.topLeft +
+        Offset(cat.width * (maru ? .62 : .64), cat.height * .76 - _hostLift);
+    final wrist = grip + Offset(maru ? -2 * unit : 0, -2 * unit);
+    final elbow = shoulder + Offset((maru ? 23 : 12) * unit, 13 * unit);
     final limb = Path()
-      ..moveTo(shoulder.dx - width * .5, shoulder.dy - width * .6)
-      ..quadraticBezierTo(
-        elbow.dx + width,
-        elbow.dy - 5,
-        wrist.dx + width * .35,
-        wrist.dy - width * .4,
-      )
-      ..quadraticBezierTo(
-        wrist.dx + width * .8,
-        wrist.dy + width * .45,
-        wrist.dx - width * .35,
-        wrist.dy + width * .5,
-      )
-      ..quadraticBezierTo(
-        elbow.dx - width,
-        elbow.dy + width,
-        shoulder.dx - width * .65,
-        shoulder.dy + width,
-      )
-      ..close();
-    final fur = maru ? const Color(0xff9a9581) : const Color(0xfffbf7ee);
+      ..moveTo(shoulder.dx, shoulder.dy)
+      ..quadraticBezierTo(elbow.dx, elbow.dy, wrist.dx, wrist.dy);
+    final fur = maru ? const Color(0xff797565) : const Color(0xfffbf7ee);
+    final shadow = maru ? const Color(0xff55594c) : const Color(0xffd9cfc3);
+    final thickness = 13 * unit;
     c.drawPath(
       limb,
       Paint()
+        ..isAntiAlias = true
+        ..style = PaintingStyle.stroke
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round
+        ..strokeWidth = thickness
         ..shader = LinearGradient(
-          colors: [
-            fur,
-            maru ? const Color(0xff696858) : const Color(0xffd9cfc3),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ).createShader(limb.getBounds()),
+          colors: [Color.lerp(fur, Colors.white, .16)!, fur, shadow],
+          stops: const [0, .45, 1],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ).createShader(limb.getBounds().inflate(thickness)),
     );
-    c.drawPath(limb, LuckyDrawing.stroke(const Color(0xff30382f), 2));
-    final paw = Rect.fromCenter(
-      center: wrist,
-      width: width * 1.35,
-      height: width * .9,
-    );
-    c.drawOval(
-      paw.shift(const Offset(0, 2)),
-      LuckyDrawing.fill(const Color(0x4430382f)),
-    );
-    c.drawOval(paw, LuckyDrawing.fill(fur));
-    c.drawOval(paw, LuckyDrawing.stroke(const Color(0xff30382f), 1.5));
-    for (final dx in [-2.0, 2.0]) {
+    Offset along(double t) =>
+        shoulder * ((1 - t) * (1 - t)) +
+        elbow * (2 * (1 - t) * t) +
+        wrist * (t * t);
+    if (maru) {
+      // A short tuxedo cuff joins the body; tabby bands belong to the fur.
       LuckyDrawing.line(
         c,
-        wrist + Offset(dx, 0),
-        wrist + Offset(dx, 3),
-        maru ? const Color(0xff4b5145) : const Color(0xffbda89c),
-        .8,
+        shoulder,
+        along(.17),
+        const Color(0xff383e40),
+        thickness,
+      );
+      final seam = along(.18);
+      LuckyDrawing.line(
+        c,
+        seam + Offset(0, -5 * unit),
+        seam + Offset(1 * unit, 5 * unit),
+        const Color(0xffb6b9a4),
+        unit,
+      );
+      for (final t in [.42, .62]) {
+        final band = along(t);
+        final tangent = (elbow - shoulder) * (1 - t) + (wrist - elbow) * t;
+        final normal = Offset(-tangent.dy, tangent.dx) / tangent.distance;
+        final stripe = Path()
+          ..moveTo((band - normal * 4 * unit).dx, (band - normal * 4 * unit).dy)
+          ..quadraticBezierTo(
+            band.dx - unit,
+            band.dy + unit,
+            (band + normal * 3 * unit).dx,
+            (band + normal * 3 * unit).dy,
+          );
+        c.drawPath(
+          stripe,
+          LuckyDrawing.stroke(const Color(0xff3f463a), 2 * unit),
+        );
+      }
+    }
+    // A rounded mitten silhouette, with small toe separations rather than a
+    // pointed wedge or an oval pasted onto the end of the arm.
+    c.save();
+    c.translate(wrist.dx, wrist.dy);
+    if (maru) {
+      c.rotate(math.atan2(wrist.dy - elbow.dy, wrist.dx - elbow.dx) * .25);
+    }
+    c.scale(unit);
+    c.drawOval(
+      const Rect.fromLTWH(-10, 5, 22, 5),
+      LuckyDrawing.fill(const Color(0x4030382f)),
+    );
+    final paw = Path()
+      ..moveTo(-8, -5)
+      ..cubicTo(-5, -8, 0, -8, 3, -6)
+      ..cubicTo(8, -8, 12, -2, 10, 2)
+      ..cubicTo(10, 6, 7, 8, 4, 7)
+      ..cubicTo(2, 9, -1, 9, -3, 7)
+      ..cubicTo(-7, 9, -10, 6, -9, 2)
+      ..cubicTo(-11, 0, -10, -3, -8, -5)
+      ..close();
+    c.drawPath(
+      paw,
+      Paint()
+        ..isAntiAlias = true
+        ..shader = LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color.lerp(fur, Colors.white, .22)!, fur, shadow],
+          stops: const [0, .65, 1],
+        ).createShader(paw.getBounds()),
+    );
+    for (final x in [-3.0, 3.0]) {
+      final toe = Path()
+        ..moveTo(x, 3)
+        ..quadraticBezierTo(x + .8, 5, x, 7);
+      c.drawPath(
+        toe,
+        LuckyDrawing.stroke(
+          maru ? const Color(0xff444d3d) : const Color(0xffbcae9e),
+          .85,
+        ),
       );
     }
+    c.restore();
   }
+
+  double get _hostLift => frame.hasReward
+      ? frame.celebration *
+            math.sin((frame.seconds - 3.35) * 13).abs() *
+            (frame.bigWin ? 5 : 2)
+      : 0;
 
   void _room(Canvas c, Size size) {
     final all = Offset.zero & size;
@@ -650,12 +713,7 @@ class LuckyCabinetPainter extends CustomPainter {
       LuckyDrawing.fill(const Color(0x66000000)),
     );
     c.save();
-    final bounce = frame.hasReward
-        ? frame.celebration *
-              math.sin((frame.seconds - 3.35) * 13).abs() *
-              (frame.bigWin ? 5 : 2)
-        : 0.0;
-    c.translate(rect.left, rect.top - bounce);
+    c.translate(rect.left, rect.top - _hostLift);
     final painter = maru
         ? MaruPainter(
             phase: .16 + frame.pull * .08,

@@ -9,8 +9,12 @@ import 'scratch_mask.dart';
 import 'scratch_models.dart';
 
 class ScratchLocalRepository {
-  ScratchLocalRepository(this.storage, {LuckyRandom? random})
-    : random = random ?? SecureLuckyRandom();
+  ScratchLocalRepository(
+    this.storage, {
+    LuckyRandom? random,
+    this.rulesVersion = ScratchRules.version,
+  }) : random = random ?? SecureLuckyRandom();
+  final String rulesVersion;
   final LuckyDatabase storage;
   final LuckyRandom random;
   Future<int> balance() => storage.transaction(
@@ -69,11 +73,13 @@ class ScratchLocalRepository {
         if (wallet['balance'] < ScratchRules.cost) {
           throw const LuckyDeclined('sin-fichas-locales');
         }
-        final outcome = const ScratchEngine().generate(random);
+        final outcome = ScratchEngine(
+          rulesVersion: rulesVersion,
+        ).generate(random);
         await luckyRecords.record('scratch.intent').put(tx, {
           'id': operationId,
           'themeId': themeId,
-          'rules': ScratchRules.version,
+          'rules': rulesVersion,
           'cells': outcome.cells,
         });
         return operationId;
@@ -83,21 +89,22 @@ class ScratchLocalRepository {
       return _receipt(tx, id);
     }
     final intent = await luckyRecords.record('scratch.intent').get(tx);
-    if (intent == null ||
-        intent['id'] != id ||
-        intent['rules'] != ScratchRules.version) {
+    if (intent == null || intent['id'] != id) {
       throw StateError('Boleto no preparado');
     }
     final wallet = await LocalLuckyWallet.read(tx);
     if (wallet['balance'] < ScratchRules.cost) {
       throw const LuckyDeclined('sin-fichas-locales');
     }
-    final outcome = ScratchOutcome(List<int>.from(intent['cells'] as List));
+    final outcome = ScratchOutcome(
+      List<int>.from(intent['cells'] as List),
+      rulesVersion: intent['rules'] as String,
+    );
     final receipt = ScratchReceipt({
       'id': id,
       'origin': 'local',
       'themeId': intent['themeId'],
-      'rules': ScratchRules.version,
+      'rules': outcome.rulesVersion,
       'cost': ScratchRules.cost,
       'cells': outcome.cells,
       'gross': outcome.gross,

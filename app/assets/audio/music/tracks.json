@@ -1,9 +1,43 @@
 {
-  "menu": ["menu/00-boba date.mp3", "menu/01-For the First Time (Instrumental) (1).mp3", "menu/02-New Look (Wii U Mii Maker Lofi Mix).mp3", "menu/03-Relaxed Scene.mp3", "menu/04-The Indoor Song.mp3"],
-  "wordle": ["wordle/00-i love cats 3.mp3", "wordle/01-Nintendo DSi Shop Theme (High Quality, 2019 Remastered).mp3", "wordle/02-Tsundere Labs Inc - Sambou, Sambou (MIDI Visualizer).mp3"],
-  "sweet": ["sweet/00-Cat Cafe.mp3", "sweet/01-Meet Lime Cookie! (Twintails Edition).mp3", "sweet/02-sleepy cat.mp3", "sweet/03-Waiting.mp3"],
-  "blocks": ["blocks/00-Acid Tunnel of Love.mp3", "blocks/01-Head Empty.mp3", "blocks/02-Parfait.mp3", "blocks/03-sofa cat.mp3"],
-  "leap": ["leap/00-Happy Wednesday.mp3", "leap/01-melon bread.mp3", "leap/02-Rararainbowmuffin.mp3"],
-  "marus-zombies": ["marus/garden-patrol.wav"],
-  "marus-zombies-patio": ["marus/zombies-on-your-lawn.mp3"]
+  "menu": [
+    "menu/00-boba date.mp3",
+    "menu/01-For the First Time (Instrumental) (1).mp3",
+    "menu/02-New Look (Wii U Mii Maker Lofi Mix).mp3",
+    "menu/03-Relaxed Scene.mp3",
+    "menu/04-The Indoor Song.mp3"
+  ],
+  "wordle": [
+    "wordle/00-i love cats 3.mp3",
+    "wordle/01-Nintendo DSi Shop Theme (High Quality, 2019 Remastered).mp3",
+    "wordle/02-Tsundere Labs Inc - Sambou, Sambou (MIDI Visualizer).mp3"
+  ],
+  "sweet": [
+    "sweet/00-Cat Cafe.mp3",
+    "sweet/01-Meet Lime Cookie! (Twintails Edition).mp3",
+    "sweet/02-sleepy cat.mp3",
+    "sweet/03-Waiting.mp3"
+  ],
+  "blocks": [
+    "blocks/00-Acid Tunnel of Love.mp3",
+    "blocks/01-Head Empty.mp3",
+    "blocks/02-Parfait.mp3",
+    "blocks/03-sofa cat.mp3"
+  ],
+  "leap": [
+    "leap/00-Happy Wednesday.mp3",
+    "leap/01-melon bread.mp3",
+    "leap/02-Rararainbowmuffin.mp3"
+  ],
+  "marus-zombies": [
+    "marus/garden-patrol.wav"
+  ],
+  "marus-zombies-patio": [
+    "marus/zombies-on-your-lawn.mp3"
+  ],
+  "casino": [
+    "casino/milky.mp3",
+    "casino/pipo-pipo.mp3",
+    "casino/garfield.mp3",
+    "casino/ninjin.mp3"
+  ]
 }

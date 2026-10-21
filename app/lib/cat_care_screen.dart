@@ -976,6 +976,8 @@ class _CatCareScreenState extends State<CatCareScreen>
                 label: Text(
                   care.ownsClothing(item)
                       ? item.name
+                      : item.casinoExclusive
+                      ? '${item.name} · Premio de Lucky Palace'
                       : '${item.name} · ${item.price} 🪙',
                 ),
                 backgroundColor: care.outfit(_cat).at(slot) == item.id
@@ -983,6 +985,13 @@ class _CatCareScreenState extends State<CatCareScreen>
                     : Colors.white,
                 onPressed: () async {
                   if (!care.ownsClothing(item)) {
+                    if (item.casinoExclusive) {
+                      setState(
+                        () => _message =
+                            'Consigue esta prenda en Premios de Lucky Palace, desde los minijuegos.',
+                      );
+                      return;
+                    }
                     final confirmed = await showDialog<bool>(
                       context: context,
                       builder: (context) => _ClothingPurchaseDialog(

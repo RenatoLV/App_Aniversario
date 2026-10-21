@@ -16,8 +16,19 @@ class LocalLuckyRoundRepository implements LuckyRoundRepository {
   @override
   LuckyOrigin get origin => LuckyOrigin.local;
   final _wallet = LocalLuckyWallet.record;
-  Future<Map<String, dynamic>> _read(Transaction tx) =>
-      LocalLuckyWallet.read(tx, configId: configId);
+  Future<Map<String, dynamic>> _read(Transaction tx) async {
+    final wallet = await LocalLuckyWallet.read(tx, configId: configId);
+    // Finish any old intent, presentation or bonus with its original pay table.
+    if (configId == 'rewards25v2' &&
+        wallet['configId'] == 'reference25' &&
+        wallet['remaining'] == 0 &&
+        wallet['presentationId'] == null &&
+        !await luckyRecords.record('local.intent').exists(tx)) {
+      wallet['configId'] = configId;
+      await _wallet.put(tx, wallet);
+    }
+    return wallet;
+  }
 
   LuckyWalletSnapshot _snapshot(Map<String, dynamic> j) => LuckyWalletSnapshot(
     origin: origin,

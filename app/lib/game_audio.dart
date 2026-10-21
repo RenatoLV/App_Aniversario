@@ -35,7 +35,10 @@ enum GameSfx {
   jump('jump.wav', .22, 220),
   spring('spring.wav', .42, 500),
   rocket('rocket.wav', .4, 700),
-  abduction('abduction.wav', .45, 1000);
+  abduction('abduction.wav', .45, 1000),
+  casinoSpin('casino_spin.wav', .60, 300),
+  casinoStop('casino_stop.wav', .36, 120),
+  casinoPayout('casino_payout.wav', .50, 700);
 
   final String file;
   final double gain;
@@ -306,7 +309,7 @@ class GameAudio with WidgetsBindingObserver {
     );
   }
 
-  void play(GameSfx effect) {
+  void play(GameSfx effect, {Duration? position}) {
     if (CombatSfxLimiter.priorities.containsKey(effect)) {
       playCombat([effect]);
       return;
@@ -321,7 +324,10 @@ class GameAudio with WidgetsBindingObserver {
       return;
     }
     final now = _clock.elapsedMilliseconds;
-    if (now - (_lastEffect[effect] ?? -10000) < effect.cooldownMs) return;
+    if (position == null &&
+        now - (_lastEffect[effect] ?? -10000) < effect.cooldownMs) {
+      return;
+    }
     _lastEffect[effect] = now;
     unawaited(
       _safe(() async {
@@ -331,6 +337,7 @@ class GameAudio with WidgetsBindingObserver {
             'audio/${effect == GameSfx.kitten ? meows.next() : effect.file}',
           ),
           volume: effectsVolume * effect.gain,
+          position: position,
         );
       }),
     );
@@ -522,6 +529,9 @@ class GameAudioRouteObserver extends NavigatorObserver {
     '/wordle': 'wordle',
     '/sweet': 'sweet',
     '/leap': 'leap',
+    '/lucky-palace': 'casino',
+    '/lucky-palace/scratch': 'casino',
+    '/lucky-palace/prizes': 'casino',
   };
   void _select(Route<dynamic>? route) {
     final scene = scenes[route?.settings.name];

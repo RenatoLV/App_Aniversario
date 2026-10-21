@@ -63,7 +63,10 @@ void main() {
           ),
           home: const RepaintBoundary(
             key: _art,
-            child: LuckyPalaceScreen(initialMode: LuckyPlayMode.demo),
+            child: LuckyPalaceScreen(
+              enableDeveloperTools: true,
+              initialMode: LuckyPlayMode.demo,
+            ),
           ),
         ),
       );
@@ -167,7 +170,10 @@ void main() {
         const MaterialApp(
           home: RepaintBoundary(
             key: _art,
-            child: LuckyPalaceScreen(initialMode: LuckyPlayMode.demo),
+            child: LuckyPalaceScreen(
+              enableDeveloperTools: true,
+              initialMode: LuckyPlayMode.demo,
+            ),
           ),
         ),
       );
@@ -225,8 +231,10 @@ void main() {
               onPressed: () => Navigator.push(
                 context,
                 MaterialPageRoute<void>(
-                  builder: (_) =>
-                      const LuckyPalaceScreen(initialMode: LuckyPlayMode.demo),
+                  builder: (_) => const LuckyPalaceScreen(
+                    enableDeveloperTools: true,
+                    initialMode: LuckyPlayMode.demo,
+                  ),
                 ),
               ),
               child: const Text('Abrir taller'),
@@ -254,7 +262,10 @@ void main() {
             update = setState;
             return MediaQuery(
               data: MediaQuery.of(context).copyWith(disableAnimations: reduced),
-              child: const LuckyPalaceScreen(initialMode: LuckyPlayMode.demo),
+              child: const LuckyPalaceScreen(
+                enableDeveloperTools: true,
+                initialMode: LuckyPlayMode.demo,
+              ),
             );
           },
         ),

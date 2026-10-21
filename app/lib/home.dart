@@ -23,6 +23,7 @@ import 'brand_title.dart';
 import 'card_trades.dart';
 import 'sweet_screen.dart';
 import 'cat_room.dart';
+import 'maruversary.dart';
 import 'patio_screen.dart';
 import 'leap_screen.dart';
 import 'card_palette.dart';
@@ -39,6 +40,8 @@ import 'card_media.dart';
 import 'celestial_reveal.dart';
 import 'bomber/bomber_screen.dart';
 import 'lucky_palace/lucky_palace_screen.dart';
+import 'lucky_palace/casino_balance_badge.dart';
+import 'lucky_palace/scratch/scratch_screen.dart';
 
 const ink = Color(0xff293f39),
     cream = Color(0xfffaf6ee),
@@ -93,7 +96,10 @@ class RinconApp extends StatelessWidget {
       care: store.catCare,
       child: Listener(
         onPointerDown: (_) => GameAudio.instance.unlock(),
-        child: child!,
+        child: MaruversaryDay(
+          builder: (context, celebrating) =>
+              MaruversaryEntrance(enabled: celebrating, child: child!),
+        ),
       ),
     ),
     theme: ThemeData(
@@ -132,6 +138,12 @@ class _RinconHomeState extends State<RinconHome>
   bool _refreshingCloud = false;
   final _blocKey = GlobalKey<BlocBoardState>();
   int page = 0;
+  void _selectPage(int next) {
+    if (next == page) return;
+    setState(() => page = next);
+    MaruversaryEntrance.replay(context);
+  }
+
   String _collectionQuery = '';
   final TextEditingController _collectionSearch = TextEditingController();
   CardRarity? _collectionRarity;
@@ -415,6 +427,8 @@ class _RinconHomeState extends State<RinconHome>
                 ? '/bomber'
                 : screen is LuckyPalaceScreen
                 ? '/lucky-palace'
+                : screen is ScratchScreen
+                ? '/lucky-palace/scratch'
                 : '/blocks',
           ),
           builder: (_) => screen,
@@ -443,7 +457,7 @@ class _RinconHomeState extends State<RinconHome>
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: s,
     builder: (context, _) => MenuSwipe(
-      onStep: (step) => setState(() => page = (page + step).clamp(0, 3)),
+      onStep: (step) => _selectPage((page + step).clamp(0, 3)),
       child: Scaffold(
         appBar: AppBar(
           title: FittedBox(
@@ -495,8 +509,32 @@ class _RinconHomeState extends State<RinconHome>
             ),
             const AudioSettingsButton(),
             const AppUpdateButton(),
-            Chip(avatar: const CoinIcon(size: 20), label: Text('${s.coins}')),
-            const SizedBox(width: 16),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 105),
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const CoinIcon(size: 19),
+                        const SizedBox(width: 5),
+                        Text(
+                          '${s.coins}',
+                          style: const TextStyle(fontSize: 13),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 3),
+                    const CasinoBalanceBadge(),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
           ],
         ),
         body: PawBackground(
@@ -532,7 +570,7 @@ class _RinconHomeState extends State<RinconHome>
         ),
         bottomNavigationBar: NavigationBar(
           selectedIndex: page,
-          onDestinationSelected: (i) => setState(() => page = i),
+          onDestinationSelected: _selectPage,
           destinations: const [
             NavigationDestination(
               icon: Icon(Icons.cottage_outlined),
@@ -721,6 +759,11 @@ class _RinconHomeState extends State<RinconHome>
     key: const PageStorageKey('home-scroll'),
     padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
     children: [
+      MaruversaryDay(
+        builder: (context, celebrating) => celebrating
+            ? MaruversaryWelcome(store: s)
+            : const SizedBox.shrink(),
+      ),
       const Text(
         'JUEGUITOS DE ANIVERSARIO CON COLECCIONABLES CHISTOSOS MUAK',
         textAlign: TextAlign.center,
@@ -960,11 +1003,24 @@ class _RinconHomeState extends State<RinconHome>
         eyebrow: 'EL CASINO DE MARU Y LADY',
         title: 'Lucky Palace',
         description:
-            'Gira los rodillos, consigue giros gratis y juega con fichas del casino.',
+            'Gira los rodillos, consigue giros gratis y canjea tus fichas por monedas y ropa exclusiva para Maru y Lady.',
         icon: Icons.auto_awesome_rounded,
         colors: const [Color(0xff452047), Color(0xff86254f)],
         accent: const Color(0xffffe6a0),
-        onTap: () => _play(const LuckyPalaceScreen()),
+        onTap: () => _play(LuckyPalaceScreen(store: s)),
+      ),
+      const SizedBox(height: 24),
+      _gameSpotlight(
+        gameId: 'lucky-palace-scratch',
+        showLeaderboard: false,
+        eyebrow: 'LOS RASPES DE MARU Y LADY',
+        title: 'Patita de la Suerte',
+        description:
+            'Raspa tu boleto y reúne fichas. Cada raspe revelado te acerca a los premios únicos de Lucky Palace.',
+        icon: Icons.style_rounded,
+        colors: const [Color(0xff593068), Color(0xffa34477)],
+        accent: const Color(0xffffe6a0),
+        onTap: () => _play(ScratchScreen(store: s)),
       ),
       const SizedBox(height: 24),
       Wrap(
@@ -995,7 +1051,7 @@ class _RinconHomeState extends State<RinconHome>
             'Abre tu primer sobre con las monedas de bienvenida.',
           ),
           trailing: const Icon(Icons.chevron_right),
-          onTap: () => setState(() => page = 1),
+          onTap: () => _selectPage(1),
         ),
       ),
       const SizedBox(height: 20),
@@ -1519,7 +1575,7 @@ class _RinconHomeState extends State<RinconHome>
       await s.saveNote(note, waitForSync: false);
       _blocKey.currentState?.focus(note);
       if (mounted) {
-        setState(() => page = 3);
+        _selectPage(3);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Foto AR guardada en Nuestro bloc.')),
         );

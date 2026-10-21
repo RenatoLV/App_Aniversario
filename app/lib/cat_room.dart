@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'cat_character.dart';
 import 'game_audio.dart';
 import 'house_day_cycle.dart';
+import 'maruversary.dart';
 import 'patio_art.dart';
 
 enum _RoomMoment { cuddle, churu, litter, thoughts, yarn, window, food, cards }
@@ -200,12 +201,15 @@ class _CatRoomState extends State<CatRoom> with TickerProviderStateMixin {
   );
 
   @override
-  Widget build(BuildContext context) => HouseDayCycle(
+  Widget build(BuildContext context) => MaruversaryDay(
     clock: widget.clock,
-    builder: (context, light) => _room(light),
+    builder: (context, celebrating) => HouseDayCycle(
+      clock: widget.clock,
+      builder: (context, light) => _room(light, celebrating),
+    ),
   );
 
-  Widget _room(HouseLight light) => _openable(
+  Widget _room(HouseLight light, bool celebrating) => _openable(
     Container(
       padding: const EdgeInsets.fromLTRB(10, 12, 10, 10),
       decoration: BoxDecoration(
@@ -256,8 +260,10 @@ class _CatRoomState extends State<CatRoom> with TickerProviderStateMixin {
                   child: AnimatedSwitcher(
                     duration: const Duration(milliseconds: 450),
                     child: Text(
-                      caption,
-                      key: ValueKey(caption),
+                      celebrating
+                          ? '¡Un año juntitos con Maru y Lady!'
+                          : caption,
+                      key: ValueKey(celebrating ? 'first-year' : caption),
                       textAlign: TextAlign.center,
                       style: const TextStyle(
                         fontSize: 13,
@@ -405,6 +411,18 @@ class _CatRoomState extends State<CatRoom> with TickerProviderStateMixin {
                         left: width * .43,
                         child: HouseTimeBadge(light: light),
                       ),
+                      if (celebrating)
+                        Positioned(
+                          bottom: 6,
+                          left: (width - math.min(136.0, width * .36)) / 2,
+                          width: math.min(136.0, width * .36),
+                          height: math.min(136.0, width * .36),
+                          child: const IgnorePointer(
+                            child: MaruversaryCake(
+                              key: ValueKey('maruversary-room-cake'),
+                            ),
+                          ),
+                        ),
                       if (thoughts) ...[
                         Positioned(
                           top: width * .24 + 35,

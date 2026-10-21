@@ -64,6 +64,29 @@ class LuckyRules {
       lineStake *
       payouts.values.expand((p) => p.values).reduce((a, b) => a > b ? a : b);
 
+  /// Local-only successor. Legacy candidate/server configurations stay immutable.
+  static final rewardsV2 = LuckyRules(
+    catalogVersion: candidate.catalogVersion,
+    rulesVersion: 'lucky777.rules.local.rewards.v2',
+    reels: candidate.reels,
+    lines: candidate.lines,
+    payouts: candidate.payouts.map(
+      (symbol, table) => MapEntry(
+        symbol,
+        table.map(
+          (count, value) => MapEntry(
+            count,
+            count == 5
+                ? value * 6 ~/ 5
+                : count == 4
+                ? value * 11 ~/ 10
+                : value,
+          ),
+        ),
+      ),
+    ),
+  );
+
   static final candidate = LuckyRules(
     catalogVersion: 'lucky777.catalog.v1',
     rulesVersion: 'lucky777.rules.candidate.v1',

@@ -10,14 +10,16 @@ class ScratchReceipt {
     this.revealed = false,
   }) : data = Map.unmodifiable(data),
        mask = mask ?? ScratchMask() {
-    if (data['rules'] != ScratchRules.version ||
-        data['origin'] != 'local' ||
+    if (data['origin'] != 'local' ||
         data['id'] is! String ||
         data['cost'] != ScratchRules.cost) {
       throw const FormatException('Recibo de raspe incompatible');
     }
     ScratchTheme.byId(data['themeId']);
-    outcome = ScratchOutcome(List<int>.from(data['cells']));
+    outcome = ScratchOutcome(
+      List<int>.from(data['cells']),
+      rulesVersion: data['rules'] as String,
+    );
     if (outcome.gross != data['gross'] ||
         data['net'] != outcome.gross - ScratchRules.cost ||
         luckyInt(data['balance']) < 0 ||
@@ -30,6 +32,7 @@ class ScratchReceipt {
   final bool revealed;
   late final ScratchOutcome outcome;
   String get id => data['id'];
+  String get rulesVersion => data['rules'];
   ScratchTheme get theme => ScratchTheme.byId(data['themeId']);
   int get cost => data['cost'];
   int get gross => data['gross'];

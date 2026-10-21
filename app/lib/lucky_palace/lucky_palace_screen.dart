@@ -8,13 +8,17 @@ import 'lucky_palace_theme.dart';
 import 'lucky_demo.dart';
 import 'lucky_responsive_layout.dart';
 import 'lucky_console_controls.dart';
+import 'lucky_machine_audio.dart';
 import 'scratch/scratch_screen.dart';
 import 'scratch/scratch_local_repository.dart';
+import 'scratch/scratch_engine.dart';
 import 'engine/lucky_engine.dart';
 import 'data/lucky_models.dart';
 import 'data/lucky_database.dart';
 import 'data/local_lucky_repository.dart';
 import '../game_audio.dart';
+import '../store.dart';
+import 'lucky_prize_screen.dart';
 
 enum LuckyPlayMode { local, online, motor, demo }
 
@@ -28,8 +32,12 @@ class LuckyPalaceScreen extends StatefulWidget {
     this.onRound,
     this.localRepository,
     this.connectSandbox,
+    this.store,
+    this.enableDeveloperTools = false,
   });
   final LuckyPlayMode initialMode;
+  final GameStore? store;
+  final bool enableDeveloperTools;
   final LuckyEngine? engine;
   final LuckyRandom? random;
   final ValueChanged<LuckyRound>? onRound;
@@ -66,6 +74,7 @@ class _LuckyPalaceScreenState extends State<LuckyPalaceScreen>
   Timer? networkProbe;
   bool probing = false, backgrounded = false, userPaused = false;
   bool audioPausedByUs = false, soundDialogPaused = false;
+  final machineSound = LuckyMachineAudio();
   (bool, bool, bool)? clockPhase;
   final ruleCache = <String, LuckyRules>{};
   bool get presentationActive => started && clock.value < 1;
@@ -107,6 +116,13 @@ class _LuckyPalaceScreenState extends State<LuckyPalaceScreen>
           vsync: this,
           duration: const Duration(milliseconds: 6200),
         )..addListener(() {
+          if (!backgrounded && !userPaused) {
+            for (final cue in machineSound.advance(
+              clock.value * LuckyDemoFrame.duration,
+            )) {
+              GameAudio.instance.play(cue);
+            }
+          }
           // HUD/controls change only on phase boundaries. The art owns frame ticks.
           final phase = (
             clock.isAnimating,
@@ -119,6 +135,7 @@ class _LuckyPalaceScreenState extends State<LuckyPalaceScreen>
           }
         });
     clock.addStatusListener((status) {
+      if (status == AnimationStatus.completed) machineSound.cancel();
       if (status == AnimationStatus.completed &&
           receipt != null &&
           presentingRepository != null) {
@@ -137,7 +154,10 @@ class _LuckyPalaceScreenState extends State<LuckyPalaceScreen>
         localRepository = widget.localRepository;
       } else {
         ownedDatabase = LuckyDatabase(await openLuckyDatabase());
-        localRepository = LocalLuckyRoundRepository(ownedDatabase!);
+        localRepository = LocalLuckyRoundRepository(
+          ownedDatabase!,
+          configId: 'rewards25v2',
+        );
       }
       await _load(localRepository!);
     } catch (e) {
@@ -258,7 +278,7 @@ class _LuckyPalaceScreenState extends State<LuckyPalaceScreen>
       drag = 0;
     });
     widget.onRound?.call(result.round);
-    GameAudio.instance.play(GameSfx.paper);
+    _beginMachineAudio();
     if (MediaQuery.disableAnimationsOf(context)) {
       clock.value = 0;
       clock.value = 1;
@@ -408,6 +428,7 @@ class _LuckyPalaceScreenState extends State<LuckyPalaceScreen>
       drag = 0;
     });
     if (next != null) widget.onRound?.call(next);
+    _beginMachineAudio();
     if (MediaQuery.disableAnimationsOf(context)) {
       clock.value = 1;
     } else {
@@ -429,9 +450,40 @@ class _LuckyPalaceScreenState extends State<LuckyPalaceScreen>
     });
     audioPausedByUs = userPaused;
     GameAudio.instance.pauseGame(userPaused);
+    if (userPaused) {
+      _silenceMachineAudio();
+    } else {
+      _resumeMachineAudio();
+    }
+  }
+
+  void _beginMachineAudio() {
+    _silenceMachineAudio();
+    final actualReward = round != null
+        ? round!.evaluation.total > round!.simulatedCost
+        : frame.hasReward;
+    for (final cue in machineSound.begin(
+      hasReward: actualReward,
+      reduced: MediaQuery.disableAnimationsOf(context),
+    )) {
+      GameAudio.instance.play(cue);
+    }
+  }
+
+  void _silenceMachineAudio() {
+    for (final cue in LuckyMachineAudio.effects) {
+      GameAudio.instance.stopEffect(cue);
+    }
+  }
+
+  void _resumeMachineAudio() {
+    final cue = machineSound.resumeAt(clock.value * LuckyDemoFrame.duration);
+    if (cue != null) GameAudio.instance.play(cue.$1, position: cue.$2);
   }
 
   void skip() {
+    machineSound.cancel();
+    _silenceMachineAudio();
     userPaused = false;
     resumeAfterPause = false;
     if (audioPausedByUs) {
@@ -469,12 +521,14 @@ class _LuckyPalaceScreenState extends State<LuckyPalaceScreen>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     backgrounded = state != AppLifecycleState.resumed;
     if (state != AppLifecycleState.resumed) {
+      _silenceMachineAudio();
       resumeAfterPause = resumeAfterPause || clock.isAnimating;
       clock.stop();
       if (drag != 0) setState(() => drag = 0);
     } else if (resumeAfterPause && !userPaused) {
       resumeAfterPause = false;
       clock.forward();
+      _resumeMachineAudio();
     }
     if (!backgrounded) unawaited(_probe());
   }
@@ -483,6 +537,8 @@ class _LuckyPalaceScreenState extends State<LuckyPalaceScreen>
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (MediaQuery.disableAnimationsOf(context) && clock.isAnimating) {
+      machineSound.cancel();
+      _silenceMachineAudio();
       clock.stop();
       clock.value = 1;
     }
@@ -490,6 +546,8 @@ class _LuckyPalaceScreenState extends State<LuckyPalaceScreen>
 
   @override
   void dispose() {
+    machineSound.cancel();
+    _silenceMachineAudio();
     WidgetsBinding.instance.removeObserver(this);
     clock.dispose();
     networkProbe?.cancel();
@@ -599,7 +657,7 @@ class _LuckyPalaceScreenState extends State<LuckyPalaceScreen>
                             color: LuckyPalette.goldLight,
                           ),
                         ),
-                      if (financial)
+                      if (financial && widget.enableDeveloperTools)
                         PopupMenuButton<LuckyPlayMode>(
                           key: const ValueKey('lucky-options'),
                           tooltip: 'Opciones',
@@ -692,36 +750,37 @@ class _LuckyPalaceScreenState extends State<LuckyPalaceScreen>
                           }
                         },
                       ),
-                      Flexible(
-                        child: TextButton.icon(
-                          style: TextButton.styleFrom(
-                            minimumSize: const Size(48, 48),
-                            foregroundColor: LuckyPalette.goldLight,
-                          ),
-                          icon: Icon(
-                            gallery
-                                ? Icons.arrow_back_rounded
-                                : Icons.grid_view_rounded,
-                          ),
-                          onPressed: () {
-                            if (clock.isAnimating) skip();
-                            setState(() => gallery = !gallery);
-                          },
-                          label: Text(
-                            gallery
-                                ? 'Volver al gabinete'
-                                : financial &&
-                                      MediaQuery.textScalerOf(
-                                            context,
-                                          ).scale(15) >
-                                          20
-                                ? 'Símbolos'
-                                : 'Explorar símbolos',
-                            textAlign: TextAlign.center,
-                            style: LuckyPalette.text(15),
+                      if (widget.enableDeveloperTools)
+                        Flexible(
+                          child: TextButton.icon(
+                            style: TextButton.styleFrom(
+                              minimumSize: const Size(48, 48),
+                              foregroundColor: LuckyPalette.goldLight,
+                            ),
+                            icon: Icon(
+                              gallery
+                                  ? Icons.arrow_back_rounded
+                                  : Icons.grid_view_rounded,
+                            ),
+                            onPressed: () {
+                              if (clock.isAnimating) skip();
+                              setState(() => gallery = !gallery);
+                            },
+                            label: Text(
+                              gallery
+                                  ? 'Volver al gabinete'
+                                  : financial &&
+                                        MediaQuery.textScalerOf(
+                                              context,
+                                            ).scale(15) >
+                                            20
+                                  ? 'Símbolos'
+                                  : 'Explorar símbolos',
+                              textAlign: TextAlign.center,
+                              style: LuckyPalette.text(15),
+                            ),
                           ),
                         ),
-                      ),
                     ],
                   ),
                 ),
@@ -736,13 +795,19 @@ class _LuckyPalaceScreenState extends State<LuckyPalaceScreen>
   Future<void> _openScratch() async {
     final resume = clock.isAnimating;
     clock.stop();
+    _silenceMachineAudio();
     final local = localRepository;
     await Navigator.push<void>(
       context,
       MaterialPageRoute(
+        settings: const RouteSettings(name: '/lucky-palace/scratch'),
         builder: (_) => ScratchScreen(
+          store: widget.store,
           repository: local is LocalLuckyRoundRepository
-              ? ScratchLocalRepository(local.storage)
+              ? ScratchLocalRepository(
+                  local.storage,
+                  rulesVersion: ScratchRules.enhancedVersion,
+                )
               : null,
         ),
       ),
@@ -758,7 +823,24 @@ class _LuckyPalaceScreenState extends State<LuckyPalaceScreen>
     }
     if (!mounted) return;
     setState(() {});
-    if (resume && !userPaused && !backgrounded) clock.forward();
+    if (resume && !userPaused && !backgrounded) {
+      clock.forward();
+      _resumeMachineAudio();
+    }
+  }
+
+  Future<void> _openPrizes() async {
+    final local = localRepository;
+    if (widget.store == null || local is! LocalLuckyRoundRepository) return;
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute(
+        settings: const RouteSettings(name: '/lucky-palace/prizes'),
+        builder: (_) =>
+            LuckyPrizeScreen(storage: local.storage, store: widget.store!),
+      ),
+    );
+    if (mounted) await _load(local);
   }
 
   Widget _status() => FittedBox(
@@ -1113,29 +1195,30 @@ class _LuckyPalaceScreenState extends State<LuckyPalaceScreen>
         onPressed: _paytable,
         icon: const Icon(Icons.info_outline_rounded),
       ),
-      PopupMenuButton<LuckyPlayMode>(
-        key: const ValueKey('lucky-options'),
-        tooltip: 'Opciones',
-        icon: const Icon(
-          Icons.more_vert_rounded,
-          color: LuckyPalette.goldLight,
+      if (widget.enableDeveloperTools)
+        PopupMenuButton<LuckyPlayMode>(
+          key: const ValueKey('lucky-options'),
+          tooltip: 'Opciones',
+          icon: const Icon(
+            Icons.more_vert_rounded,
+            color: LuckyPalette.goldLight,
+          ),
+          enabled: !presentationActive,
+          onSelected: (v) => unawaited(_selectMode(v)),
+          itemBuilder: (_) => [
+            for (final item in LuckyPlayMode.values)
+              PopupMenuItem(
+                value: item,
+                key: ValueKey('lucky-mode-${item.name}'),
+                child: Text(switch (item) {
+                  LuckyPlayMode.local => 'Jugar con fichas',
+                  LuckyPlayMode.online => 'Prueba de servidor',
+                  LuckyPlayMode.motor => 'Laboratorio del motor',
+                  LuckyPlayMode.demo => 'Demostraciones visuales',
+                }),
+              ),
+          ],
         ),
-        enabled: !presentationActive,
-        onSelected: (v) => unawaited(_selectMode(v)),
-        itemBuilder: (_) => [
-          for (final item in LuckyPlayMode.values)
-            PopupMenuItem(
-              value: item,
-              key: ValueKey('lucky-mode-${item.name}'),
-              child: Text(switch (item) {
-                LuckyPlayMode.local => 'Jugar con fichas',
-                LuckyPlayMode.online => 'Prueba de servidor',
-                LuckyPlayMode.motor => 'Laboratorio del motor',
-                LuckyPlayMode.demo => 'Demostraciones visuales',
-              }),
-            ),
-        ],
-      ),
     ],
   );
 
@@ -1252,26 +1335,39 @@ class _LuckyPalaceScreenState extends State<LuckyPalaceScreen>
         icon: const Icon(Icons.confirmation_number_outlined),
       ),
       Expanded(
-        child: Semantics(
-          label: gallery ? 'Volver al gabinete' : 'Explorar símbolos',
-          onTap: _toggleGallery,
-          excludeSemantics: true,
-          button: true,
-          child: TextButton.icon(
-            key: const ValueKey('lucky-symbols'),
-            onPressed: () {
-              if (clock.isAnimating) skip();
-              setState(() => gallery = !gallery);
-            },
-            icon: Icon(
-              gallery ? Icons.casino_outlined : Icons.grid_view_rounded,
-            ),
-            label: Text(
-              gallery ? 'Gabinete' : 'Símbolos',
-              style: LuckyPalette.text(15),
-            ),
-          ),
-        ),
+        child: widget.enableDeveloperTools
+            ? Semantics(
+                label: gallery ? 'Volver al gabinete' : 'Explorar símbolos',
+                onTap: _toggleGallery,
+                excludeSemantics: true,
+                button: true,
+                child: TextButton.icon(
+                  key: const ValueKey('lucky-symbols'),
+                  onPressed: () {
+                    if (clock.isAnimating) skip();
+                    setState(() => gallery = !gallery);
+                  },
+                  icon: Icon(
+                    gallery ? Icons.casino_outlined : Icons.grid_view_rounded,
+                  ),
+                  label: Text(
+                    gallery ? 'Gabinete' : 'Símbolos',
+                    style: LuckyPalette.text(15),
+                  ),
+                ),
+              )
+            : TextButton.icon(
+                key: const ValueKey('lucky-prizes'),
+                onPressed:
+                    widget.store == null ||
+                        localRepository is! LocalLuckyRoundRepository ||
+                        presentationActive ||
+                        waiting
+                    ? null
+                    : _openPrizes,
+                icon: const Icon(Icons.card_giftcard_rounded),
+                label: const Text('Premios'),
+              ),
       ),
     ],
   );
@@ -1351,7 +1447,7 @@ class _LuckyPalaceScreenState extends State<LuckyPalaceScreen>
 
   Widget _machine(bool portrait) => Column(
     children: [
-      if (!financial)
+      if (!financial && widget.enableDeveloperTools)
         SizedBox(
           height: 48,
           child: Row(
@@ -1490,7 +1586,9 @@ class _LuckyPalaceScreenState extends State<LuckyPalaceScreen>
     builder: (context) => AlertDialog(
       backgroundColor: LuckyPalette.night,
       title: Text(
-        'Tabla candidata · créditos de prueba',
+        widget.enableDeveloperTools
+            ? 'Tabla candidata · créditos de prueba'
+            : 'Tabla de premios · fichas del casino',
         style: LuckyPalette.text(22, title: true),
       ),
       content: SizedBox(
@@ -1561,7 +1659,9 @@ class _LuckyPalaceScreenState extends State<LuckyPalaceScreen>
               ),
               const SizedBox(height: 8),
               Text(
-                'Reglas: ${payRules.rulesVersion} · ${payRules.catalogVersion}. Tabla pendiente de aprobación económica. Local conserva fichas y bonus; Online utiliza únicamente saldo sintético. Motor y Demo son talleres visuales sin cartera.',
+                widget.enableDeveloperTools
+                    ? 'Reglas: ${payRules.rulesVersion} · ${payRules.catalogVersion}.'
+                    : 'Usa tus fichas en Premios para canjear monedas y prendas exclusivas. Cada premio se obtiene una sola vez. Los giros de pago y los raspes revelados cuentan para desbloquearlos. Si quedan menos de 25 fichas y no tienes giros gratis pendientes, puedes recargar 500 gratis.',
                 style: LuckyPalette.text(13, color: LuckyPalette.goldLight),
               ),
             ],

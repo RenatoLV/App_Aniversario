@@ -98,11 +98,17 @@ void main() {
       expect(GameStore(prefs).catCare.stock(CatFood.salmon), 0);
     },
   );
-  test('Wardrobe has fifteen unique garments per category and ten foods', () {
-    expect(catWardrobe.length, 60);
-    expect(catWardrobe.map((item) => item.id).toSet().length, 60);
+  test('Wardrobe keeps sixty shop garments plus six casino exclusives', () {
+    expect(catWardrobe.length, 66);
+    expect(catWardrobe.map((item) => item.id).toSet().length, 66);
+    expect(catWardrobe.where((item) => item.casinoExclusive).length, 6);
     for (final slot in ClothingSlot.values) {
-      expect(catWardrobe.where((item) => item.slot == slot).length, 15);
+      expect(
+        catWardrobe
+            .where((item) => item.slot == slot && !item.casinoExclusive)
+            .length,
+        15,
+      );
     }
     expect(CatFood.values.length, 10);
   });

@@ -75,7 +75,12 @@ void main() {
       );
       final delayed = DelayedRepository(base);
       await tester.pumpWidget(
-        MaterialApp(home: LuckyPalaceScreen(localRepository: delayed)),
+        MaterialApp(
+          home: LuckyPalaceScreen(
+            enableDeveloperTools: true,
+            localRepository: delayed,
+          ),
+        ),
       );
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('lucky-spin')));
@@ -151,7 +156,10 @@ void main() {
                   ).copyWith(textScaler: TextScaler.linear(textScale)),
                   child: child!,
                 ),
-                home: LuckyPalaceScreen(localRepository: repo),
+                home: LuckyPalaceScreen(
+                  enableDeveloperTools: true,
+                  localRepository: repo,
+                ),
               ),
             ),
           );
@@ -298,7 +306,12 @@ void main() {
       final rng = FixedStops([14, 6, 3, 9, 10]);
       final repo = LocalLuckyRoundRepository(LuckyDatabase(db), random: rng);
       await tester.pumpWidget(
-        MaterialApp(home: LuckyPalaceScreen(localRepository: repo)),
+        MaterialApp(
+          home: LuckyPalaceScreen(
+            enableDeveloperTools: true,
+            localRepository: repo,
+          ),
+        ),
       );
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('lucky-spin')));
@@ -354,7 +367,10 @@ void main() {
       );
       await tester.pumpWidget(
         MaterialApp(
-          home: LuckyPalaceScreen(localRepository: FaultRepository(base)),
+          home: LuckyPalaceScreen(
+            enableDeveloperTools: true,
+            localRepository: FaultRepository(base),
+          ),
         ),
       );
       await tester.pumpAndSettle();
@@ -419,6 +435,7 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           home: LuckyPalaceScreen(
+            enableDeveloperTools: true,
             localRepository: local,
             connectSandbox: () async => remote,
           ),
@@ -468,7 +485,10 @@ void main() {
               ).copyWith(textScaler: const TextScaler.linear(2)),
               child: child!,
             ),
-            home: LuckyPalaceScreen(localRepository: failing),
+            home: LuckyPalaceScreen(
+              enableDeveloperTools: true,
+              localRepository: failing,
+            ),
           ),
         ),
       );
@@ -566,7 +586,10 @@ void main() {
               ).copyWith(textScaler: const TextScaler.linear(2)),
               child: child!,
             ),
-            home: LuckyPalaceScreen(localRepository: base),
+            home: LuckyPalaceScreen(
+              enableDeveloperTools: true,
+              localRepository: base,
+            ),
           ),
         ),
       );

@@ -1,0 +1,59 @@
+{
+  "sources": [
+    {
+      "name": "ratchet",
+      "title": "Revolver Spin",
+      "author": "ryansitz",
+      "page": "https://freesound.org/people/ryansitz/sounds/505698/",
+      "download": "https://cdn.freesound.org/previews/505/505698_5800259-hq.mp3",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "file": "ratchet.mp3",
+      "sha256": "1d25bb1e1fd90d81869e704956d4ec10f081fe0b45ad0267bc675569d3cc0b5d",
+      "sourceFormat": "Public HQ MP3 preview of the CC0 recording; not the original WAV"
+    },
+    {
+      "name": "coins",
+      "title": "slot machine payout.wav",
+      "author": "jack126guy",
+      "page": "https://freesound.org/people/jack126guy/sounds/361346/",
+      "download": "https://cdn.freesound.org/previews/361/361346_5506271-hq.mp3",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "file": "coins.mp3",
+      "sha256": "e88df32f0e49441893110506a0e430acdeb0eb639946ad898e8b7bf6bc971a6f",
+      "sourceFormat": "Public HQ MP3 preview of the CC0 recording; not the original WAV"
+    }
+  ],
+  "processing": "mono 44.1kHz PCM16; 100Hz high-pass, 9.5kHz low-pass, 4:1 compression, RMS normalization, soft limiting and fades; continuous ratchet section crossfaded, extracted ratchet transient",
+  "files": [
+    {
+      "file": "casino_spin.wav",
+      "seconds": 2.94,
+      "rate": 44100,
+      "channels": 1,
+      "peak": 0.7683734767263272,
+      "rms": 0.10500098269659108,
+      "sha256": "3d3bccc0ac17c00ee91e1b2ed6dc2e97c0a4cd0e15447e1530d0c4fc78d47793"
+    },
+    {
+      "file": "casino_stop.wav",
+      "seconds": 0.14,
+      "rate": 44100,
+      "channels": 1,
+      "peak": 0.7521509265090462,
+      "rms": 0.11131400067778169,
+      "sha256": "fc0cc65aba193d7a39be8e042374759305cdf376f865baf1146d95cb318d218a"
+    },
+    {
+      "file": "casino_payout.wav",
+      "seconds": 1.9,
+      "rate": 44100,
+      "channels": 1,
+      "peak": 0.6449756496642937,
+      "rms": 0.12209948533738162,
+      "sha256": "a3cc8cf7d688cd0922068fe9d47121613c24a3014dc1297b2e41c406fcbdc390"
+    }
+  ],
+  "audit": "Technical checks only. Timbre/listening approval pending user audition."
+}

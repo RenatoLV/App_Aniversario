@@ -225,6 +225,30 @@ class _FoilPainter extends CustomPainter {
               i / 16,
             )!.withValues(alpha: alpha * .7),
         );
+        // Glitter and curled foil follow the finger, never the hidden outcome.
+        final shimmer = Paint()
+          ..color =
+              (i.isEven ? const Color(0xffffdc85) : const Color(0xffefb7d9))
+                  .withValues(alpha: alpha * .85)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.2;
+        if (i % 3 == 0) {
+          final r = 2.5 + drift * 2;
+          canvas.drawLine(p + Offset(-r, 0), p + Offset(r, 0), shimmer);
+          canvas.drawLine(p + Offset(0, -r), p + Offset(0, r), shimmer);
+        } else {
+          canvas.drawArc(
+            Rect.fromCenter(
+              center: p + const Offset(3, -3),
+              width: 5,
+              height: 3,
+            ),
+            drift * 4,
+            2.5,
+            false,
+            shimmer,
+          );
+        }
       }
     }
     canvas.restore();

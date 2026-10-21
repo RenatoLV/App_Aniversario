@@ -1,12 +1,24 @@
 # Anivermaru
 
+Guía técnica completa: [cómo funciona el código, tecnologías, diseño de Maru y Lady e inventario de archivos](GUIA_COMPLETA_DEL_PROYECTO.md).
+
+Lucky Palace y Patita de la Suerte están disponibles desde los minijuegos, con un saldo local compartido de fichas del casino, guardado y recuperación de partidas. Los accesos normales activan los premios locales v2; las partidas antiguas terminan con sus reglas originales. Las fichas están separadas de las monedas y la colección de la app. [Plan y avances](app/LUCKY_PALACE_PLAN.md).
+
+[Auditoría histórica 3.5 y condiciones de la etapa 4](app/LUCKY_PALACE_STAGE4_READINESS.md): comparación de giros de 10/25, fuentes/precios reales y arquitectura transaccional. Sus restricciones sobre economía conectada no impiden jugar con las fichas locales.
+
 Estado actualizado (30/09/2026): el backend activo es **Firebase**, no Supabase. Android y web conservan datos locales sin internet y reintentan sincronizar al recuperar conexión con la app abierta o al volver a abrirla. Ver [ESTADO_SISTEMA.md](ESTADO_SISTEMA.md) para el resumen completo de cambios, verificaciones y pendientes; [app/FIREBASE.md](app/FIREBASE.md) para configuración.
 
 Aplicación Flutter de aniversario con juegos, Maru y Lady animados, sobres holográficos y una colección local de memes convertidos en cartas. El mismo proyecto funciona en web y Android.
 
-El repositorio incluye **334 memes**, **27 cartas celestiales animadas** y seis cartas de ejemplo (367 entradas en el álbum). Las celestiales aparecen en los sobres Momazos vol. 1 y vol. 2 con probabilidad de 1% por apertura. Se reproducen en la apertura, colección y AR Android. Los sobres cuestan 50 monedas; el primero de cada día local cuesta 20. Para añadir GIF: [app/CELESTIAL_CARDS.md](app/CELESTIAL_CARDS.md).
+El repositorio incluye **334 memes**, **27 cartas celestiales animadas** y seis cartas de ejemplo (367 entradas en el álbum). Las celestiales aparecen en los sobres Momazos vol. 1 y vol. 2 con probabilidad de 1% por apertura. Se reproducen en la apertura, colección y AR Android. Los sobres normales empiezan en 20 monedas y aumentan 5 por apertura hasta un máximo de 70; el contador se reinicia cada día local. El sobre celestial cuesta 5000 monedas. Para añadir GIF: [app/CELESTIAL_CARDS.md](app/CELESTIAL_CARDS.md).
 
 ## Qué incluye
+
+- Lucky Palace y los raspes comparten un mostrador **Premios**: 200 monedas (5 partidas / 75 fichas), Amuleto de la suerte (10 / 150), Gafas Estrella de la noche (15 / 220), Traje Royal Maru (20 / 300), Medallón Maruzonita (25 / 420), Corona Lucky Palace (35 / 600), Traje Noche de confeti (40 / 750), 1200 monedas (50 / 900) y Cofre del primer año de 2000 monedas (75 / 1500). Cada giro de pago y cada raspe revelado cuenta, también los anteriores a esta actualización. Cada premio se canjea una sola vez; las seis prendas son exclusivas del casino y se equipan en la casita. El canje conserva un recibo para recuperar una entrega interrumpida sin otro cobro. La interfaz normal oculta símbolos, modos y controles de laboratorio.
+- Casino y raspe comparten cuatro canciones locales: Milky (Bomberman Hero), Pipo Pipo (Serani Poji), Garfield explode the internet! (nobonoko) y Ninjin loves you yeah! instrumental. Continúan entre ambos juegos y el mostrador de premios, con los controles existentes de música, volumen y siguiente canción.
+- Cada 21 se alternan seis celebraciones al cambiar de menú: globos del primer año, huellitas, globos de gato, corazones, estrellas fugaces y serpentinas. Son finitas, permiten tocar los controles y respetan la preferencia de reducir animaciones.
+
+- Cada día 21, según la fecha local del dispositivo, el inicio recibe con «¡Feliz maruversario!», globos y besitos animados. Maru y Lady tienen una torta de dos pisos con fresas y vela número 1 durante todo el día, en todas sus actividades. La celebración se actualiza a medianoche y al volver a la app; se repite cada mes y respeta la opción de reducir animaciones.
 
 - Marus vs Zombies, desde los juegos del Patio: campaña de seis mundos y 60
   misiones, once gatos defensores, Roombas, atún, poderes humanos, terreno especial,

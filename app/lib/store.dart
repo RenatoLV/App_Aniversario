@@ -13,6 +13,7 @@ export 'celestial_cards.dart';
 import 'cat_character.dart';
 import 'progress_sync.dart';
 import 'note_cloud.dart';
+import 'lucky_palace/lucky_prizes.dart';
 
 const anniversaryCollectionId = 'momazos-v1-anniversary';
 const anniversaryCollectionTitle = 'MOMAZOS VOL. 1';
@@ -147,6 +148,25 @@ class GameStore extends ChangeNotifier {
   int coins = 30, best = 0;
   final Set<String> _wordleRewards = {};
   final Set<String> _gameRewards = {};
+  static const maruversaryGiftId = 'maruversary:first-year:gift';
+  bool get maruversaryGiftClaimed => _gameRewards.contains(maruversaryGiftId);
+  Future<void> claimMaruversaryGift() =>
+      rewardGameCoins(maruversaryGiftId, 1200);
+  bool ownsCasinoPrize(String id) =>
+      _gameRewards.contains(luckyPrize(id).claimId);
+  String get casinoPrizeOwner => prefs.getString('firebase.owner') ?? 'guest';
+  Future<void> deliverCasinoPrize(String id) async {
+    final prize = luckyPrize(id);
+    if (_gameRewards.add(prize.claimId)) {
+      coins += prize.coins;
+      if (prize.clothingId != null) {
+        await catCare.unlockClothing(clothingById(prize.clothingId)!);
+      }
+    }
+    await save();
+    if (saveError != null) throw StateError(saveError!);
+  }
+
   static const achievementRewards = <String, (String, int)>{
     'sweet:5': ('Candy: llegar al nivel 5', 500),
     'sweet:10': ('Candy: llegar al nivel 10', 1500),
@@ -576,6 +596,7 @@ class GameStore extends ChangeNotifier {
     final garment = clothingById(item.id);
     if (garment == null) return false;
     if (catCare.ownsClothing(garment)) return true;
+    if (garment.casinoExclusive) return false;
     if (coins < garment.price) return false;
     coins -= garment.price;
     await catCare.unlockClothing(garment);

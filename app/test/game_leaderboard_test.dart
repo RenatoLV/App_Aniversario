@@ -98,7 +98,7 @@ void main() {
     await tester.pumpWidget(RinconApp(store: store));
     expect(find.text('Compartir / unirme al bloc'), findsNothing);
     await tester.scrollUntilVisible(
-      find.text('Ver clasificación').first,
+      find.text('Ver clasificación'),
       150,
       scrollable: find.byType(Scrollable).first,
     );

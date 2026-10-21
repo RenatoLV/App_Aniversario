@@ -94,7 +94,11 @@ void main() {
             ),
             child: child!,
           ),
-          home: LuckyPalaceScreen(random: rng, onRound: rounds.add),
+          home: LuckyPalaceScreen(
+            enableDeveloperTools: true,
+            random: rng,
+            onRound: rounds.add,
+          ),
         ),
       );
       await tester.pumpAndSettle();
@@ -145,7 +149,11 @@ void main() {
           data: MediaQuery.of(context).copyWith(disableAnimations: true),
           child: child!,
         ),
-        home: LuckyPalaceScreen(random: rng, onRound: rounds.add),
+        home: LuckyPalaceScreen(
+          enableDeveloperTools: true,
+          random: rng,
+          onRound: rounds.add,
+        ),
       ),
     );
     await tester.tap(find.byKey(const ValueKey('lucky-spin')));
@@ -194,7 +202,11 @@ void main() {
       tester,
       MaterialApp(
         debugShowCheckedModeBanner: false,
-        home: LuckyPalaceScreen(random: rng, onRound: rounds.add),
+        home: LuckyPalaceScreen(
+          enableDeveloperTools: true,
+          random: rng,
+          onRound: rounds.add,
+        ),
       ),
     );
     await tester.tap(find.byKey(const ValueKey('lucky-spin')));
@@ -238,6 +250,7 @@ void main() {
       MaterialApp(
         debugShowCheckedModeBanner: false,
         home: LuckyPalaceScreen(
+          enableDeveloperTools: true,
           random: StopsRandom([14, 6, 3, 9, 10]),
           onRound: rounds.add,
         ),
