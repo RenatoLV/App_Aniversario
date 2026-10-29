@@ -6,11 +6,14 @@
         android:layout_width="match_parent" android:layout_height="match_parent" />
 
     <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content"
-        android:layout_gravity="bottom|center_horizontal" android:layout_marginBottom="16dp" android:orientation="horizontal">
+        android:layout_gravity="center_vertical|start" android:layout_marginStart="16dp" android:orientation="vertical">
         <Button android:id="@+id/ucg_overlay_pause" android:layout_width="56dp" android:layout_height="48dp" android:layout_margin="4dp"
             android:background="@drawable/uncanny_overlay_button" android:text="Ⅱ" android:textColor="#CCFFFFFF" android:textSize="20sp" android:contentDescription="Pausa" />
         <Button android:id="@+id/ucg_overlay_retry" android:layout_width="56dp" android:layout_height="48dp" android:layout_margin="4dp"
             android:background="@drawable/uncanny_overlay_button" android:text="↻" android:textColor="#CCFFFFFF" android:textSize="24sp" android:contentDescription="Reiniciar" />
+    </LinearLayout>
+    <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:layout_gravity="center_vertical|end" android:layout_marginEnd="16dp" android:orientation="vertical">
         <Button android:id="@+id/ucg_overlay_parry" android:layout_width="56dp" android:layout_height="48dp" android:layout_margin="4dp"
             android:background="@drawable/uncanny_overlay_button" android:text="◇" android:textColor="#CCFFFFFF" android:textSize="24sp" android:contentDescription="Parry" />
         <Button android:id="@+id/ucg_overlay_exit" android:layout_width="56dp" android:layout_height="48dp" android:layout_margin="4dp"

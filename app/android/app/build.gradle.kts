@@ -15,6 +15,14 @@ android {
         // expensive decompression of the entire original game on startup.
         noCompress += "pck"
     }
+    if (providers.gradleProperty("target-platform").orNull == "android-arm64") {
+        // Newer Flutter plugins reset defaultConfig ABI filters after the DSL.
+        // Apply the same restriction at packaging so transitive AARs cannot
+        // reintroduce libraries for architectures without a Flutter engine.
+        packaging.jniLibs.excludes += setOf(
+            "lib/armeabi-v7a/**", "lib/x86/**", "lib/x86_64/**"
+        )
+    }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -24,6 +32,11 @@ android {
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = "cl.nuestrorincon.nuestro_rincon"
+        // The published APK is ARM64. Also filter transitive Godot JNI libraries;
+        // Flutter's --target-platform alone only filters Flutter's libraries.
+        if (providers.gradleProperty("target-platform").orNull == "android-arm64") {
+            ndk { abiFilters += "arm64-v8a" }
+        }
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion

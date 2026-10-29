@@ -2,8 +2,10 @@ package cl.nuestrorincon.nuestro_rincon
 
 import android.os.Bundle
 import android.os.SystemClock
+import android.content.pm.ActivityInfo
 import android.view.KeyEvent
 import android.view.WindowManager
+import androidx.activity.OnBackPressedCallback
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -16,7 +18,8 @@ import org.godotengine.godot.Godot
 class UncannyGolfActivity : GodotActivity() {
     override fun getGodotAppLayout() = R.layout.uncanny_golf
     override fun getCommandLine() = mutableListOf(
-        "--main-pack", "res://uncanny/uncanny-mobile.pck", "--rendering-method", "gl_compatibility"
+        "--main-pack", "res://uncanny/uncanny-mobile.pck", "--rendering-method", "gl_compatibility",
+        "res://uncanny/mobile_landscape.tscn"
     )
 
     private lateinit var game: FrameLayout
@@ -30,6 +33,11 @@ class UncannyGolfActivity : GodotActivity() {
         bindKey(R.id.ucg_overlay_retry, KeyEvent.KEYCODE_R)
         bindKey(R.id.ucg_overlay_parry, KeyEvent.KEYCODE_SHIFT_LEFT)
         bindKey(R.id.ucg_overlay_exit, KeyEvent.KEYCODE_F10)
+        // Android 13+ predictive back otherwise backgrounds the task without
+        // reaching GodotActivity's legacy onBackPressed implementation.
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() = sendKey(KeyEvent.KEYCODE_ESCAPE)
+        })
     }
 
     override fun onGodotForceQuit(instance: Godot) {
@@ -42,7 +50,10 @@ class UncannyGolfActivity : GodotActivity() {
     }
 
     override fun onGodotMainLoopStarted() {
-        runOnUiThread { enterFullscreen() }
+        runOnUiThread {
+            requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+            enterFullscreen()
+        }
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
@@ -59,16 +70,17 @@ class UncannyGolfActivity : GodotActivity() {
     }
 
     private fun bindKey(id: Int, code: Int) {
-        findViewById<View>(id).setOnClickListener {
-            val now = SystemClock.uptimeMillis()
-            godot?.renderView?.inputHandler?.onKeyDown(code,
-                KeyEvent(now, now, KeyEvent.ACTION_DOWN, code, 0))
-            // Keep the key pressed for physics frames, rather than losing both
-            // transitions between consecutive Godot input polls.
-            game.postDelayed({
-                godot?.renderView?.inputHandler?.onKeyUp(code,
-                    KeyEvent(now, SystemClock.uptimeMillis(), KeyEvent.ACTION_UP, code, 0))
-            }, 60)
-        }
+        findViewById<View>(id).setOnClickListener { sendKey(code) }
+    }
+
+    private fun sendKey(code: Int) {
+        val now = SystemClock.uptimeMillis()
+        godot?.renderView?.inputHandler?.onKeyDown(code,
+            KeyEvent(now, now, KeyEvent.ACTION_DOWN, code, 0))
+        // Keep the key pressed long enough for a physics frame.
+        game.postDelayed({
+            godot?.renderView?.inputHandler?.onKeyUp(code,
+                KeyEvent(now, SystemClock.uptimeMillis(), KeyEvent.ACTION_UP, code, 0))
+        }, 60)
     }
 }

@@ -39,14 +39,18 @@ def prepare(source, godot):
     config = config.replace('config/custom_user_dir_name="Uncanny Cat Golf"',
                             'config/custom_user_dir_name="Anivermaru Uncanny Cat Golf"')
     config = config.replace('run/main_scene="uid://blipbbly572f5"',
-                            'run/main_scene="res://mobile_portrait.tscn"')
+                            'run/main_scene="res://uncanny/mobile_landscape.tscn"')
     config = config.replace('window/stretch/mode="canvas_items"',
-        'window/stretch/mode="canvas_items"\nwindow/stretch/aspect="expand"\nwindow/handheld/orientation=1')
+        'window/stretch/mode="canvas_items"\nwindow/stretch/aspect="expand"\nwindow/handheld/orientation=4')
     config += '\n[input_devices]\npointing/emulate_mouse_from_touch=true\n'
     project.write_text(config, encoding='utf-8')
     for path in (APP / 'tool/uncanny_mobile').iterdir():
         if path.suffix in {'.gd', '.tscn'}:
             shutil.copy2(path, stage / path.name)
+    (stage / 'uncanny').mkdir(exist_ok=True)
+    for name in ('mobile_landscape.gd', 'mobile_landscape.tscn'):
+        shutil.copy2(APP / 'android/app/src/main/assets/uncanny' / name,
+                     stage / 'uncanny' / name)
     # Keep the original content, but avoid nested parallel resource loads on
     # mobile's smaller worker pool (shared scene dependencies can deadlock).
     world = stage / 'assetsNEW/scenes/utils/world.gd'

@@ -1,5 +1,92 @@
 # Uncanny Cat Golf original: integración Android
 
+## Revisión del cierre en release y presentación horizontal (29/10/2026)
+
+Se descargó y examinó la APK publicada **v1.11.0-build1032** del commit
+`fec3ce6`. Sus DEX no conservan las definiciones originales de `Dictionary` y
+`GodotRenderView`, aunque la biblioteca
+nativa de Godot contiene referencias a esos nombres. Las reglas anteriores
+solo conservaban métodos `native`; no protegían clases ni métodos Java llamados
+desde C++. **Confirmado con logcat del Xiaomi 14T (2406APNFAG), Android 16**:
+el proceso `:uncanny_golf` aborta con SIGABRT durante `GodotLib.initialize` por
+`NoSuchMethodError` al buscar `Godot.restart()V` y `Godot.setKeepScreenOn(Z)V`.
+La optimización de release rompe así el arranque antes de cargar el juego.
+
+Se protege `org.godotengine.**` contra eliminación y renombrado por R8. La nueva
+comprobación `python tool/verify_uncanny_apk.py RUTA_APK` inspecciona las clases
+realmente definidas en los DEX después de R8, las referencias del motor nativo,
+los métodos de arranque llamados desde JNI, las arquitecturas, la escena
+horizontal y el tamaño/hash/compresión del PCK.
+Se ejecuta en CI sobre la APK final antes de publicar. La APK 1032 falla esta
+comprobación por esas clases y métodos. Las cadenas antiguas `InputManagerCompat`
+e `InputManagerV16` también aparecen en el binario nativo, pero esas clases no
+existen ni en el AAR original de Maven; se excluyen de la comprobación.
+
+La Activity solicita **sensorLandscape** y la escena móvil reafirma horizontal
+en Godot, pues la configuración del PCK anterior todavía solicita vertical.
+El nuevo punto de entrada es `res://uncanny/mobile_landscape.tscn`, incluido como
+asset Android junto al PCK verificado: permite conservar exactamente el paquete
+original descargado. Las futuras exportaciones también incluyen esa escena.
+La escena presenta un único cuadro de **768×512 (3:2)**, con su HUD original,
+centrado mediante escala uniforme y bandas laterales. Ya no separa el logo, los
+indicadores ni la cancha. Los toques y arrastres se transforman a las coordenadas
+originales; una captura conserva el arrastre al salir del cuadro. Pausa, reinicio,
+Parry y salida siguen siendo botones transparentes a los lados.
+
+Métricas verificadas del artefacto publicado:
+
+| Elemento | Bytes | Observación |
+| --- | ---: | --- |
+| APK 1032 | 1.020.371.006 | Aproximadamente 973 MiB |
+| PCK original | 553.807.328 | Aproximadamente 528 MiB, sin compresión ZIP |
+| Godot x86_64 | 76.487.192 | Innecesario en la distribución ARM64 |
+| Godot armeabi-v7a | 76.303.400 | Innecesario en la distribución ARM64 |
+| Godot arm64-v8a | 69.115.776 | Arquitectura de la distribución |
+
+Se filtran también las bibliotecas JNI transitivas al compilar para ARM64.
+Eliminar las otras dos bibliotecas supone unos 153 MB menos antes de considerar
+otros cambios de compilación. A 844×390, el cuadro completo mide 585×390; la
+cancha original de 512×512 mide 390×390. A 740×360, el cuadro mide 540×360 y la
+cancha 360×360. No hay recorte ni estiramiento. Estas son métricas de geometría
+y empaquetado; no equivalen a FPS, RAM ni estabilidad medidos en un teléfono.
+Con los 2340×1080 indicados para el A55 en horizontal, el cuadro completo mide
+1620×1080, la cancha 1080×1080 y quedan dos bandas laterales de 360 píxeles.
+
+Validación de esta corrección:
+
+- Análisis Flutter sin incidencias; prueba del lanzador aprobada.
+- APK completa compilada en **release** para ARM64, build local 1033:
+  **866.828.729 bytes** (826,7 MiB), frente a 1.020.371.006 bytes de la 1032:
+  reducción de **153.542.277 bytes** (15,0 %).
+- `verify_uncanny_apk.py` aprobado sobre esa APK: cinco clases JNI, ocho métodos
+  de arranque, solo ARM64, escena horizontal idéntica al código y PCK original
+  íntegro, con SHA-256 y tamaño verificados.
+- App nativa de prueba separada (`cl.nuestrorincon.uncannytest`) compilada con R8,
+  misma Activity/escena/recursos/PCK y comprobación de APK aprobada. Evita
+  reemplazar la instalación real, porque la clave local no coincide con la firma
+  de la release oficial. Instalada tras aceptar el aviso de instalación por USB.
+- Arranque y presentación horizontal observados en el Xiaomi 14T. Se recorrieron
+  pantallas originales y se alcanzó el tutorial; el usuario confirmó haber
+  probado personalmente las partes del juego. No equivale a una auditoría
+  exhaustiva de todos los mapas.
+- Se observó además un SIGTRAP al crear una segunda Activity con el motor ya
+  inicializado. La Activity usa ahora `singleTask`; dos aperturas consecutivas
+  por ADB conservaron el mismo proceso (PID 14590), sin crear otro motor.
+- En Android 16, Atrás mandaba la tarea al fondo por la navegación predictiva.
+  Se registra un `OnBackPressedCallback` para enviar la misma pausa que el botón
+  superpuesto. Un regreso al launcher durante la prueba anterior coincidió con
+  una pulsación Atrás enviada por el agente; el proceso siguió vivo.
+- Muestras observadas del SurfaceView: aproximadamente 60 FPS. Memoria PSS del
+  proceso entre unos 878 MiB y 1,3 GiB durante la prueba, con RSS de hasta 1,5 GiB.
+  Son muestras puntuales, no un benchmark prolongado ni una medida en el A55.
+  El consumo de memoria sigue siendo elevado.
+
+La APK local no actualiza la app publicada debido a la diferencia de firma.
+La distribución final debe compilarse con la firma preservada del workflow.
+
+Las verificaciones históricas siguientes corresponden a la adaptación vertical
+anterior y a una APK de depuración. No validaban la optimización de release.
+
 La versión final ejecuta el proyecto original en **Godot 4.4.1**, la misma versión que declara el EXE entregado. Se retiró la recreación 2D en Flutter; una copia local de ese prototipo se conserva fuera de Git en `.tools/uncanny-flutter-prototype`.
 
 ## Contenido comprobado

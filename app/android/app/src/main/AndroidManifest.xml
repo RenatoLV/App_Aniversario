@@ -6,7 +6,8 @@
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity android:name=".UncannyGolfActivity" android:exported="false"
-            android:process=":uncanny_golf" android:screenOrientation="portrait"
+            android:launchMode="singleTask"
+            android:process=":uncanny_golf" android:screenOrientation="sensorLandscape"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|screenLayout|uiMode"
             android:theme="@android:style/Theme.Material.NoActionBar" />
         <activity android:name=".CameraCardActivity" android:exported="false"

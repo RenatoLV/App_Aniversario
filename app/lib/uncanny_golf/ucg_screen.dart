@@ -61,7 +61,7 @@ class _UncannyGolfScreenState extends State<UncannyGolfScreen> {
           ),
           const SizedBox(height: 12),
           const Text(
-            'Los mapas, personajes, modelos, sonidos y menús del juego original, ejecutados con Godot. Pantalla completa vertical y controles transparentes para jugar desde Anivermaru.',
+            'Los mapas, personajes, modelos, sonidos y menús del juego original, ejecutados con Godot. Pantalla completa horizontal, presentación original de PC y controles transparentes para jugar desde Anivermaru.',
             style: TextStyle(color: Color(0xffccd6ef), fontSize: 16),
           ),
           const SizedBox(height: 24),

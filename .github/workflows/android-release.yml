@@ -69,6 +69,7 @@ jobs:
           flutter analyze --no-pub
           flutter test --concurrency=2
           flutter build apk --release --target-platform android-arm64 --build-number "$ANDROID_BUILD_NUMBER"
+          python3 tool/verify_uncanny_apk.py build/app/outputs/flutter-apk/app-release.apk
           (cd android && ./gradlew :app:testDebugUnitTest -Ptarget-platform=android-arm64)
           node tool/prepare_release.cjs
       - name: Publish APK and update metadata
