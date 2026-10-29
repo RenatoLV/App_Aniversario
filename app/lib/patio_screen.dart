@@ -353,7 +353,7 @@ class _PatioScreenState extends State<PatioScreen>
                             ),
                             SizedBox(height: 5),
                             Text(
-                              'Golf arcade en 5 mundos con Maru, Lady y Canny.\nControles táctiles para móvil y premios por rango.',
+                              'El juego original de Uncanny Cat Golf.\nPantalla horizontal y controles transparentes.',
                               style: TextStyle(fontSize: 12),
                             ),
                           ],

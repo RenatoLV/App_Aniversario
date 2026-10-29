@@ -1032,7 +1032,7 @@ class _RinconHomeState extends State<RinconHome>
         eyebrow: 'GOLF ARCADE Y CAOS GATUNO',
         title: 'Uncanny Cat Golf',
         description:
-            'El juego original con sus mapas, personajes, música y menús. Godot y controles táctiles en vertical para Android.',
+            'Los mapas, personajes, música y menús originales, en horizontal y con controles táctiles transparentes para Android.',
         icon: Icons.sports_golf_rounded,
         colors: const [Color(0xff1e3c47), Color(0xff2e7b68)],
         accent: const Color(0xff80ffdb),
