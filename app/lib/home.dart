@@ -42,6 +42,7 @@ import 'bomber/bomber_screen.dart';
 import 'lucky_palace/lucky_palace_screen.dart';
 import 'lucky_palace/casino_balance_badge.dart';
 import 'lucky_palace/scratch/scratch_screen.dart';
+import 'uncanny_golf/ucg_screen.dart';
 
 const ink = Color(0xff293f39),
     cream = Color(0xfffaf6ee),
@@ -429,6 +430,8 @@ class _RinconHomeState extends State<RinconHome>
                 ? '/lucky-palace'
                 : screen is ScratchScreen
                 ? '/lucky-palace/scratch'
+                : screen is UncannyGolfScreen
+                ? '/uncanny-golf'
                 : '/blocks',
           ),
           builder: (_) => screen,
@@ -1021,6 +1024,19 @@ class _RinconHomeState extends State<RinconHome>
         colors: const [Color(0xff593068), Color(0xffa34477)],
         accent: const Color(0xffffe6a0),
         onTap: () => _play(ScratchScreen(store: s)),
+      ),
+      const SizedBox(height: 24),
+      _gameSpotlight(
+        gameId: 'uncanny-cat-golf',
+        showLeaderboard: false,
+        eyebrow: 'GOLF ARCADE Y CAOS GATUNO',
+        title: 'Uncanny Cat Golf',
+        description:
+            'El juego original con sus mapas, personajes, música y menús. Godot y controles táctiles en vertical para Android.',
+        icon: Icons.sports_golf_rounded,
+        colors: const [Color(0xff1e3c47), Color(0xff2e7b68)],
+        accent: const Color(0xff80ffdb),
+        onTap: () => _play(UncannyGolfScreen(store: s)),
       ),
       const SizedBox(height: 24),
       Wrap(

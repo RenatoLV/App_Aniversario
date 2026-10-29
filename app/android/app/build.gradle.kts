@@ -10,6 +10,11 @@ android {
     namespace = "cl.nuestrorincon.nuestro_rincon"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = "28.2.13676358"
+    androidResources {
+        // Godot seeks directly within its pack; ZIP compression would force
+        // expensive decompression of the entire original game on startup.
+        noCompress += "pck"
+    }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -63,5 +68,7 @@ flutter {
 }
 
 dependencies {
+    // Same engine version as the supplied original Windows executable.
+    implementation("org.godotengine:godot:4.4.1.stable")
     testImplementation("junit:junit:4.13.2")
 }

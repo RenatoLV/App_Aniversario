@@ -11,11 +11,11 @@ abstract final class MzArt {
   static const grass = Color(0xff58a442), grassLight = Color(0xff79bb4e);
   static const grassDark = Color(0xff3b8538), earth = Color(0xff795638);
   // Maru and Lady's markings come from cat_character.dart, with thematic accents.
-  static const maruFur = Color(0xff797565), maruStripe = Color(0xff2b302b);
-  static const maruChest = Color(0xffd2c3a5), maruEyes = Color(0xffc8ce7d);
-  static const ladyFur = Color(0xfffbf7ee), ladyMask = Color(0xff4b4745);
-  static const ladyCrown = Color(0xffe4bc86), ladyEyes = Color(0xffc6a05c);
-  static const pink = Color(0xffe5a0a8);
+  static const maruFur = Color(0xff72695a), maruStripe = Color(0xff232623);
+  static const maruChest = Color(0xffe1d4b8), maruEyes = Color(0xffd0d978);
+  static const ladyFur = Color(0xfffdfaf4), ladyMask = Color(0xff323032);
+  static const ladyCrown = Color(0xffe2ae76), ladyEyes = Color(0xffd8ab56);
+  static const pink = Color(0xffeb9ca8);
   static const contact = Color(0xff465267), rim = Color(0xffffefd1);
   static const anticipationSeconds = .18;
   static const attackSeconds = .24, hurtSeconds = .20;

@@ -1,5 +1,44 @@
 import 'package:flutter/material.dart';
 
+class LuckyChipPack {
+  const LuckyChipPack(
+    this.id,
+    this.name,
+    this.chips,
+    this.coinCost,
+    this.icon,
+  );
+  final String id, name;
+  final int chips, coinCost;
+  final IconData icon;
+}
+
+/// Buying chips with coins is intentionally priced higher in coins-per-chip
+/// (3.0 to 4.0 coins per chip) than the one-time chip-to-coin prizes.
+const luckyChipPacks = [
+  LuckyChipPack(
+    'pack_50',
+    'Bolsa de fichas',
+    50,
+    200,
+    Icons.toll_rounded,
+  ),
+  LuckyChipPack(
+    'pack_150',
+    'Montón de fichas',
+    150,
+    525,
+    Icons.generating_tokens_rounded,
+  ),
+  LuckyChipPack(
+    'pack_400',
+    'Cofre VIP de fichas',
+    400,
+    1200,
+    Icons.diamond_rounded,
+  ),
+];
+
 class LuckyPrize {
   const LuckyPrize(
     this.id,

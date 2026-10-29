@@ -55,6 +55,18 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "anivermaru/uncanny_golf")
+            .setMethodCallHandler { call, result ->
+                if (call.method != "launch") {
+                    result.notImplemented()
+                } else try {
+                    assets.open("uncanny/uncanny-mobile.pck").close()
+                    startActivity(Intent(this, UncannyGolfActivity::class.java))
+                    result.success(null)
+                } catch (_: Exception) {
+                    result.error("unavailable", "No se pudo abrir el juego original.", null)
+                }
+            }
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "anivermaru/updates")
             .setMethodCallHandler { call, result ->
                 when (call.method) {

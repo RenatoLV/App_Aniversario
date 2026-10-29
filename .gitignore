@@ -20,3 +20,6 @@ supabase/activation.local.txt
 supabase/seed.local.sql
 supabase/deploy.local.sql
 app/config.local.json
+
+# Original Godot pack is versioned as a verified GitHub release asset.
+app/android/app/src/main/assets/uncanny/*.pck

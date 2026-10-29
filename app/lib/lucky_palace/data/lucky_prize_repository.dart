@@ -43,6 +43,24 @@ class LuckyPrizeRepository {
 
   Future<LuckyPrizeProgress> progress() => storage.transaction(_progress);
 
+  Future<int> creditPurchasedChips(int chips, {required int coinCost}) =>
+      storage.transaction((tx) async {
+        if (chips <= 0) throw ArgumentError.value(chips, 'chips');
+        if (await luckyRecords.record('local.intent').exists(tx) ||
+            await luckyRecords.record('scratch.intent').exists(tx)) {
+          throw StateError(
+            'Recupera la partida pendiente antes de comprar fichas.',
+          );
+        }
+        final wallet = await LocalLuckyWallet.read(tx);
+        final nextBalance = (wallet['balance'] as int) + chips;
+        await LocalLuckyWallet.record.put(tx, {
+          ...wallet,
+          'balance': nextBalance,
+        });
+        return nextBalance;
+      });
+
   Future<void> redeem(String prizeId) => storage.transaction((tx) async {
     final prize = luckyPrize(prizeId);
     final receipt = luckyRecords.record('$_prefix$prizeId');

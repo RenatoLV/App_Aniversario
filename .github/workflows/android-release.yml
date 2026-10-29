@@ -64,9 +64,10 @@ jobs:
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
+          python3 tool/fetch_uncanny_pack.py
           flutter pub get
           flutter analyze --no-pub
-          flutter test
+          flutter test --concurrency=2
           flutter build apk --release --target-platform android-arm64 --build-number "$ANDROID_BUILD_NUMBER"
           (cd android && ./gradlew :app:testDebugUnitTest -Ptarget-platform=android-arm64)
           node tool/prepare_release.cjs
@@ -75,7 +76,13 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           if ! gh release view "$TAG" >/dev/null 2>&1; then
-            gh release create "$TAG" --target "$GITHUB_SHA" --title "Anivermaru $TAG" --generate-notes --latest
+            VERSION=$(sed -n 's/^version: \([^+]*\)+.*/\1/p' app/pubspec.yaml)
+            NOTES="app/docs/release-$VERSION.md"
+            if [ -f "$NOTES" ]; then
+              gh release create "$TAG" --target "$GITHUB_SHA" --title "Anivermaru $TAG" --notes-file "$NOTES" --latest
+            else
+              gh release create "$TAG" --target "$GITHUB_SHA" --title "Anivermaru $TAG" --generate-notes --latest
+            fi
           fi
           gh release upload "$TAG" app/build/release/* --clobber
       - name: Remove signing key

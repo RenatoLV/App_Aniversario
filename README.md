@@ -172,6 +172,10 @@ El importador convierte las imágenes a WebP, evita nombres duplicados y añade 
 
 ## Validación
 
+### Uncanny Cat Golf
+
+Integración Android del juego original con Godot 4.4.1, sus assets y mapas completos y controles táctiles en vertical. Juego original de **SH2K (SlappyHappy2000) y The Canny Crew**: [Uncanny Cat Golf en itch.io](https://slappyhappy2000.itch.io/uncanny-cat-golf). Créditos completos y diferencias frente al proyecto original en [la auditoría](app/docs/uncanny-audit.md); [notas de la versión 1.11.0](app/docs/release-1.11.0.md).
+
 Desde `app`:
 
 ```powershell

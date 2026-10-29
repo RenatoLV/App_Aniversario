@@ -604,6 +604,24 @@ class GameStore extends ChangeNotifier {
     return true;
   }
 
+  Future<bool> spendCoinsForCasinoChips(int coinCost) async {
+    if (coinCost <= 0 || coins < coinCost) return false;
+    coins -= coinCost;
+    await save();
+    if (saveError != null) {
+      coins += coinCost;
+      notifyListeners();
+      return false;
+    }
+    return true;
+  }
+
+  Future<void> refundCasinoChipCoins(int coinCost) async {
+    if (coinCost <= 0) return;
+    coins += coinCost;
+    await save();
+  }
+
   Future<void> save() {
     final snapshot = jsonEncode({
       'coins': coins,

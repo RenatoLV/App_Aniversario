@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'cat_character.dart';
+import 'cat_clothing.dart';
 import 'store.dart';
 import 'game_audio.dart';
 import 'cat_care_art.dart';
@@ -43,8 +44,49 @@ class _CatCareScreenState extends State<CatCareScreen>
   bool _bathFinishedDuringDrag = false;
   late final Timer _needsRefresh;
   Offset? _lastScrub;
+
+  // Interactive 360° wardrobe turntable and real-time stage try-on state.
+  double _wardrobeTurn = 0;
+  ClothingSlot? _wardrobeFilter;
+  bool _onlyOwnedFilter = false;
+  final Map<CatKind, CatOutfit> _liveTryOutfits = {};
+  CatClothing? _liveTryItem;
+
   CatCare get care => widget.store.catCare;
   String get name => _cat == CatKind.maru ? 'Maru' : 'Lady';
+
+  CatOutfit _displayedWardrobeOutfit(CatKind cat) =>
+      _liveTryOutfits[cat] ?? care.outfit(cat);
+
+  void _tryOnStage(CatClothing item) {
+    setState(() {
+      final base = _liveTryOutfits[_cat] ?? care.outfit(_cat);
+      final alreadyTrying = base.at(item.slot) == item.id && _liveTryItem?.id == item.id;
+      if (alreadyTrying) {
+        _liveTryOutfits.remove(_cat);
+        _liveTryItem = null;
+        _message = 'Volviste al conjunto guardado de $name.';
+      } else {
+        _previousOutfit = _displayedWardrobeOutfit(_cat);
+        _liveTryOutfits[_cat] = base.withItem(item.slot, item.id);
+        _liveTryItem = item;
+        _dress.forward(from: 0);
+        _message = item.casinoExclusive
+            ? 'Probando ${item.name} en vivo · Gira a $name para verlo desde todos los ángulos.'
+            : 'Probando ${item.name} en vivo (${item.price} 🪙) · Gira a $name en la tarima.';
+      }
+    });
+    _showStage();
+  }
+
+  void _clearStageTry() {
+    setState(() {
+      _liveTryOutfits.clear();
+      _liveTryItem = null;
+      _wardrobeTurn = 0;
+      _message = 'Conjunto guardado de $name.';
+    });
+  }
 
   void _showStage() {
     final context = _stageKey.currentContext;
@@ -259,6 +301,11 @@ class _CatCareScreenState extends State<CatCareScreen>
                       _dress.reset();
                       _hand = null;
                       _lastWaterTick = null;
+                      if (room != _CareRoom.wardrobe) {
+                        _wardrobeTurn = 0;
+                        _liveTryOutfits.clear();
+                        _liveTryItem = null;
+                      }
                       if (room == _CareRoom.bath) {
                         _action.repeat();
                       } else {
@@ -270,7 +317,7 @@ class _CatCareScreenState extends State<CatCareScreen>
                         _CareRoom.bath =>
                           'Jabón para hacer espuma, regadera para enjuagar',
                         _CareRoom.wardrobe =>
-                          'Combina accesorios. Se verán también en todos los juegos.',
+                          'Combina accesorios y desliza sobre $name para girarlo en 360°.',
                         _CareRoom.bedroom =>
                           'Su camita, sus colores y una carta favorita en la pared.',
                       };
@@ -477,13 +524,40 @@ class _CatCareScreenState extends State<CatCareScreen>
                 Positioned(
                   top: 18,
                   left: 18,
-                  child: Text(
-                    name,
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w800,
-                      color: light.text,
-                    ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        name,
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                          color: light.text,
+                        ),
+                      ),
+                      if (_room == _CareRoom.wardrobe &&
+                          _liveTryOutfits.containsKey(_cat)) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xff24836d),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Text(
+                            'Probador en vivo',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
                 Positioned(
@@ -524,6 +598,14 @@ class _CatCareScreenState extends State<CatCareScreen>
                       onAcceptWithDetails: (details) => _feed(details.data),
                       builder: (context, candidates, rejected) => GestureDetector(
                         key: const ValueKey('care-pelaje'),
+                        onHorizontalDragUpdate:
+                            _room == _CareRoom.wardrobe && !_busy
+                            ? (d) => setState(() {
+                                _wardrobeTurn =
+                                    (_wardrobeTurn + d.delta.dx / (size * .55))
+                                        .clamp(-1.0, 1.0);
+                              })
+                            : null,
                         onPanStart: _room == _CareRoom.bath && !_busy
                             ? (d) {
                                 _bathFinishedDuringDrag = false;
@@ -569,11 +651,16 @@ class _CatCareScreenState extends State<CatCareScreen>
                                 size: size,
                                 active: true,
                                 showLabel: false,
+                                turn: _room == _CareRoom.wardrobe
+                                    ? _wardrobeTurn
+                                    : 0,
                                 outfit:
                                     _room == _CareRoom.wardrobe &&
                                         _dress.isAnimating &&
                                         _dress.value < .46
                                     ? _previousOutfit
+                                    : _room == _CareRoom.wardrobe
+                                    ? _displayedWardrobeOutfit(_cat)
                                     : care.outfit(_cat),
                                 cleanliness:
                                     care.needs(_cat).clean +
@@ -660,6 +747,14 @@ class _CatCareScreenState extends State<CatCareScreen>
                     ),
                   ),
                 ),
+                if (_room == _CareRoom.wardrobe)
+                  Positioned(
+                    bottom: 6,
+                    child: _TurntableBar(
+                      turn: _wardrobeTurn,
+                      onChanged: (next) => setState(() => _wardrobeTurn = next),
+                    ),
+                  ),
                 if (_room == _CareRoom.food)
                   Positioned(
                     bottom: 6,
@@ -936,113 +1031,344 @@ class _CatCareScreenState extends State<CatCareScreen>
     ],
   );
 
-  Widget _wardrobe() => Column(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [
-      Text(
-        'El armario de $name',
-        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
-      ),
-      const SizedBox(height: 6),
-      Text(
-        '${catWardrobe.length} prendas · ${care.clothesOwned} tuyas · ${widget.store.coins} monedas',
-        style: TextStyle(fontSize: 12, color: Color(0xff6b8075)),
-      ),
-      const SizedBox(height: 12),
-      for (final slot in ClothingSlot.values) ...[
-        Text(switch (slot) {
-          ClothingSlot.neck => 'Collares y pañuelos',
-          ClothingSlot.head => 'Gorros',
-          ClothingSlot.eyes => 'Lentes',
-          ClothingSlot.body => 'Poleras',
-        }, style: const TextStyle(fontWeight: FontWeight.w700)),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            for (final item in catWardrobe.where((i) => i.slot == slot))
-              ActionChip(
-                key: ValueKey('wear-${item.id}'),
-                avatar: Icon(
-                  care.outfit(_cat).at(slot) == item.id
-                      ? Icons.check_circle
-                      : item.icon,
-                  color: care.outfit(_cat).at(slot) == item.id
-                      ? const Color(0xff18775d)
-                      : item.color,
-                  size: 20,
-                ),
-                label: Text(
-                  care.ownsClothing(item)
-                      ? item.name
-                      : item.casinoExclusive
-                      ? '${item.name} · Premio de Lucky Palace'
-                      : '${item.name} · ${item.price} 🪙',
-                ),
-                backgroundColor: care.outfit(_cat).at(slot) == item.id
-                    ? const Color(0xffdcefe5)
-                    : Colors.white,
-                onPressed: () async {
-                  if (!care.ownsClothing(item)) {
-                    if (item.casinoExclusive) {
-                      setState(
-                        () => _message =
-                            'Consigue esta prenda en Premios de Lucky Palace, desde los minijuegos.',
-                      );
-                      return;
-                    }
-                    final confirmed = await showDialog<bool>(
-                      context: context,
-                      builder: (context) => _ClothingPurchaseDialog(
-                        item: item,
-                        cat: _cat,
-                        outfits: {
-                          for (final cat in CatKind.values)
-                            cat: care.outfit(cat),
-                        },
+  Widget _wardrobe() {
+    final activeTryItem = _liveTryItem;
+    final visibleSlots = _wardrobeFilter == null
+        ? ClothingSlot.values
+        : [_wardrobeFilter!];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (activeTryItem != null) ...[
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            margin: const EdgeInsets.only(bottom: 14),
+            decoration: BoxDecoration(
+              color: const Color(0xffe7f5ef),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: const Color(0xff84c5ae), width: 1.5),
+            ),
+            child: Wrap(
+              spacing: 10,
+              runSpacing: 8,
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ClothingPreviewIcon(item: activeTryItem, size: 32),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        'Probando en vivo: ${activeTryItem.name}',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xff1f5747),
+                        ),
                       ),
-                    );
-                    if (confirmed != true) return;
-                    if (!await widget.store.buyCatClothing(item)) {
-                      if (mounted) {
-                        setState(
-                          () => _message =
-                              'Necesitas ${item.price} monedas para esta prenda.',
-                        );
-                      }
-                      return;
-                    }
-                  }
-                  _previousOutfit = care.outfit(_cat);
-                  _showStage();
-                  _dress.forward(from: 0);
-                  await care.equip(_cat, item);
-                  if (mounted) {
-                    setState(
-                      () => _message =
-                          'El estilo de $name se guarda para todos los juegos.',
-                    );
-                  }
-                },
+                    ),
+                  ],
+                ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (!care.ownsClothing(activeTryItem) &&
+                        !activeTryItem.casinoExclusive)
+                      FilledButton.tonalIcon(
+                        onPressed: () async {
+                          if (!await widget.store.buyCatClothing(
+                            activeTryItem,
+                          )) {
+                            if (mounted) {
+                              setState(
+                                () => _message =
+                                    'Necesitas ${activeTryItem.price} monedas para esta prenda.',
+                              );
+                            }
+                            return;
+                          }
+                          _previousOutfit = care.outfit(_cat);
+                          _liveTryOutfits.remove(_cat);
+                          _liveTryItem = null;
+                          _dress.forward(from: 0);
+                          await care.equip(_cat, activeTryItem);
+                          if (mounted) {
+                            setState(
+                              () => _message =
+                                  '¡${activeTryItem.name} comprada y equipada!',
+                            );
+                          }
+                        },
+                        icon: const Icon(Icons.shopping_bag_rounded, size: 16),
+                        label: Text('Comprar ${activeTryItem.price} 🪙'),
+                      ),
+                    const SizedBox(width: 6),
+                    TextButton.icon(
+                      onPressed: _clearStageTry,
+                      icon: const Icon(Icons.close_rounded, size: 16),
+                      label: const Text('Quitar prueba'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'El armario de $name',
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${catWardrobe.length} prendas · ${care.clothesOwned} tuyas · ${widget.store.coins} monedas',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Color(0xff6b8075),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            FilterChip(
+              selected: _onlyOwnedFilter,
+              label: const Text('Solo tuyas'),
+              onSelected: (v) => setState(() => _onlyOwnedFilter = v),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          children: [
+            ChoiceChip(
+              label: const Text('Todas'),
+              selected: _wardrobeFilter == null,
+              onSelected: (_) => setState(() => _wardrobeFilter = null),
+            ),
+            for (final slot in ClothingSlot.values)
+              ChoiceChip(
+                label: Text(switch (slot) {
+                  ClothingSlot.neck => 'Collares y pañuelos',
+                  ClothingSlot.head => 'Gorros',
+                  ClothingSlot.eyes => 'Lentes',
+                  ClothingSlot.body => 'Poleras',
+                }),
+                selected: _wardrobeFilter == slot,
+                onSelected: (_) => setState(
+                  () => _wardrobeFilter = _wardrobeFilter == slot ? null : slot,
+                ),
               ),
           ],
         ),
         const SizedBox(height: 14),
+        for (final slot in visibleSlots) ...[
+          Text(switch (slot) {
+            ClothingSlot.neck => 'Collares y pañuelos',
+            ClothingSlot.head => 'Gorros',
+            ClothingSlot.eyes => 'Lentes',
+            ClothingSlot.body => 'Poleras',
+          }, style: const TextStyle(fontWeight: FontWeight.w700)),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final item in catWardrobe.where(
+                (i) =>
+                    i.slot == slot &&
+                    (!_onlyOwnedFilter || care.ownsClothing(i)),
+              ))
+                ActionChip(
+                  key: ValueKey('wear-${item.id}'),
+                  avatar: care.outfit(_cat).at(slot) == item.id
+                      ? const Icon(
+                          Icons.check_circle,
+                          color: Color(0xff18775d),
+                          size: 20,
+                        )
+                      : ClothingPreviewIcon(item: item, size: 22),
+                  label: Text(
+                    care.ownsClothing(item)
+                        ? item.name
+                        : item.casinoExclusive
+                        ? '${item.name} · Premio de Lucky Palace'
+                        : '${item.name} · ${item.price} 🪙',
+                  ),
+                  backgroundColor: care.outfit(_cat).at(slot) == item.id
+                      ? const Color(0xffdcefe5)
+                      : _displayedWardrobeOutfit(_cat).at(slot) == item.id
+                      ? const Color(0xffedf7f2)
+                      : Colors.white,
+                  onPressed: () async {
+                    if (!care.ownsClothing(item)) {
+                      if (item.casinoExclusive) {
+                        _tryOnStage(item);
+                        setState(
+                          () => _message =
+                              'Probando ${item.name} en vivo · Consíguela en Premios de Lucky Palace.',
+                        );
+                        return;
+                      }
+                      final confirmed = await showDialog<bool>(
+                        context: context,
+                        builder: (context) => _ClothingPurchaseDialog(
+                          item: item,
+                          cat: _cat,
+                          outfits: {
+                            for (final cat in CatKind.values)
+                              cat: care.outfit(cat),
+                          },
+                          onTryOnStage: () => _tryOnStage(item),
+                        ),
+                      );
+                      if (confirmed != true) return;
+                      if (!await widget.store.buyCatClothing(item)) {
+                        if (mounted) {
+                          setState(
+                            () => _message =
+                                'Necesitas ${item.price} monedas para esta prenda.',
+                          );
+                        }
+                        return;
+                      }
+                    }
+                    _liveTryOutfits.remove(_cat);
+                    _liveTryItem = null;
+                    _previousOutfit = care.outfit(_cat);
+                    _showStage();
+                    _dress.forward(from: 0);
+                    await care.equip(_cat, item);
+                    if (mounted) {
+                      setState(
+                        () => _message =
+                            'El estilo de $name se guarda para todos los juegos.',
+                      );
+                    }
+                  },
+                ),
+            ],
+          ),
+          const SizedBox(height: 14),
+        ],
+        TextButton.icon(
+          key: const ValueKey('care-undress'),
+          onPressed: () {
+            _liveTryOutfits.remove(_cat);
+            _liveTryItem = null;
+            _previousOutfit = care.outfit(_cat);
+            _showStage();
+            _dress.forward(from: 0);
+            care.undress(_cat);
+          },
+          icon: const Icon(Icons.restart_alt_rounded),
+          label: const Text('Sin ropa ni accesorios'),
+        ),
       ],
-      TextButton.icon(
-        key: const ValueKey('care-undress'),
-        onPressed: () {
-          _previousOutfit = care.outfit(_cat);
-          _showStage();
-          _dress.forward(from: 0);
-          care.undress(_cat);
-        },
-        icon: const Icon(Icons.restart_alt_rounded),
-        label: const Text('Sin ropa ni accesorios'),
+    );
+  }
+}
+
+/// Interactive 360° turntable bar rendered on the wardrobe & showroom stages.
+class _TurntableBar extends StatelessWidget {
+  final double turn;
+  final ValueChanged<double> onChanged;
+  static const bool darkTheme = false;
+  const _TurntableBar({
+    required this.turn,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final bg = darkTheme ? const Color(0xd8251a30) : const Color(0xe6fffdf8);
+    final fg = darkTheme ? const Color(0xffffe7b3) : const Color(0xff355246);
+    final activeBg = darkTheme
+        ? const Color(0xff523868)
+        : const Color(0xffd4ece1);
+
+    Widget angleButton(String label, double target, bool selected) => InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: () => onChanged(target),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: selected ? activeBg : Colors.transparent,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+            color: fg,
+          ),
+        ),
       ),
-    ],
-  );
+    );
+
+    final isBack = turn.abs() > 0.65;
+    final isProfile = !isBack && turn.abs() >= 0.25;
+    final isFront = !isBack && !isProfile;
+
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: darkTheme
+                ? const Color(0xff806240)
+                : const Color(0xffc9dcd3),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            InkWell(
+              borderRadius: BorderRadius.circular(14),
+              onTap: () {
+                final next = turn - 0.45;
+                onChanged(next < -1.0 ? 1.0 : next.clamp(-1.0, 1.0));
+              },
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                child: Icon(Icons.rotate_left_rounded, size: 17, color: fg),
+              ),
+            ),
+            angleButton('Frente', 0.0, isFront),
+            angleButton('Perfil', 0.48, isProfile),
+            angleButton('Espalda', 1.0, isBack),
+            InkWell(
+              borderRadius: BorderRadius.circular(14),
+              onTap: () {
+                final next = turn + 0.45;
+                onChanged(next > 1.0 ? -1.0 : next.clamp(-1.0, 1.0));
+              },
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                child: Icon(Icons.rotate_right_rounded, size: 17, color: fg),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _CareScroll extends StatelessWidget {
@@ -1062,10 +1388,12 @@ class _ClothingPurchaseDialog extends StatefulWidget {
   final CatClothing item;
   final CatKind cat;
   final Map<CatKind, CatOutfit> outfits;
+  final VoidCallback? onTryOnStage;
   const _ClothingPurchaseDialog({
     required this.item,
     required this.cat,
     required this.outfits,
+    this.onTryOnStage,
   });
   @override
   State<_ClothingPurchaseDialog> createState() =>
@@ -1075,32 +1403,55 @@ class _ClothingPurchaseDialog extends StatefulWidget {
 class _ClothingPurchaseDialogState extends State<_ClothingPurchaseDialog> {
   bool _trying = false;
   late CatKind _cat = widget.cat;
+  double _turn = 0;
+
   @override
   Widget build(BuildContext context) => AlertDialog(
-    title: Text(widget.item.name),
+    title: Row(
+      children: [
+        ClothingPreviewIcon(item: widget.item, size: 34),
+        const SizedBox(width: 10),
+        Expanded(child: Text(widget.item.name)),
+      ],
+    ),
     scrollable: true,
     content: Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         if (_trying) ...[
-          Container(
-            width: double.infinity,
-            decoration: BoxDecoration(
-              color: const Color(0xfff5ecdd),
-              borderRadius: BorderRadius.circular(22),
-            ),
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            child: Center(
-              child: CatActor(
-                key: const ValueKey('clothing-preview-cat'),
-                cat: _cat,
-                size: 160,
-                active: true,
-                showLabel: false,
-                outfit: widget.outfits[_cat]!.withItem(
-                  widget.item.slot,
-                  widget.item.id,
-                ),
+          GestureDetector(
+            onHorizontalDragUpdate: (d) => setState(() {
+              _turn = (_turn + d.delta.dx / 90).clamp(-1.0, 1.0);
+            }),
+            child: Container(
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: const Color(0xfff5ecdd),
+                borderRadius: BorderRadius.circular(22),
+              ),
+              padding: const EdgeInsets.fromLTRB(8, 12, 8, 12),
+              child: Column(
+                children: [
+                  Center(
+                    child: CatActor(
+                      key: const ValueKey('clothing-preview-cat'),
+                      cat: _cat,
+                      size: 160,
+                      active: true,
+                      showLabel: false,
+                      turn: _turn,
+                      outfit: widget.outfits[_cat]!.withItem(
+                        widget.item.slot,
+                        widget.item.id,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  _TurntableBar(
+                    turn: _turn,
+                    onChanged: (next) => setState(() => _turn = next),
+                  ),
+                ],
               ),
             ),
           ),
@@ -1115,7 +1466,7 @@ class _ClothingPurchaseDialogState extends State<_ClothingPurchaseDialog> {
           ),
           const SizedBox(height: 10),
           const Text(
-            'Solo una prueba: no se guarda ni gasta monedas.',
+            'Solo una prueba: desliza para girar. No se guarda ni gasta monedas.',
             style: TextStyle(fontSize: 12),
             textAlign: TextAlign.center,
           ),
@@ -1124,6 +1475,17 @@ class _ClothingPurchaseDialogState extends State<_ClothingPurchaseDialog> {
         Text(
           'Comprar por ${widget.item.price} monedas. La prenda queda para Maru y Lady.',
         ),
+        if (widget.onTryOnStage != null) ...[
+          const SizedBox(height: 6),
+          TextButton.icon(
+            onPressed: () {
+              widget.onTryOnStage!();
+              Navigator.pop(context, false);
+            },
+            icon: const Icon(Icons.threesixty_rounded, size: 18),
+            label: const Text('Probar en la tarima principal'),
+          ),
+        ],
       ],
     ),
     actions: [
