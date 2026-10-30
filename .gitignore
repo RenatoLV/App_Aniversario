@@ -23,3 +23,7 @@ app/config.local.json
 
 # Original Godot pack is versioned as a verified GitHub release asset.
 app/android/app/src/main/assets/uncanny/*.pck
+
+# Regenerable simulation output and discarded audio candidate.
+/app/tool/lucky_math_seed_*.json
+/app/audio_sources/lucky_palace/slot-machine-designed-candidate.*
