@@ -2,7 +2,7 @@
 
 Ver [README principal](../README.md), [estado del sistema](../ESTADO_SISTEMA.md), [Firebase](FIREBASE.md) y [cámara 3D](AR_CARTAS.md).
 
-Backend activo: Firebase. Android/web guardan localmente partidas, récords, cartas y notas; la sincronización se reintenta cuando hay conexión con la app abierta o al volver a ella. Supabase y Drive son material histórico, no requisitos de ejecución.
+Backend activo: Firebase. Android/web guardan localmente partidas, récords, cartas y notas; la sincronización se reintenta cuando hay conexión con la app abierta o al volver a ella.
 
 Desde esta carpeta, con Flutter en PATH:
 

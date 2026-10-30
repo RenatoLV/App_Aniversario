@@ -76,4 +76,4 @@ Actualizado: 30 de septiembre de 2026. Resumen completo; distingue los cambios d
 6. Actualizar plugins Firebase/Android cuando soporten la nueva compatibilidad Kotlin Gradle requerida por futuras versiones de Flutter.
 7. iOS no está preparado/validado para distribución; cámara 3D e inclinación nativa son Android.
 
-Supabase/Drive permanecen como material histórico, no backend activo. Ascenso guarda récord/resumen, no restaura una simulación a mitad de salto.
+Ascenso guarda récord/resumen, no restaura una simulación a mitad de salto.

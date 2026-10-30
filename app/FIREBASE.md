@@ -75,6 +75,6 @@ Los cuatro juegos sincronizan sus récords. Bloques conserva su tablero en `rinc
 
 Storage consulta membresía en Firestore. Se habilitó `roles/firebaserules.firestoreServiceAgent` para `service-273979503185@gcp-sa-firebasestorage.iam.gserviceaccount.com`. `node tool/firebase_admin_check.cjs --diagnose-notes` permite revisar sin imprimir credenciales; `--storage-permissions` verifica y puede añadir el rol necesario (usa Firebase CLI). `--audit-leaderboard` solo lee; `--migrate-leaderboard` migra récords históricos sin disminuir marcas.
 
-Las monedas, aperturas y puntuaciones se calculan en el cliente. Las reglas protegen la propiedad y evitan sobrescrituras obsoletas, pero no prueban que una partida o una recompensa sea legítima. Antes de una competición pública o monetización se necesita validación de esas operaciones en servidor y App Check. La migración conserva los guardados de este dispositivo; no exporta datos históricos de Supabase de otros dispositivos.
+Las monedas, aperturas y puntuaciones se calculan en el cliente. Las reglas protegen la propiedad y evitan sobrescrituras obsoletas, pero no prueban que una partida o una recompensa sea legítima. Antes de una competición pública o monetización se necesita validación de esas operaciones en servidor y App Check.
 
 Los archivos del mural se guardan también localmente para uso offline. En web muchos adjuntos pueden alcanzar la cuota de almacenamiento del navegador; el error de guardado es visible. Las versiones antiguas de imágenes se conservan actualmente en Storage.

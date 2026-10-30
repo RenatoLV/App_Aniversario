@@ -1,12 +1,8 @@
 # Anivermaru
 
-Guía técnica completa: [cómo funciona el código, tecnologías, diseño de Maru y Lady e inventario de archivos](GUIA_COMPLETA_DEL_PROYECTO.md).
+Lucky Palace y Patita de la Suerte están disponibles desde los minijuegos, con un saldo local compartido de fichas del casino, guardado y recuperación de partidas. Los accesos normales activan los premios locales v2; las partidas antiguas terminan con sus reglas originales. Las fichas están separadas de las monedas y la colección de la app.
 
-Lucky Palace y Patita de la Suerte están disponibles desde los minijuegos, con un saldo local compartido de fichas del casino, guardado y recuperación de partidas. Los accesos normales activan los premios locales v2; las partidas antiguas terminan con sus reglas originales. Las fichas están separadas de las monedas y la colección de la app. [Plan y avances](app/LUCKY_PALACE_PLAN.md).
-
-[Auditoría histórica 3.5 y condiciones de la etapa 4](app/LUCKY_PALACE_STAGE4_READINESS.md): comparación de giros de 10/25, fuentes/precios reales y arquitectura transaccional. Sus restricciones sobre economía conectada no impiden jugar con las fichas locales.
-
-Estado actualizado (30/09/2026): el backend activo es **Firebase**, no Supabase. Android y web conservan datos locales sin internet y reintentan sincronizar al recuperar conexión con la app abierta o al volver a abrirla. Ver [ESTADO_SISTEMA.md](ESTADO_SISTEMA.md) para el resumen completo de cambios, verificaciones y pendientes; [app/FIREBASE.md](app/FIREBASE.md) para configuración.
+Estado actualizado (30/09/2026): el backend activo es **Firebase**. Android y web conservan datos locales sin internet y reintentan sincronizar al recuperar conexión con la app abierta o al volver a abrirla. Ver [ESTADO_SISTEMA.md](ESTADO_SISTEMA.md) para el resumen completo de cambios, verificaciones y pendientes; [app/FIREBASE.md](app/FIREBASE.md) para configuración.
 
 Aplicación Flutter de aniversario con juegos, Maru y Lady animados, sobres holográficos y una colección local de memes convertidos en cartas. El mismo proyecto funciona en web y Android.
 
@@ -126,26 +122,9 @@ flutter build apk --debug
 
 El archivo queda en `app/build/app/outputs/flutter-apk/app-debug.apk`.
 
-## Configuración histórica de Supabase (no usada por la app actual)
+## Configuración de Firebase
 
-La configuración activa está en [app/FIREBASE.md](app/FIREBASE.md). Lo siguiente describe el prototipo anterior, conservado como referencia; no se necesita para ejecutar Anivermaru.
-
-Copia `app/config.example.json` como `app/config.local.json` y reemplaza los valores de ejemplo:
-
-```json
-{
-  "SUPABASE_URL": "https://TU_PROYECTO.supabase.co",
-  "SUPABASE_PUBLISHABLE_KEY": "sb_publishable_REEMPLAZAR"
-}
-```
-
-Después inicia Flutter así:
-
-```powershell
-flutter run -d chrome --dart-define-from-file=config.local.json
-```
-
-Las migraciones están en `supabase/migrations/`. Los códigos de activación, archivos de despliegue local y configuraciones reales están ignorados por Git. No publiques claves privadas, JWT, contraseñas ni la clave `service_role`.
+Consulta [app/FIREBASE.md](app/FIREBASE.md) para configurar el backend activo.
 
 ## Memes y cartas
 
@@ -186,10 +165,8 @@ flutter test
 ## Estructura
 
 - `app/`: aplicación Flutter, assets y herramientas de importación.
-- `supabase/migrations/`: esquema SQL y políticas RLS.
-- `integrations/drive/`: prototipo opcional de integración privada con Google Drive.
 - `memes/por_agregar/`: instrucciones para preparar futuros lotes de imágenes.
 
 ## Datos y seguridad
 
-Firebase protege datos por UID y membresía del mural; los rankings son comunes a usuarios autenticados. Monedas, cartas, partidas y notas tienen guardado local y sincronización posterior. Los conflictos entre dispositivos conservan ambas versiones para elegir. Antes de distribuir: firma release estable, validación física de cámara/inclinación, App Check y validación de puntuaciones/recompensas en servidor. No subir credenciales privadas ni claves de firma. Supabase/Drive son material histórico, no backend activo.
+Firebase protege datos por UID y membresía del mural; los rankings son comunes a usuarios autenticados. Monedas, cartas, partidas y notas tienen guardado local y sincronización posterior. Los conflictos entre dispositivos conservan ambas versiones para elegir. Antes de distribuir: firma release estable, validación física de cámara/inclinación, App Check y validación de puntuaciones/recompensas en servidor. No subir credenciales privadas ni claves de firma.
